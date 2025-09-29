@@ -129,7 +129,7 @@ export function prodRemotePlugin(
 
                 function get(name, ${REMOTE_FROM_PARAMETER}) {
                     return __federation_import(name).then(module => () => {
-                        if (${REMOTE_FROM_PARAMETER} === 'webpack') {
+                        if ((globalThis.__federation_shared_remote_from__ ?? ${REMOTE_FROM_PARAMETER}) === 'webpack') {
                             return Object.prototype.toString.call(module).indexOf('Module') > -1 && module.default ? module.default : module
                         }
                         return module
@@ -147,21 +147,12 @@ export function prodRemotePlugin(
                 }
 
                 const wrapShareModule = ${REMOTE_FROM_PARAMETER} => {
+                  globalThis.__federation_shared_remote_from__ = ${REMOTE_FROM_PARAMETER};
                   return merge({
                     ${getModuleMarker('shareScope')}
                   }, (globalThis.__federation_shared__ || {})['${shareScope}'] || {});
                 }
-
-                const factoryESInterop = (remote, factory) => {
-                  if (remote.format === 'var') {
-                    // CJS interop compatibility in nested federations
-                    // in case loaded shareScope is ESM
-                    return __federation_method_unwrapDefault(factory);
-                  } else {
-                    return factory;
-                  }
-                }
-
+                
                 async function __federation_import(name) {
                     currentImports[name] ??= import(name)
                     return currentImports[name]
@@ -181,7 +172,7 @@ export function prodRemotePlugin(
                                         remote.lib.init(wrapShareModule(remote.from));
                                         remote.inited = true;
                                     }
-                                    resolve(remote);
+                                    resolve(remote.lib);
                                 }
                                 return loadJS(remote.url, callback);
                             });
@@ -198,13 +189,13 @@ export function prodRemotePlugin(
                                             remote.lib.init(shareScope);
                                             remote.inited = true;
                                         }
-                                        resolve(remote);
+                                        resolve(remote.lib);
                                     }).catch(reject)
                                 })
                             })
                         }
                     } else {
-                        return remote;
+                        return remote.lib;
                     }
                 }
 
@@ -224,9 +215,8 @@ export function prodRemotePlugin(
 
                 function __federation_method_getRemote(remoteName, componentName) {
                     return __federation_method_ensure(remoteName).then(async (remote) => {
-                      const factory = await remote.lib.get(componentName);
-                      const interopFactory = factoryESInterop(remote, factory);
-                      return interopFactory();
+                      const factory = await remote.get(componentName);
+                      return factory();
                     });
                 }
 
@@ -300,12 +290,14 @@ export function prodRemotePlugin(
       if (builderInfo.isHost) {
         if (id === '\0virtual:__federation__') {
           const res: string[] = []
+          console.log('parsed options prod shared', parsedOptions.prodShared)
           parsedOptions.prodShared.forEach((arr) => {
             const obj = arr[1]
             let str = ''
             if (typeof obj === 'object') {
+              console.log('Replacing host code', arr)
               const fileUrl = `import.meta.ROLLUP_FILE_URL_${obj.emitFile}`
-              str += `get:()=>get(${fileUrl}, ${REMOTE_FROM_PARAMETER}), loaded:1`
+              str += `get:() => get(${fileUrl}, ${REMOTE_FROM_PARAMETER}), loaded:1`
               // If interop === 'cjs', unwrap ESM namespace to default before seeding the share scope.
               // Otherwise (default 'esm'), keep the module as-is.
               // const needsCJS = obj.interop === 'cjs'
@@ -315,7 +307,13 @@ export function prodRemotePlugin(
               res.push(`'${arr[0]}':{'${obj.version}':{${str}}}`)
             }
           })
-          return code.replace(getModuleMarker('shareScope'), res.join(','))
+          const moduleMarker = getModuleMarker('shareScope')
+          console.log('Module marker', moduleMarker)
+          const replacement = res.join(', ')
+          console.log('Replacement:', replacement)
+          const replacedCode = code.replace(moduleMarker, replacement)
+          console.debug('Replaced code', replacedCode)
+          return replacedCode
         }
       }
 

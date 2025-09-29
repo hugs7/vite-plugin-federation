@@ -76,7 +76,7 @@ const loadJS = async (url, fn) => {
 }
 function get(name, ${REMOTE_FROM_PARAMETER}){
   return import(/* @vite-ignore */ name).then(module => ()=> {
-    if (${REMOTE_FROM_PARAMETER} === 'webpack') {
+    if ((globalThis.__federation_shared_remote_from__ ?? ${REMOTE_FROM_PARAMETER}) === 'webpack') {
       return Object.prototype.toString.call(module).indexOf('Module') > -1 && module.default ? module.default : module
     }
     return module
