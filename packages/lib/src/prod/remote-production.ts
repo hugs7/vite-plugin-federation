@@ -299,13 +299,7 @@ export function prodRemotePlugin(
               res.push(`'${arr[0]}':{'${obj.version}':{${str}}}`)
             }
           })
-          const moduleMarker = getModuleMarker('shareScope')
-          console.log('Module marker', moduleMarker)
-          const replacement = res.join(', ')
-          console.log('Replacement:', replacement)
-          const replacedCode = code.replace(moduleMarker, replacement)
-          console.debug('Replaced code', replacedCode)
-          return replacedCode
+          return code.replace(getModuleMarker('shareScope'), res.join(','))
         }
       }
 

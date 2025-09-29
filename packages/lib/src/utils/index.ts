@@ -251,6 +251,5 @@ export function getFileExtname(url: string): string {
   return path.extname(fileName)
 }
 
-export const REMOTE_FORMAT_PARAMETER = 'remoteFormat'
 export const REMOTE_FROM_PARAMETER = 'remoteFrom'
 export const NAME_CHAR_REG = new RegExp('[0-9a-zA-Z@_-]+')
