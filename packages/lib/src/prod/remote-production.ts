@@ -152,6 +152,16 @@ export function prodRemotePlugin(
                   }, (globalThis.__federation_shared__ || {})['${shareScope}'] || {});
                 }
 
+                const factoryESInterop = (remote, factory) => {
+                  if (remote.format === 'var') {
+                    // CJS interop compatibility in nested federations
+                    // in case loaded shareScope is ESM
+                    return __federation_method_unwrapDefault(factory);
+                  } else {
+                    return factory;
+                  }
+                }
+
                 async function __federation_import(name) {
                     currentImports[name] ??= import(name)
                     return currentImports[name]
@@ -215,14 +225,8 @@ export function prodRemotePlugin(
                 function __federation_method_getRemote(remoteName, componentName) {
                     return __federation_method_ensure(remoteName).then(async (remote) => {
                       const factory = await remote.lib.get(componentName);
-                      const module = factory();
-                      if (remote.format === 'var') {
-                        // CJS interop compatibility in nested federations
-                        // in case loaded shareScope is ESM
-                        return __federation_method_unwrapDefault(module);
-                      } else {
-                        return module;
-                      }
+                      const interopFactory = factoryESInterop(remote, factory);
+                      return interopFactory();
                     });
                 }
 
