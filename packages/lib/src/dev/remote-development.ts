@@ -141,7 +141,7 @@ function __federation_method_wrapDefault(module ,need){
   return module; 
 }
 
-function __federation_method_getRemote(remoteName,  componentName){
+function __federation_method_getRemote(remoteName, componentName) {
   return __federation_method_ensure(remoteName).then((remote) => remote.get(componentName).then(factory => factory()));
 }
 
@@ -395,7 +395,9 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
         const idx = moduleFilePath.indexOf(cwdPath)
 
         const relativePath =
-          idx === 0 ? posix.join(base, moduleFilePath.slice(cwdPath.length)) : null
+          idx === 0
+            ? posix.join(base, moduleFilePath.slice(cwdPath.length))
+            : null
 
         const sharedName = item[0]
         const obj = item[1]
@@ -406,7 +408,7 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
           const url = origin
             ? `'${origin}${pathname}'`
             : `window.location.origin+'${pathname}'`
-          str += `get:()=> get(${url}, ${REMOTE_FROM_PARAMETER})`
+          str += `get:() => get(${url}, ${REMOTE_FROM_PARAMETER})`
           res.push(`'${sharedName}':{'${obj.version}':{${str}}}`)
         }
       }
