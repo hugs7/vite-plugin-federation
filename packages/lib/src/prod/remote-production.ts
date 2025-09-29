@@ -290,20 +290,12 @@ export function prodRemotePlugin(
       if (builderInfo.isHost) {
         if (id === '\0virtual:__federation__') {
           const res: string[] = []
-          console.log('parsed options prod shared', parsedOptions.prodShared)
           parsedOptions.prodShared.forEach((arr) => {
             const obj = arr[1]
             let str = ''
             if (typeof obj === 'object') {
-              console.log('Replacing host code', arr)
               const fileUrl = `import.meta.ROLLUP_FILE_URL_${obj.emitFile}`
               str += `get:() => get(${fileUrl}, ${REMOTE_FROM_PARAMETER}), loaded:1`
-              // If interop === 'cjs', unwrap ESM namespace to default before seeding the share scope.
-              // Otherwise (default 'esm'), keep the module as-is.
-              // const needsCJS = obj.interop === 'cjs'
-              // str += `get:()=>get(${fileUrl}, ${REMOTE_FROM_PARAMETER})${
-              //   needsCJS ? '.then(m=>__federation_method_unwrapDefault(m))' : ''
-              // }, loaded:1`
               res.push(`'${arr[0]}':{'${obj.version}':{${str}}}`)
             }
           })
