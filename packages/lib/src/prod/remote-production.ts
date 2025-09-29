@@ -34,6 +34,7 @@ import {
   createRemotesMap,
   getModuleMarker,
   parseRemoteOptions,
+  REMOTE_FORMAT_PARAMETER,
   REMOTE_FROM_PARAMETER,
   injectToHead,
   toPreloadTag
@@ -146,11 +147,39 @@ export function prodRemotePlugin(
                   return mergedObj;
                 }
 
-                const wrapShareModule = ${REMOTE_FROM_PARAMETER} => {
-                  return merge({
+                const wrapShareModule = (${REMOTE_FORMAT_PARAMETER}, ${REMOTE_FROM_PARAMETER}) => {
+                  const scope = (globalThis.__federation_shared__ || {})['${shareScope}'] || {};
+                  const merged = {
                     ${getModuleMarker('shareScope')}
-                  }, (globalThis.__federation_shared__ || {})['${shareScope}'] || {});
-                }
+                  };
+
+                  for (const key in scope) {
+                    const versions = scope[key];
+                    const normalized = {};
+                    for (const ver in versions) {
+                      const conf = versions[ver];
+                      normalized[ver] = {
+                        ...conf,
+                        get: async () => {
+                          const mod = await conf.get();
+
+                          // If the remote is webpack/var, normalize to CJS-style (unwrap .default)
+                          if (${REMOTE_FROM_PARAMETER} === 'webpack' || ${REMOTE_FORMAT_PARAMETER} === 'var') {
+                            return (mod?.__esModule || mod?.[Symbol.toStringTag] === 'Module')
+                              ? mod.default
+                              : mod;
+                          }
+
+                          // Otherwise (vite/esm), leave as is
+                          return mod;
+                        },
+                      };
+                    }
+                    merged[key] = normalized;
+                  }
+
+                  return merged;
+                };
 
                 async function __federation_import(name) {
                     currentImports[name] ??= import(name)
@@ -168,7 +197,7 @@ export function prodRemotePlugin(
                                 const callback = () => {
                                     if (!remote.inited) {
                                         remote.lib = window[remoteId];
-                                        remote.lib.init(wrapShareModule(remote.from))
+                                        remote.lib.init(wrapShareModule(remote.format, remote.from))
                                         remote.inited = true;
                                     }
                                     resolve(remote.lib);
@@ -182,7 +211,7 @@ export function prodRemotePlugin(
                                 getUrl().then(url => {
                                     import(/* @vite-ignore */ url).then(lib => {
                                         if (!remote.inited) {
-                                            const shareScope = wrapShareModule(remote.from);
+                                            const shareScope = wrapShareModule(remote.format, remote.from);
                                             lib.init(shareScope);
                                             remote.lib = lib;
                                             remote.lib.init(shareScope);
@@ -292,6 +321,12 @@ export function prodRemotePlugin(
             if (typeof obj === 'object') {
               const fileUrl = `import.meta.ROLLUP_FILE_URL_${obj.emitFile}`
               str += `get:()=>get(${fileUrl}, ${REMOTE_FROM_PARAMETER}), loaded:1`
+              // If interop === 'cjs', unwrap ESM namespace to default before seeding the share scope.
+              // Otherwise (default 'esm'), keep the module as-is.
+              // const needsCJS = obj.interop === 'cjs'
+              // str += `get:()=>get(${fileUrl}, ${REMOTE_FROM_PARAMETER})${
+              //   needsCJS ? '.then(m=>__federation_method_unwrapDefault(m))' : ''
+              // }, loaded:1`
               res.push(`'${arr[0]}':{'${obj.version}':{${str}}}`)
             }
           })
