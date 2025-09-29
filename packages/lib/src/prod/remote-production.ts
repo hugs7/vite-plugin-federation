@@ -214,10 +214,7 @@ export function prodRemotePlugin(
                 }
 
                 function __federation_method_getRemote(remoteName, componentName) {
-                    return __federation_method_ensure(remoteName).then(async (remote) => {
-                      const factory = await remote.get(componentName);
-                      return factory();
-                    });
+                    return __federation_method_ensure(remoteName).then((remote) => remote.get(componentName).then(factory => factory()));
                 }
 
                 function __federation_method_setRemote(remoteName, remoteConfig) {
