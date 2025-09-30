@@ -30,7 +30,10 @@
     "vite",
     "plugins"
   ],
-  "author": "@hugs7",
+  "author": {
+    "name": "@hugs7",
+    "url": "https://github.com/hugs7"
+  },
   "license": "UNLICENSED",
   "bugs": {
     "url": "https://github.com/hugs7/vite-plugin-federation/issues"
