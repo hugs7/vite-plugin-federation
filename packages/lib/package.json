@@ -1,6 +1,6 @@
 {
   "name": "@hugs7/vite-plugin-federation",
-  "version": "1.4.1-hugs.1",
+  "version": "1.4.1-hugs.2",
   "description": "A Vite plugin which support Module Federation.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
