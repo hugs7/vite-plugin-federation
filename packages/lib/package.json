@@ -1,6 +1,6 @@
 {
-  "name": "@originjs/vite-plugin-federation",
-  "version": "1.4.1",
+  "name": "@hugs7/vite-plugin-federation",
+  "version": "0.0.1",
   "description": "A Vite plugin which support Module Federation.",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -24,18 +24,21 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/originjs/vite-plugin-federation.git"
+    "url": "git+https://github.com/hugs7/vite-plugin-federation.git"
   },
   "keywords": [
     "vite",
     "plugins"
   ],
-  "author": "@originjs",
-  "license": "MulanPSL-2.0",
-  "bugs": {
-    "url": "https://github.com/originjs/vite-plugin-federation/issues"
+  "author": {
+    "name": "@hugs7",
+    "url": "https://github.com/hugs7"
   },
-  "homepage": "https://github.com/originjs/vite-plugin-federation#readme",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/hugs7/vite-plugin-federation/issues"
+  },
+  "homepage": "https://github.com/hugs7/vite-plugin-federation#readme",
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",

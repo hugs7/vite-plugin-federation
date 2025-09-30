@@ -3,8 +3,8 @@ English | [简体中文](./README-zh.md)
 
 <p align="center">
   <a href="https://bestpractices.coreinfrastructure.org/projects/5752"><img src="https://bestpractices.coreinfrastructure.org/projects/5752/badge"></a>
-  <a href="https://api.securityscorecards.dev/projects/github.com/originjs/vite-plugin-federation"><img src="https://api.securityscorecards.dev/projects/github.com/originjs/vite-plugin-federation/badge"></a>
-  <a href="https://github.com/originjs/vite-plugin-federation/actions/workflows/ci.yml"><img src="https://github.com/originjs/vite-plugin-federation/actions/workflows/ci.yml/badge.svg?branch=main" alt="Build Status"></a>
+  <a href="https://api.securityscorecards.dev/projects/github.com/hugs7/vite-plugin-federation"><img src="https://api.securityscorecards.dev/projects/github.com/hugs7/vite-plugin-federation/badge"></a>
+  <a href="https://github.com/hugs7/vite-plugin-federation/actions/workflows/ci.yml"><img src="https://github.com/hugs7/vite-plugin-federation/actions/workflows/ci.yml/badge.svg?branch=main" alt="Build Status"></a>
   <a href="https://www.npmjs.com/package/@originjs/vite-plugin-federation"><img src="https://badgen.net/npm/v/@originjs/vite-plugin-federation" alt="Version"></a>
   <a href="https://nodejs.org/en/about/releases/"><img src="https://img.shields.io/node/v/vite.svg" alt="Node Compatibility"></a>
   <a href="https://www.npmjs.com/package/@originjs/vite-plugin-federation"><img src="https://badgen.net/npm/license/@originjs/vite-plugin-federation" alt="License"></a>
@@ -152,29 +152,29 @@ Using remote components in templates
 
 | Examples                                                                                                                                | Host                                  | Remote                              |
 | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ----------------------------------- |
-| [basic-host-remote](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/basic-host-remote)                   | `rollup`+`esm`                        | `rollup`+`esm`                      |
-| [react-in-vue](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/react-in-vue)                             | `vite`+`esm`                          | `vite`+`esm`                        |
-| [simple-react-esm](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/simple-react-esm)                     | `rollup`+`esm`                        | `rollup`+`esm`                      |
-| [simple-react-systemjs](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/simple-react-systemjs)           | `rollup`+`systemjs`                   | `rollup`+`systemjs`                 |
-| [simple-react-webpack](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/simple-react-webpack)             | `rollup`+`systemjs`                   | `webpack`+`systemjs`                |
-| [vue2-demo](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue2-demo)                                   | `vite`+`esm`                          | `vite`+`esm`                        |
-| [vue3-advanced-demo](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-advanced-demo)                 | `vite`+`esm` <br/>`vue-router`/`pinia` | `vite`+`esm`<br/>`vue-router`/`pinia` |
-| [vue3-demo-esm](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-demo-esm)                           | `vite`+`esm`                          | `vite`+`esm`                        |
-| [vue3-demo-systemjs](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-demo-systemjs)                 | `vite`+`systemjs`                     | `vite`+`systemjs`                   |
-| [vue3-demo-webpack-esm-esm](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-esm-esm)   | `vite/webpack`+`esm`                  | `vite/webpack`+`esm`                |
-| [vue3-demo-webpack-esm-var](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-esm-var)   | `vite`+`esm`                          | `webpack`+`var`                     |
-| [vue3-demo-webpack-systemjs](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-systemjs) | `vite`+`systemjs`                     | `webpack`+`systemjs`                |
-| [react-vite](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/react-vite)                                 | `vite`+`react` | `vite` + `react`
+| [basic-host-remote](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/basic-host-remote)                   | `rollup`+`esm`                        | `rollup`+`esm`                      |
+| [react-in-vue](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/react-in-vue)                             | `vite`+`esm`                          | `vite`+`esm`                        |
+| [simple-react-esm](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/simple-react-esm)                     | `rollup`+`esm`                        | `rollup`+`esm`                      |
+| [simple-react-systemjs](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/simple-react-systemjs)           | `rollup`+`systemjs`                   | `rollup`+`systemjs`                 |
+| [simple-react-webpack](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/simple-react-webpack)             | `rollup`+`systemjs`                   | `webpack`+`systemjs`                |
+| [vue2-demo](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue2-demo)                                   | `vite`+`esm`                          | `vite`+`esm`                        |
+| [vue3-advanced-demo](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-advanced-demo)                 | `vite`+`esm` <br/>`vue-router`/`pinia` | `vite`+`esm`<br/>`vue-router`/`pinia` |
+| [vue3-demo-esm](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-demo-esm)                           | `vite`+`esm`                          | `vite`+`esm`                        |
+| [vue3-demo-systemjs](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-demo-systemjs)                 | `vite`+`systemjs`                     | `vite`+`systemjs`                   |
+| [vue3-demo-webpack-esm-esm](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-esm-esm)   | `vite/webpack`+`esm`                  | `vite/webpack`+`esm`                |
+| [vue3-demo-webpack-esm-var](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-esm-var)   | `vite`+`esm`                          | `webpack`+`var`                     |
+| [vue3-demo-webpack-systemjs](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-systemjs) | `vite`+`systemjs`                     | `webpack`+`systemjs`                |
+| [react-vite](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/react-vite)                                 | `vite`+`react` | `vite` + `react`
 
 ## Features
 ### Integration with Webpack
 It is now possible to use Module Federation without the restrictions of `Vite` and `Webpack`! That is, you can choose to use the components exposed by `vite-plugin-federation` in `Webpack` or the components exposed by `Webpack ModuleFederationPlugin` in `Vite`. But you need to pay attention to the configuration in `remotes`, for different frameworks you need to specify `remotes.from` and `remotes.format` to make them work better. A couple of example projects can be found here.
 
-* [vue3-demo-webpack-esm-esm](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-esm-esm)
+* [vue3-demo-webpack-esm-esm](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-esm-esm)
 
-* [vue3-demo-webpack-esm-var](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-esm-var)
+* [vue3-demo-webpack-esm-var](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-esm-var)
 
-* [vue3-demo-webpack-systemjs](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-systemjs)
+* [vue3-demo-webpack-systemjs](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-demo-webpack-systemjs)
 
 ⚠️ **Note:**
 1. `Vite` is relatively easy to use with the `Webpack` component, but `Webpack` is best used with the `vite-plugin-federation` component using the `esm` format, as the other formats lack complete test cases for now.
@@ -466,7 +466,7 @@ function __federation_method_setRemote(name: string, config: IRemoteConfig): voi
 interface IRemoteConfig {
     url: (() => Promise<string>) | string; 
     format: "esm" | "systemjs" | "var";   
-    from: "vite" | "webpack;
+    from: "vite" | "webpack";
 }
 ```
 
@@ -583,7 +583,7 @@ declare module "virtual:__federation__" {
 </details>
 
 Now you can load remote applications without predefining them in `vite.config`.
-- [Example vue3-demo-esm](https://github.com/originjs/vite-plugin-federation/blob/main/packages/examples/vue3-demo-esm/layout/src/Layout.vue)
+- [Example vue3-demo-esm](https://github.com/hugs7/vite-plugin-federation/blob/main/packages/examples/vue3-demo-esm/layout/src/Layout.vue)
 
 
 ## Add other example projects?
@@ -676,7 +676,7 @@ or
  }
 ```
 
-Or you can try using the plugin [`vite-plugin-top-level-await`](https://github.com/Menci/vite-plugin-top-level-await) to eliminate `top-level-await`, as demonstrated in [vue3-demo- esm](https://github.com/originjs/vite-plugin-federation/tree/main/packages/examples/vue3-demo-esm) demonstrates this usage
+Or you can try using the plugin [`vite-plugin-top-level-await`](https://github.com/Menci/vite-plugin-top-level-await) to eliminate `top-level-await`, as demonstrated in [vue3-demo- esm](https://github.com/hugs7/vite-plugin-federation/tree/main/packages/examples/vue3-demo-esm) demonstrates this usage
 
 ### Is not generating chunk properly?
 
@@ -686,7 +686,7 @@ Please check if you have started the project in `dev` mode with `vite`, currentl
 
 ### React uses federation for some questions
 
-It is recommended to check this [Issue](https://github.com/originjs/vite-plugin-federation/issues/173), which contains most of the `React` related issues
+It is recommended to check this [Issue](https://github.com/hugs7/vite-plugin-federation/issues/173), which contains most of the `React` related issues
 
 
 
@@ -724,4 +724,4 @@ declare module "router-remote/*"{}
 
 ## Wiki
 
-[Detailed design](https://github.com/originjs/vite-plugin-federation/wiki)
+[Detailed design](https://github.com/hugs7/vite-plugin-federation/wiki)

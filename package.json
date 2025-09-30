@@ -8,8 +8,8 @@
     "node": "^14.18.0 || >=16.0.0",
     "pnpm": ">=8.0.1"
   },
-  "author": "@originjs",
-  "license": "MulanPSL-2.0",
+  "author": "@hugs7",
+  "license": "UNLICENSED",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "prepare": "husky install",
