@@ -5,7 +5,6 @@ on:
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -38,7 +37,7 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           body: |
-            Please refer to [CHANGELOG.md](https://github.com/originjs/vite-plugin-federation/blob/main/packages/lib/CHANGELOG.md) for details.
+            Please refer to [CHANGELOG.md](https://github.com/hugs7/vite-plugin-federation/blob/main/packages/lib/CHANGELOG.md) for details.
       - name: Publish to npm registry
         run: |
           rm -rf packages/temp
