@@ -1,3 +1,185 @@
+# Change Log
+
+All notable changes to this project will be documented in this file.
+See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
+
+# 1.6.0 (2026-03-19)
+
+
+
+# 1.5.0 (2026-03-19)
+
+
+### Bug Fixes
+
+* add federation id null check ([6448129](https://github.com/hugs7/vite-plugin-federation/commit/644812992fc03d1c5ac53ca892d4e181880f2b7e))
+* some e2e test errors ([3812ff3](https://github.com/hugs7/vite-plugin-federation/commit/3812ff373ba02c8f1eeb868eef00141e37341b70))
+
+
+### Features
+
+* support Vite 8 by skipping manualChunks when codeSplitting is configured ([75ed6ee](https://github.com/hugs7/vite-plugin-federation/commit/75ed6ee8487eb1a8be44824528a656cf48c8a6ec))
+
+
+
+## 1.4.1-hugs.4 (2025-09-30)
+
+
+### Bug Fixes
+
+* federation id resolve namespace ([cf57ca2](https://github.com/hugs7/vite-plugin-federation/commit/cf57ca21b1b898cb2a6414eaa330b61185c61408))
+
+
+
+## 1.4.1-hugs.3 (2025-09-30)
+
+
+
+## 1.4.1-hugs.2 (2025-09-30)
+
+
+
+## 1.4.1-hugs.1 (2025-09-30)
+
+
+
+## 1.4.1-hugs.0 (2025-09-30)
+
+
+### Bug Fixes
+
+* [#45](https://github.com/hugs7/vite-plugin-federation/issues/45) ([#48](https://github.com/hugs7/vite-plugin-federation/issues/48)) ([6d7c567](https://github.com/hugs7/vite-plugin-federation/commit/6d7c567345dfef2e802b6e89382b294aaf81f8d7))
+* Add base and assetsDir to dynamicLoadingCss to support loading style file addresses using the base configuration. ([766b521](https://github.com/hugs7/vite-plugin-federation/commit/766b521ee56fd2ba15f234c5f5c0aa6336fa518f))
+* add testcase for isSameFilepath and fix bugs ([3db8a0d](https://github.com/hugs7/vite-plugin-federation/commit/3db8a0dee7510305b7f65277c0995fc4388d0b29))
+* added catch when loading js with import(...) ([#328](https://github.com/hugs7/vite-plugin-federation/issues/328)) ([97ed8f7](https://github.com/hugs7/vite-plugin-federation/commit/97ed8f7c74535260fa3d91a31b697ea4499eaccd))
+* apply cjs interop after factory loaded ([9ab0ea1](https://github.com/hugs7/vite-plugin-federation/commit/9ab0ea1ee63e071206c4610d3f98581a2be51790))
+* applying esinterop ([91a7ee4](https://github.com/hugs7/vite-plugin-federation/commit/91a7ee4a3ea23a552cdae5cac8f16b2d314856bf))
+* bug on expose-production.ts ([#680](https://github.com/hugs7/vite-plugin-federation/issues/680)) ([be78ec0](https://github.com/hugs7/vite-plugin-federation/commit/be78ec0cda8e9c1d5fdcf3d53561805af4390e42))
+* Build error when format is systemjs and minify:true is set ([4ff5523](https://github.com/hugs7/vite-plugin-federation/commit/4ff552320ee91b9012ba6b76b09f2c860646fb08))
+* build warning when opening soucemap ([3a7385c](https://github.com/hugs7/vite-plugin-federation/commit/3a7385ca35936c508223e7a40310825c275605dc))
+* cant find module semver with pnpm build ([2951a9a](https://github.com/hugs7/vite-plugin-federation/commit/2951a9aaef37cc0f99764ba5df4c9fc868e89b68))
+* check for regex in external ([#573](https://github.com/hugs7/vite-plugin-federation/issues/573)) ([7e5be49](https://github.com/hugs7/vite-plugin-federation/commit/7e5be49057be534982f1819f80e5ea9c78305498))
+* CI error ([9476f14](https://github.com/hugs7/vite-plugin-federation/commit/9476f1459387c4c47fc8e5bd2d14ad11ae8b349d))
+* circular dependencies bug ([#47](https://github.com/hugs7/vite-plugin-federation/issues/47)) ([95be98d](https://github.com/hugs7/vite-plugin-federation/commit/95be98db2833f618fbf6bd7b86309a036bc2ef3a))
+* CSS path in expose-production produce double slashes ([8df65ef](https://github.com/hugs7/vite-plugin-federation/commit/8df65ef4d31dc7f18027ed8d9101f3a7f2bfefb2))
+* **css-file-paths-formatting:** ensure CSS paths include hostname for remote module styles ([#667](https://github.com/hugs7/vite-plugin-federation/issues/667)) ([e39a86f](https://github.com/hugs7/vite-plugin-federation/commit/e39a86f578c2b71dee051f86f5fd4bd3fb76e960))
+* dependabot alerts for ecstatic ([ae8d829](https://github.com/hugs7/vite-plugin-federation/commit/ae8d829e0f739417499aebb26641e90ef5220ff9))
+* dev mode error ([47d76c7](https://github.com/hugs7/vite-plugin-federation/commit/47d76c730e8abf4f834c8b66889c5421463c0e47))
+* dev mode error because of not js type related files ([#372](https://github.com/hugs7/vite-plugin-federation/issues/372)) ([9c19ef4](https://github.com/hugs7/vite-plugin-federation/commit/9c19ef4de01b30d0e97722f50900906d5e58799f))
+* dev mode shared version is undefined ([#325](https://github.com/hugs7/vite-plugin-federation/issues/325)) ([1c2d328](https://github.com/hugs7/vite-plugin-federation/commit/1c2d32863697860edbee31bdae9d976f8f34f429))
+* dev mode throw error ([3a37701](https://github.com/hugs7/vite-plugin-federation/commit/3a377015ae0e09d650fbef4a2de1178bcd17a5c1))
+* **dev:** Append styles to head even for duplicates, fix key construction ([#683](https://github.com/hugs7/vite-plugin-federation/issues/683)) ([8381233](https://github.com/hugs7/vite-plugin-federation/commit/83812338a0de7ae5418b57e897818a64d65b74da))
+* **dev:** vite --mode always overrides configured mode ([#405](https://github.com/hugs7/vite-plugin-federation/issues/405)) ([5f899df](https://github.com/hugs7/vite-plugin-federation/commit/5f899dfb960c309b508149cc9b80cf3b50c5cff7)), closes [#404](https://github.com/hugs7/vite-plugin-federation/issues/404)
+* dynamic import failed ([#86](https://github.com/hugs7/vite-plugin-federation/issues/86)) ([3755727](https://github.com/hugs7/vite-plugin-federation/commit/37557275b0e5d663aebf4453f9d6f71db8d66e6a))
+* dynamic import incorrectly judged as remote component ([#94](https://github.com/hugs7/vite-plugin-federation/issues/94)) ([1160a6c](https://github.com/hugs7/vite-plugin-federation/commit/1160a6cc13d063574af8a4927fb0b13a07605d11))
+* eliminate circular dependencies ([bb93481](https://github.com/hugs7/vite-plugin-federation/commit/bb9348130951952955cae2dbb90a7b2be5a5e906))
+* empty dep error ([3affe92](https://github.com/hugs7/vite-plugin-federation/commit/3affe92b714c10ff0869ca7a2a3876b27b2f22e2))
+* expose the module error which is under node_modules ([#377](https://github.com/hugs7/vite-plugin-federation/issues/377)) ([8d7d85a](https://github.com/hugs7/vite-plugin-federation/commit/8d7d85ae216f0193b0608830b2f607ff2560c364))
+* exposed component imports other components that do not handle shared properly ([52f8b65](https://github.com/hugs7/vite-plugin-federation/commit/52f8b6553d3136c06714f874ed2f2724512b8ad8))
+* exposes with object values ([#233](https://github.com/hugs7/vite-plugin-federation/issues/233)) ([7ee9b53](https://github.com/hugs7/vite-plugin-federation/commit/7ee9b53a69dfa4ffe01ba0f4fa8085953bf0115a)), closes [#196](https://github.com/hugs7/vite-plugin-federation/issues/196)
+* federation will override vite `config.optimizeDeps` ([37f4e56](https://github.com/hugs7/vite-plugin-federation/commit/37f4e56b65aca67bba75f51e0b8be2798c14cbc6))
+* fix style bug when build.minify true ([#37](https://github.com/hugs7/vite-plugin-federation/issues/37)) ([eb6f9fd](https://github.com/hugs7/vite-plugin-federation/commit/eb6f9fd84a2ab615ef18e684ef065ef037672ee5))
+* fix the default import for esm ([6085594](https://github.com/hugs7/vite-plugin-federation/commit/6085594cead17943f4d8f8c8af47a1f67db22ed1))
+* flatten module return function when module default is function ([#538](https://github.com/hugs7/vite-plugin-federation/issues/538)) ([d60c019](https://github.com/hugs7/vite-plugin-federation/commit/d60c019b288eb00337e38661985850bf8b426d34))
+* Flatten module with default exports when available ([#505](https://github.com/hugs7/vite-plugin-federation/issues/505)) ([0bc4f8e](https://github.com/hugs7/vite-plugin-federation/commit/0bc4f8ec9eb7105121da823d406cfd071f7f4b65))
+* generate correct source_map when use remote code ([#366](https://github.com/hugs7/vite-plugin-federation/issues/366)) ([7956508](https://github.com/hugs7/vite-plugin-federation/commit/7956508b5921877b4e956d5feb4adc4eda48a7e2))
+* get css file path error ([#67](https://github.com/hugs7/vite-plugin-federation/issues/67)) ([0c83750](https://github.com/hugs7/vite-plugin-federation/commit/0c8375073ea2193189c4df09486919811585411a))
+* global shared modules into wrapper ([#553](https://github.com/hugs7/vite-plugin-federation/issues/553)) ([dade815](https://github.com/hugs7/vite-plugin-federation/commit/dade815d752eb863d5c276e4c5c5f6604954648a)), closes [#543](https://github.com/hugs7/vite-plugin-federation/issues/543)
+* got the wrong package.json file path in build mode ([#320](https://github.com/hugs7/vite-plugin-federation/issues/320)) ([32e266e](https://github.com/hugs7/vite-plugin-federation/commit/32e266e3ea30fa60bccad10dd37a574d34afefea))
+* import path error ([069b702](https://github.com/hugs7/vite-plugin-federation/commit/069b702d5c5b6997e83f0685c601b1750ce7926f))
+* import shared failure ([ca0056d](https://github.com/hugs7/vite-plugin-federation/commit/ca0056d49d7b2e81816292bc3af32815364306f3))
+* importShared is not a function ([#275](https://github.com/hugs7/vite-plugin-federation/issues/275)) ([0b3dfbd](https://github.com/hugs7/vite-plugin-federation/commit/0b3dfbdb2d0da4e0116ecf43cbcaf0c2fb025af8))
+* improve getSharedFromXXX detect need unwrap module V2 ([#447](https://github.com/hugs7/vite-plugin-federation/issues/447)) ([72d9b5a](https://github.com/hugs7/vite-plugin-federation/commit/72d9b5ad9bc71f3906ec18f11f45944b14bdfafc))
+* Invalid remoteEntry.js when building in watch mode ([5fc029d](https://github.com/hugs7/vite-plugin-federation/commit/5fc029df6a560c88adf7cbd047e9800c1fe10ee6)), closes [#253](https://github.com/hugs7/vite-plugin-federation/issues/253)
+* load remote from via globalThis ([abcda9c](https://github.com/hugs7/vite-plugin-federation/commit/abcda9c35b32854ccd6b3246aad44f6171c18bd5))
+* monorepo source dependency not found ([#419](https://github.com/hugs7/vite-plugin-federation/issues/419)) ([0d91439](https://github.com/hugs7/vite-plugin-federation/commit/0d9143944642e1a68405b5258bec1e68de076edf))
+* multiple version of a package loaded causes problem ([#684](https://github.com/hugs7/vite-plugin-federation/issues/684)) ([ff0527f](https://github.com/hugs7/vite-plugin-federation/commit/ff0527fa2e3784d211f9a473c671acbb3017edd3))
+* overwrite the expose's id to synchronize with building context ([#158](https://github.com/hugs7/vite-plugin-federation/issues/158)) ([3be750b](https://github.com/hugs7/vite-plugin-federation/commit/3be750bec6f7bc33203a92fbad95f65c510dcbde))
+* react shared problems ([#166](https://github.com/hugs7/vite-plugin-federation/issues/166)) ([4bb26ce](https://github.com/hugs7/vite-plugin-federation/commit/4bb26ce660abf6443d3d1c0cbb795438881f0acf)), closes [#161](https://github.com/hugs7/vite-plugin-federation/issues/161) [#161](https://github.com/hugs7/vite-plugin-federation/issues/161)
+* regexp of dynamic css matchs double quotes(") ([74f6941](https://github.com/hugs7/vite-plugin-federation/commit/74f69413b37f1b77acf0f3df31124d3c79b582d5))
+* remote shared generate: false not work V3 ([#399](https://github.com/hugs7/vite-plugin-federation/issues/399)) ([880f027](https://github.com/hugs7/vite-plugin-federation/commit/880f027c578f2f13b577536536104a1a747a15b0))
+* remote side file path generate error ([#28](https://github.com/hugs7/vite-plugin-federation/issues/28)) ([f4f8de1](https://github.com/hugs7/vite-plugin-federation/commit/f4f8de1ddb95117eeef6541ef0dc795c863ac6c5))
+* remove commented code ([d304eb3](https://github.com/hugs7/vite-plugin-federation/commit/d304eb3302ab5f944515e648151777cccc571cce))
+* remove console logs + unused code ([3464558](https://github.com/hugs7/vite-plugin-federation/commit/34645586231a4e5266e804e746e2ea346af99c79))
+* Remove unnecessary console log in prodExposePlugin ([7baff37](https://github.com/hugs7/vite-plugin-federation/commit/7baff37fbb2e8e59be508eb635cc71c8c4181980))
+* remove unnecessary function ([e58d78a](https://github.com/hugs7/vite-plugin-federation/commit/e58d78ae60d9a6f344edf4f502ad2d85181c1e2c))
+* removeNonRegLetter for chunk filename ([#621](https://github.com/hugs7/vite-plugin-federation/issues/621)) ([7e822ff](https://github.com/hugs7/vite-plugin-federation/commit/7e822ff7dcee15499a5f065e190fd73f41a9764e))
+* rename export name bug and circular dependency problems(few cases will have problems) ([#43](https://github.com/hugs7/vite-plugin-federation/issues/43)) ([e3b75bf](https://github.com/hugs7/vite-plugin-federation/commit/e3b75bf9a806a1fd5ddbdf9fe9f103951205c0af))
+* share names with special characters fail to integrate with webpack ([5421ece](https://github.com/hugs7/vite-plugin-federation/commit/5421ece7719bf93445494119b82d6e1978bfb5ee))
+* shared import fails if shared library name contains '@' or '/'(serve mode) ([#100](https://github.com/hugs7/vite-plugin-federation/issues/100)) ([fb989e9](https://github.com/hugs7/vite-plugin-federation/commit/fb989e94301ce8dc3b87bca603c3759cd86714b1))
+* shared is invalid when format is systemjs ([d700be2](https://github.com/hugs7/vite-plugin-federation/commit/d700be223c32fcd25089d5e5b1fcd5be299281e7))
+* shared lib load failed ([#338](https://github.com/hugs7/vite-plugin-federation/issues/338)) ([49b6cae](https://github.com/hugs7/vite-plugin-federation/commit/49b6caebbef899abf18cd8d62f64261aac6a18cd))
+* shared renderChunk function error ([0870de9](https://github.com/hugs7/vite-plugin-federation/commit/0870de92961a4443c23282fabc0a5017b2aa27f5))
+* sharedFilePathReg ([#567](https://github.com/hugs7/vite-plugin-federation/issues/567)) ([0a09bf0](https://github.com/hugs7/vite-plugin-federation/commit/0a09bf0ead5e763a8c32a63d554c2bdf5f3a322c))
+* stop reading server configuration when no shared ([#470](https://github.com/hugs7/vite-plugin-federation/issues/470)) ([38af31f](https://github.com/hugs7/vite-plugin-federation/commit/38af31f6095363f62f4d780bdefd698d8ac60f59))
+* The remoteEntryChunk should use the base path from the Vite config. ([352f20e](https://github.com/hugs7/vite-plugin-federation/commit/352f20e0d4b6f10ef8a86e173221b030bbd18f99))
+* the style is missing ([#302](https://github.com/hugs7/vite-plugin-federation/issues/302)) ([9a71a45](https://github.com/hugs7/vite-plugin-federation/commit/9a71a45c04a7e5bb069eada0a4899eda2f371235))
+* throw error when remote module can not find ([#524](https://github.com/hugs7/vite-plugin-federation/issues/524)) ([4ccfe4b](https://github.com/hugs7/vite-plugin-federation/commit/4ccfe4b1db309ffaa11f2c0d845150b7e14d56c1)), closes [#522](https://github.com/hugs7/vite-plugin-federation/issues/522)
+* update content hash calculate for export module ([e2bccc1](https://github.com/hugs7/vite-plugin-federation/commit/e2bccc1cf58b9f18ac1a6c27e417e4f1a8870595))
+* update remoteEntryChunk code to handle base path correctly when Vite config is present ([538e258](https://github.com/hugs7/vite-plugin-federation/commit/538e258a891e8cf640ae503feba9205fab53c1c6))
+* Updated the CSS file path generation logic in prodExposePlugin to correctly handle the base URL. ([ccec627](https://github.com/hugs7/vite-plugin-federation/commit/ccec627da3cdf408bb031cf00b1ac31bb77671be))
+* vite 2.9.0 causes manualChunks failed ([#183](https://github.com/hugs7/vite-plugin-federation/issues/183)) ([3fa77a3](https://github.com/hugs7/vite-plugin-federation/commit/3fa77a3bd590627c2c9757015d546d68e69a9316))
+* vite bug ([#32](https://github.com/hugs7/vite-plugin-federation/issues/32)) ([85722b6](https://github.com/hugs7/vite-plugin-federation/commit/85722b688a97d066722a8631fdbd1dd0e3dbd68f))
+* viteDevServer may be undefined in Nuxt ([#240](https://github.com/hugs7/vite-plugin-federation/issues/240)) ([415e2b5](https://github.com/hugs7/vite-plugin-federation/commit/415e2b5e92ebfb07328df6d3599d1fb08717f2b7)), closes [#239](https://github.com/hugs7/vite-plugin-federation/issues/239)
+* wrong shared url is generated when server.origin is configured and  dev mode. ([#383](https://github.com/hugs7/vite-plugin-federation/issues/383)) ([f67f003](https://github.com/hugs7/vite-plugin-federation/commit/f67f003076acaf7837979415f29f1e2c25fd2630))
+* wrong version of shared lib ([#256](https://github.com/hugs7/vite-plugin-federation/issues/256)) ([6a9f414](https://github.com/hugs7/vite-plugin-federation/commit/6a9f4149a3e4e5bae00710d8944a0db4c376bd67))
+
+
+### Features
+
+* add `registerPlugins` support command & chore ts ([c374843](https://github.com/hugs7/vite-plugin-federation/commit/c37484382127ea51d690291ab439648b52179082))
+* add `shared.generate` to determine if a shared file needs to be generated on the remote side ([#311](https://github.com/hugs7/vite-plugin-federation/issues/311)) ([5c6689b](https://github.com/hugs7/vite-plugin-federation/commit/5c6689bbc7d54fcd15fde63e57906ec8e8ab01b2))
+* add branch for feature dev mode ([96edf43](https://github.com/hugs7/vite-plugin-federation/commit/96edf43b1ea637b3f5c178431eade5c0b2a08277))
+* add content hash for shared libraries ([#487](https://github.com/hugs7/vite-plugin-federation/issues/487)) ([055c759](https://github.com/hugs7/vite-plugin-federation/commit/055c7591a83a1bec6aba82da2b19729c45d7f731))
+* add content hash to federation_fn_import file name ([#520](https://github.com/hugs7/vite-plugin-federation/issues/520)) ([7b88529](https://github.com/hugs7/vite-plugin-federation/commit/7b88529a80caa396b4e2cab6b8f120093578ac47))
+* add dynamic field `externalType` and demo ([1f0ddf6](https://github.com/hugs7/vite-plugin-federation/commit/1f0ddf6c9adaa533f777dc6b4b3ad7fd1edab5e5))
+* add e2e test ([de5f75f](https://github.com/hugs7/vite-plugin-federation/commit/de5f75f8a2377873430443c65d36534564736a2a))
+* add semver build ([5c6f9f5](https://github.com/hugs7/vite-plugin-federation/commit/5c6f9f522f4ecc378d00f28722f8fe74ce7db925))
+* add test case ([4521e90](https://github.com/hugs7/vite-plugin-federation/commit/4521e9008bd8f2d392d9de7e91c9920ba5a78890))
+* add util of merging options ([#54](https://github.com/hugs7/vite-plugin-federation/issues/54)) ([ceae847](https://github.com/hugs7/vite-plugin-federation/commit/ceae847c766aee7a334a05119b597d3430ba6674))
+* adds a workaround for a safari bug when loading modules async ([#617](https://github.com/hugs7/vite-plugin-federation/issues/617)) ([bbd1d89](https://github.com/hugs7/vite-plugin-federation/commit/bbd1d89de65e36698bc0e1027a76587e4989d6cd))
+* allow custom packages to be shared via packagePath (previously limited to those under node_modules) ([0d095ba](https://github.com/hugs7/vite-plugin-federation/commit/0d095ba5efe49ef951a0ad302c32292a2271adfa))
+* change to vitest ([18c7906](https://github.com/hugs7/vite-plugin-federation/commit/18c7906a4aa0345dc729d238577d3f397e39cd24))
+* change to vitest ([d50a9d1](https://github.com/hugs7/vite-plugin-federation/commit/d50a9d1764f7d11fb3a6873d3703d23aa8a0dd2a))
+* cjs interop initial commit ([4f503dd](https://github.com/hugs7/vite-plugin-federation/commit/4f503ddad1050d189412dc817bf0918535a9845b))
+* **dev:** add option for adding styles to global object instead of <head> element (for using in Shadow DOM) ([#548](https://github.com/hugs7/vite-plugin-federation/issues/548)) ([76e847a](https://github.com/hugs7/vite-plugin-federation/commit/76e847a9af25f98a3c51afd3c8cf039f6ec5ac23))
+* **dev:** added content hash for exposed modules ([#198](https://github.com/hugs7/vite-plugin-federation/issues/198)) ([2182b31](https://github.com/hugs7/vite-plugin-federation/commit/2182b316dd1cdff09de18c1d439cb32e3de21482))
+* dynamic loading of remote support & test demo ([#481](https://github.com/hugs7/vite-plugin-federation/issues/481)) ([72a1223](https://github.com/hugs7/vite-plugin-federation/commit/72a1223c55ff786d3c21f0af6146c450cd42e708))
+* enable dynamic remote loading ([#163](https://github.com/hugs7/vite-plugin-federation/issues/163)) ([1cd75ff](https://github.com/hugs7/vite-plugin-federation/commit/1cd75ffaec409bb81f15bda0d6e3543c91e81cd4))
+* exposes support types ([c967b57](https://github.com/hugs7/vite-plugin-federation/commit/c967b5735aa83fb93cf519e5e7e67ab40181ede8))
+* federation in vite dev mode ([bae2ad6](https://github.com/hugs7/vite-plugin-federation/commit/bae2ad65329b25cd97e1c1121b7c6b1214e7d1e0))
+* plugin support webpack component ([372c69c](https://github.com/hugs7/vite-plugin-federation/commit/372c69ca1a0fb6a0c333309d84b21d37fa22587b))
+* reduce lib semver chunk ([#350](https://github.com/hugs7/vite-plugin-federation/issues/350)) ([381f383](https://github.com/hugs7/vite-plugin-federation/commit/381f383355c6084da698427da362f2ca816988a5))
+* remote style split false ([#35](https://github.com/hugs7/vite-plugin-federation/issues/35)) ([ef6e6b3](https://github.com/hugs7/vite-plugin-federation/commit/ef6e6b3c6d11bbe260c2178fc0bdbf9f68f8da73))
+* remove invalid import and optimize shared replace ([#263](https://github.com/hugs7/vite-plugin-federation/issues/263)) ([58cb82e](https://github.com/hugs7/vite-plugin-federation/commit/58cb82e92ddeec907bb97a761abcfe0269aae9d7))
+* remove rollup generated empty import(import 'filename.js') ([#101](https://github.com/hugs7/vite-plugin-federation/issues/101)) ([cdc5db4](https://github.com/hugs7/vite-plugin-federation/commit/cdc5db4ae32f76a1147a3f6d4516f140b06b7648))
+* rename filename distinguish vite and rollup ([#49](https://github.com/hugs7/vite-plugin-federation/issues/49)) ([32ba2ab](https://github.com/hugs7/vite-plugin-federation/commit/32ba2aba47bb84a2f711e4fb556a2bfc27be03f7))
+* shared code split ([691b683](https://github.com/hugs7/vite-plugin-federation/commit/691b68337426cb4166cce4dc12abb5da6e5ce208))
+* shared deps module preload ([cbbf76e](https://github.com/hugs7/vite-plugin-federation/commit/cbbf76e771512120b4512609ce1e7c2faec64fcf))
+* shared package full export ([#24](https://github.com/hugs7/vite-plugin-federation/issues/24)) ([2e01598](https://github.com/hugs7/vite-plugin-federation/commit/2e0159813056574e1e7c3ce014d8574dec58e280)), closes [#25](https://github.com/hugs7/vite-plugin-federation/issues/25)
+* shared supports monoRepo ([c629a09](https://github.com/hugs7/vite-plugin-federation/commit/c629a0972222d59ab878cf72b3398d6ed9853df7))
+* support `format:systemjs` for rollup ([ea273bb](https://github.com/hugs7/vite-plugin-federation/commit/ea273bbbac44acf723d2dc6d550279585a066642))
+* support import property of shared ([d2ed02a](https://github.com/hugs7/vite-plugin-federation/commit/d2ed02a3f04949740dbecc549115daa09aec614a))
+* support multi-config for plugin ([#469](https://github.com/hugs7/vite-plugin-federation/issues/469)) ([d1b9fd4](https://github.com/hugs7/vite-plugin-federation/commit/d1b9fd4962d35c0cc1c5d451114b38f21bba4c40))
+* support requiredVersion of shared ([5a3f76c](https://github.com/hugs7/vite-plugin-federation/commit/5a3f76c9fe8fd4cd47cc0a946856d36139bad9df))
+* support rollup v3.0 ([#230](https://github.com/hugs7/vite-plugin-federation/issues/230)) ([5fb0a31](https://github.com/hugs7/vite-plugin-federation/commit/5fb0a31f7ff0e09e17f31fd0d3621db5aa9e1226))
+* support shareScope of shared ([a5e27c3](https://github.com/hugs7/vite-plugin-federation/commit/a5e27c30657c5664f7e18a1f1c8e2862a408a9bf))
+* support static import ([f882f22](https://github.com/hugs7/vite-plugin-federation/commit/f882f222bdd20b84a6ee23e8c7c56350558a7e59))
+* support version property of shared ([bf68329](https://github.com/hugs7/vite-plugin-federation/commit/bf6832943481339c669f06e3fd55ab77d7b13f49))
+* support webpack var format ([ed2a596](https://github.com/hugs7/vite-plugin-federation/commit/ed2a596a2ee20f74310e9a1e8a59a80a538b7afc))
+* switch to pnpm ([#98](https://github.com/hugs7/vite-plugin-federation/issues/98)) ([3ec352a](https://github.com/hugs7/vite-plugin-federation/commit/3ec352a1f62b833fac5bd2e03bf7e7cd6e2ad387))
+* throw error when exposes.import is invalid ([#323](https://github.com/hugs7/vite-plugin-federation/issues/323)) ([57c6bc5](https://github.com/hugs7/vite-plugin-federation/commit/57c6bc500cd7dbe4231dd1f108bc6204a1bc6329))
+* transformed AST node type ExportNamedDeclaration ([0d4b8c6](https://github.com/hugs7/vite-plugin-federation/commit/0d4b8c6385060986b4ad54259e31015448dacfc1))
+* upgrade to vite 3.0 ([cf9c9ed](https://github.com/hugs7/vite-plugin-federation/commit/cf9c9ed720aae6c7408235740c572d652a21b5ac))
+* use __rf_fn__import to replace more shared code in exposes ([#55](https://github.com/hugs7/vite-plugin-federation/issues/55)) ([3b52e13](https://github.com/hugs7/vite-plugin-federation/commit/3b52e13b679157088b940cfe3ad1b50470971457))
+* use manualChunks and input to generate shared lib ([2ffbe1b](https://github.com/hugs7/vite-plugin-federation/commit/2ffbe1b7d4ea952ce6e0597ae0cfd2f55ae0a7ea))
+* vitePreload cause an external refer error ([8d3d029](https://github.com/hugs7/vite-plugin-federation/commit/8d3d02931d2699830c661aa179e59f20f37b5d39))
+* vitePreload cause an external refer error ([#25](https://github.com/hugs7/vite-plugin-federation/issues/25)) ([485f9ff](https://github.com/hugs7/vite-plugin-federation/commit/485f9ffdf16c450de15f05bb26a8472ed720d434))
+
+
+
+
+
 ## [1.4.1](https://github.com/originjs/vite-plugin-federation/compare/v1.4.0...v1.4.1) (2025-04-12)
 
 ### Bug Fixes
@@ -535,6 +717,3 @@
 * shared package full export ([#24](https://github.com/originjs/vite-plugin-federation/issues/24)) ([2e01598](https://github.com/originjs/vite-plugin-federation/commit/2e0159813056574e1e7c3ce014d8574dec58e280)), closes [#25](https://github.com/originjs/vite-plugin-federation/issues/25)
 * use manualChunks and input to generate shared lib ([2ffbe1b](https://github.com/originjs/vite-plugin-federation/commit/2ffbe1b7d4ea952ce6e0597ae0cfd2f55ae0a7ea))
 * vitePreload cause an external refer error ([#25](https://github.com/originjs/vite-plugin-federation/issues/25)) ([485f9ff](https://github.com/originjs/vite-plugin-federation/commit/485f9ffdf16c450de15f05bb26a8472ed720d434))
-
-
-
