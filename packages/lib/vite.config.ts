@@ -7,7 +7,7 @@ export default defineConfig({
       entry: ['./src/index.ts', 'src/utils/semver/satisfy.ts'],
       formats: ['es', 'cjs']
     },
-    target: 'node14',
+    target: 'node20',
     minify: false,
     rollupOptions: {
       external: ['fs', 'path', 'crypto', 'magic-string', 'url'],
