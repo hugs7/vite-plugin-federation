@@ -79,14 +79,15 @@ beforeAll(async (s) => {
           stdio: 'inherit'
         })
       }
-      execa('pnpm', ['run', 'dev:hosts'], {cwd: testDir, stdio: 'inherit'})
-      execa('pnpm', ['run', 'serve:remotes'], {cwd: testDir, stdio: 'inherit'})
       await execa('pnpm', ['run', 'build:remotes'], {cwd: testDir, stdio: 'inherit'})
-
+      execa('pnpm', ['run', 'serve:remotes'], {cwd: testDir, stdio: 'inherit'})
+      execa('pnpm', ['run', 'dev:hosts'], {cwd: testDir, stdio: 'inherit'})
 
       const port = 5000
       // use resolved port/base from server
       viteTestUrl = `http://localhost:${port}`
+      // wait for the serve processes to bind to ports
+      await new Promise((r) => setTimeout(r, 3000))
       await page.goto(viteTestUrl)
     }
   } catch (e) {
