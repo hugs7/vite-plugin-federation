@@ -11,6 +11,6 @@ export default defineConfig({
     testTimeout: 20000
   },
   oxc: {
-    target: 'node20'
+    target: 'node22'
   }
 })

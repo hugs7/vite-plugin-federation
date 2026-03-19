@@ -24,6 +24,6 @@ export default defineConfig({
     }
   },
   oxc: {
-    target: 'node20'
+    target: 'node22'
   }
 })
