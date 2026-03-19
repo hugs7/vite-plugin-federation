@@ -1,4 +1,4 @@
-import federation from '@originjs/vite-plugin-federation';
+import federation from '@hugs7/vite-plugin-federation';
 import babel from '@rollup/plugin-babel';
 import commonjs from '@rollup/plugin-commonjs';
 import resolve from '@rollup/plugin-node-resolve';
