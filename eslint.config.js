@@ -8,15 +8,22 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['packages/*/{src,types}/**/*.ts'],
+    files: ['packages/*/{src,types}/**/*.{ts,js}'],
+    languageOptions: {
+      globals: {
+        console: 'readonly'
+      }
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-this-alias': 'off',
-      'no-unused-vars': [
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
         'error',
-        { varsIgnorePattern: '.*', args: 'none' }
-      ]
+        { varsIgnorePattern: '^_', args: 'none', caughtErrors: 'none' }
+      ],
+      'no-useless-assignment': 'off'
     }
   }
 )
