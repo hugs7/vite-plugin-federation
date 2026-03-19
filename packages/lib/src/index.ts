@@ -147,7 +147,10 @@ export default function federation(
         const federationId = (
           await this.resolve('@hugs7/vite-plugin-federation')
         )?.id
-        return await this.resolve(`${dirname(federationId!)}/satisfy.mjs`)
+        if (!federationId) {
+          return null
+        }
+        return await this.resolve(`${dirname(federationId)}/satisfy.mjs`)
       }
       if (args[0] === 'virtual:__federation__') {
         return {
