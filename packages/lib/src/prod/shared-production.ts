@@ -163,6 +163,13 @@ export function prodSharedPlugin(
         return find ? find[0] : undefined
       }
 
+      // Vite 8+ uses Rolldown which supports codeSplitting as a replacement
+      // for manualChunks. When codeSplitting is configured, setting
+      // manualChunks causes a warning and is ignored. Skip setting it.
+      if ((outputOption as any).codeSplitting) {
+        return outputOption
+      }
+
       // only active when manualChunks is function,array not to solve
       if (typeof outputOption.manualChunks === 'function') {
         outputOption.manualChunks = new Proxy(outputOption.manualChunks, {
