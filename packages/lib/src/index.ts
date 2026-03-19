@@ -22,6 +22,7 @@ import type {
 } from 'vite'
 import virtual from '@rollup/plugin-virtual'
 import { dirname } from 'path'
+import { fileURLToPath } from 'url'
 import { prodRemotePlugin } from './prod/remote-production'
 import type { VitePluginFederationOptions } from '../types'
 import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions } from './public'
@@ -147,7 +148,10 @@ export default function federation(
         const federationId = (
           await this.resolve('@hugs7/vite-plugin-federation')
         )?.id
-        return await this.resolve(`${dirname(federationId!)}/satisfy.mjs`)
+        const pluginDir = federationId
+          ? dirname(federationId)
+          : dirname(fileURLToPath(import.meta.url))
+        return await this.resolve(`${pluginDir}/satisfy.mjs`)
       }
       if (args[0] === 'virtual:__federation__') {
         return {

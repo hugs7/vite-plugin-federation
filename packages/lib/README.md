@@ -6,13 +6,13 @@ Inspired by Webpack and compatible with [Webpack Module Federation](https://webp
 ## Install
 
 ```
-npm install @originjs/vite-plugin-federation --save-dev
+npm install @hugs7/vite-plugin-federation --save-dev
 ```
 
 or
 
 ```
-yarn add @originjs/vite-plugin-federation --dev
+yarn add @hugs7/vite-plugin-federation --dev
 ```
 
 ## Usage
@@ -22,7 +22,7 @@ Using the `Module Federation` usually requires more than 2 projects, one as the 
 
 ```js
 // vite.config.js
-import federation from "@originjs/vite-plugin-federation";
+import federation from "@hugs7/vite-plugin-federation";
 export default {
     plugins: [
         federation({
@@ -42,7 +42,7 @@ export default {
 
 ```js
 // rollup.config.js
-import federation from '@originjs/vite-plugin-federation'
+import federation from '@hugs7/vite-plugin-federation'
 export default {
     input: 'src/index.js',
     plugins: [
@@ -65,7 +65,7 @@ export default {
 
 ```js
 // vite.config.js
-import federation from "@originjs/vite-plugin-federation";
+import federation from "@hugs7/vite-plugin-federation";
 export default {
     plugins: [
         federation({
@@ -83,7 +83,7 @@ export default {
 
 ```js
 // rollup.config.js
-import federation from '@originjs/vite-plugin-federation'
+import federation from '@hugs7/vite-plugin-federation'
 export default {
     input: 'src/index.js',
     plugins: [

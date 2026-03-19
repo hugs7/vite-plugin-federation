@@ -1,9 +1,10 @@
-import babel from '@rollup/plugin-babel'
-import commonjs from '@rollup/plugin-commonjs'
-import resolve from '@rollup/plugin-node-resolve'
-import federation from '@originjs/vite-plugin-federation'
-import pkg from './package.json' assert { type: 'json' }
-import replace from '@rollup/plugin-replace'
+import federation from '@hugs7/vite-plugin-federation';
+import babel from '@rollup/plugin-babel';
+import commonjs from '@rollup/plugin-commonjs';
+import resolve from '@rollup/plugin-node-resolve';
+import replace from '@rollup/plugin-replace';
+
+import pkg from './package.json' with { type: 'json' };
 
 export default {
   input: {
