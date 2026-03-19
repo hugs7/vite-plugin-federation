@@ -31,7 +31,7 @@ export default defineConfig({
         minify: false,
         cssCodeSplit: false,
         sourcemap: true,
-        rollupOptions: {
+        rolldownOptions: {
             output: {
                 minifyInternalExports: false
             }

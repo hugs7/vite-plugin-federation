@@ -37,7 +37,7 @@ export default defineConfig({
   build: {
     target: 'esnext',
     cssCodeSplit: true,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         format: 'es',
         minifyInternalExports: false

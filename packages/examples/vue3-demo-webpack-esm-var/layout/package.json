@@ -14,7 +14,7 @@
   },
   "devDependencies": {
     "@hugs7/vite-plugin-federation": "workspace:*",
-    "@vitejs/plugin-vue": "^4.0.0",
-    "vite": "^4.0.5"
+    "@vitejs/plugin-vue": "^6.0.0",
+    "vite": "^8.0.0"
   }
 }

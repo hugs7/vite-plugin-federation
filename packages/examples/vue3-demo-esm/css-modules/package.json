@@ -13,10 +13,10 @@
     "vue": "^3.2.45"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^4.0.0",
+    "@vitejs/plugin-vue": "^6.0.0",
     "autoprefixer": "^10.3.2",
     "postcss": "^8.4.31",
-    "vite": "^4.0.5"
+    "vite": "^8.0.0"
 
   }
 }

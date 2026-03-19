@@ -32,7 +32,7 @@ export default defineConfig({
     modulePreload: false,
     minify: false,
     cssCodeSplit: true,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         minifyInternalExports: false
       }

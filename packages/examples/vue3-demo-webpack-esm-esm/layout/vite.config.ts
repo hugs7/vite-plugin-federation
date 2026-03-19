@@ -29,7 +29,7 @@ export default defineConfig({
     target: 'esnext',
     minify: false,
     cssCodeSplit: true,
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         format: 'esm',
         entryFileNames: 'assets/[name].js',
