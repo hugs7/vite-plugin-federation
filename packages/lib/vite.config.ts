@@ -9,7 +9,7 @@ export default defineConfig({
     },
     target: 'node20',
     minify: false,
-    rollupOptions: {
+    rolldownOptions: {
       external: ['fs', 'path', 'crypto', 'magic-string', 'url'],
       output: {
         minifyInternalExports: false

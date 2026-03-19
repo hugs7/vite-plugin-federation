@@ -4,7 +4,7 @@ import os from 'node:os'
 import fs from 'fs-extra'
 import { chromium } from 'playwright-chromium'
 import type { Browser, Page } from 'playwright-chromium'
-import type { File } from 'vitest'
+import type { RunnerTestFile } from 'vitest'
 import { beforeAll, afterAll } from 'vitest'
 
 export const workspaceRoot = resolve(__dirname, '../')
@@ -29,11 +29,11 @@ const DIR = join(os.tmpdir(), 'vitest_playwright_global_setup')
 let err: Error
 let skipError: boolean
 
-beforeAll(async (s) => {
+beforeAll(async ({}, s) => {
   process.env.NODE_ENV = 'production'
-  const suite = s as File
+  const suite = s as RunnerTestFile
   // skip browser setup for non-examples tests
-  if (!suite.filepath.includes('examples')) {
+  if (!suite?.filepath?.includes('examples')) {
     return
   }
 

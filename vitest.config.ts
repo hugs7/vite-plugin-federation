@@ -10,7 +10,7 @@ export default defineConfig({
     ],
     testTimeout: 20000
   },
-  esbuild: {
-    target: 'node18'
+  oxc: {
+    target: 'node20'
   }
 })
