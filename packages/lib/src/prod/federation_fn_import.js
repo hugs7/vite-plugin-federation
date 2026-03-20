@@ -10,7 +10,6 @@ async function importShared(name, shareScope = 'default') {
     ? new Promise((r) => r(moduleCache[name]))
     : (await getSharedFromRuntime(name, shareScope)) || getSharedFromLocal(name)
 }
-// eslint-disable-next-line
 async function __federation_import(name) {
   currentImports[name] ??= import(name)
   return currentImports[name]

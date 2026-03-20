@@ -6,7 +6,8 @@
     "home",
     "common-lib",
     "layout",
-    "css-modules"
+    "css-modules",
+    "dynamic-remote"
   ],
   "scripts": {
     "build": "pnpm --parallel --filter \"./**\" build ",

@@ -3,7 +3,7 @@
   "exclude": ["dist", "node_modules", "test"],
   "compilerOptions": {
     "outDir": "dist",
-    "target": "es2019",
+    "target": "es2022",
     "module": "commonjs",
     "moduleResolution": "node",
     "strict": true,

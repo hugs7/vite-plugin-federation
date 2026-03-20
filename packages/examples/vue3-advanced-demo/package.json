@@ -20,8 +20,7 @@
   },
   "devDependencies": {
     "@hugs7/vite-plugin-federation": "workspace:*",
-    "kill-port": "^2.0.1",
-    "vite-plugin-css-injected-by-js": "^2.2.0"
+    "kill-port": "^2.0.1"
   },
   "license": "MulanPSL2"
 }
