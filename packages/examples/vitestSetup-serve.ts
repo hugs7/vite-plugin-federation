@@ -105,7 +105,11 @@ beforeAll(async ({}, s) => {
 afterAll(async () => {
   await page?.close()
   skipError = true
-  await execa('pnpm', ['run', 'stop'], { cwd: testDir, stdio: 'inherit' })
+  try {
+    await execa('pnpm', ['run', 'stop'], { cwd: testDir, stdio: 'inherit' })
+  } catch {
+    // kill-port may exit non-zero when no process is found; safe to ignore.
+  }
   if (browser) {
     await browser.close()
   }
