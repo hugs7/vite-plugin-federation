@@ -1,4 +1,4 @@
-import { execa } from 'execa'
+import { execa, type ExecaChildProcess } from 'execa'
 import { dirname, join, resolve } from 'node:path'
 import os from 'node:os'
 import fs from 'fs-extra'
@@ -28,6 +28,7 @@ const DIR = join(os.tmpdir(), 'vitest_playwright_global_setup')
 
 let err: Error
 let skipError: boolean
+let serverProcess: ExecaChildProcess | undefined
 
 beforeAll(async ({}, s) => {
   process.env.NODE_ENV = 'production'
@@ -79,7 +80,7 @@ beforeAll(async ({}, s) => {
         })
       }
       await execa('pnpm', ['run', 'build'], { cwd: testDir, stdio: 'inherit' })
-      execa('pnpm', ['run', 'serve'], { cwd: testDir, stdio: 'inherit' })
+      serverProcess = execa('pnpm', ['run', 'serve'], { cwd: testDir, stdio: 'inherit', reject: false })
 
       const port = 5000
       // use resolved port/base from server
@@ -109,6 +110,11 @@ afterAll(async () => {
     await execa('pnpm', ['run', 'stop'], { cwd: testDir, stdio: 'inherit' })
   } catch {
     // kill-port may exit non-zero when no process is found; safe to ignore.
+  }
+  // Wait for the server process to fully exit so file handles are released.
+  if (serverProcess) {
+    await serverProcess.catch(() => {})
+    serverProcess = undefined
   }
   if (browser) {
     await browser.close()

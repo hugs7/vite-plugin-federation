@@ -1,4 +1,4 @@
-import { execa } from 'execa';
+import { execa, type ExecaChildProcess } from 'execa'
 import { dirname, join, resolve } from 'node:path'
 import os from 'node:os'
 import fs from 'fs-extra'
@@ -28,6 +28,7 @@ const DIR = join(os.tmpdir(), 'vitest_playwright_global_setup')
 
 let err: Error
 let skipError: boolean
+let serverProcesses: ExecaChildProcess[] = []
 
 beforeAll(async ({}, s) => {
   process.env.NODE_ENV = 'production'
@@ -80,8 +81,10 @@ beforeAll(async ({}, s) => {
         })
       }
       await execa('pnpm', ['run', 'build:remotes'], {cwd: testDir, stdio: 'inherit'})
-      execa('pnpm', ['run', 'serve:remotes'], {cwd: testDir, stdio: 'inherit'})
-      execa('pnpm', ['run', 'dev:hosts'], {cwd: testDir, stdio: 'inherit'})
+      serverProcesses.push(
+        execa('pnpm', ['run', 'serve:remotes'], {cwd: testDir, stdio: 'inherit', reject: false}),
+        execa('pnpm', ['run', 'dev:hosts'], {cwd: testDir, stdio: 'inherit', reject: false})
+      )
 
       const port = 5000
       // use resolved port/base from server
@@ -112,6 +115,9 @@ afterAll(async () => {
   } catch {
     // kill-port may exit non-zero when no process is found; safe to ignore.
   }
+  // Wait for all server processes to fully exit so file handles are released.
+  await Promise.all(serverProcesses.map((p) => p.catch(() => {})))
+  serverProcesses = []
   if (browser) {
     await browser.close()
   }
