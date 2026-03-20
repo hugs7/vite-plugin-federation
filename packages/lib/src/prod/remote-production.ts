@@ -112,7 +112,7 @@ export function prodRemotePlugin(
   let resolvedConfig: ResolvedConfig
   let federationRuntimeEmitted = false
   return {
-    name: 'originjs:remote-production',
+    name: 'hugs7:remote-production',
     virtualFile: options.remotes
       ? {
           // language=JS

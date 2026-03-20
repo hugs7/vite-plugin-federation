@@ -70,7 +70,7 @@ export function prodExposePlugin(
   // let viteConfigResolved: ResolvedConfig
 
   return {
-    name: 'originjs:expose-production',
+    name: 'hugs7:expose-production',
     virtualFile: {
       // code generated for remote
       // language=JS

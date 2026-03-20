@@ -35,7 +35,7 @@ export function prodSharedPlugin(
   const id2Prop = new Map<string, any>()
 
   return {
-    name: 'originjs:shared-production',
+    name: 'hugs7:shared-production',
     virtualFile: {
       __federation_fn_import: federation_fn_import
     },

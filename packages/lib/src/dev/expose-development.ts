@@ -13,17 +13,325 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { parseExposeOptions } from '../utils'
+import {
+  parseExposeOptions,
+  removeNonRegLetter,
+  NAME_CHAR_REG
+} from '../utils'
 import { parsedOptions } from '../public'
 import type { VitePluginFederationOptions } from 'types'
 import type { PluginHooks } from '../../types/pluginHooks'
+import { mkdirSync, writeFileSync, existsSync, readFileSync as fsReadFileSync } from 'fs'
+import { join, resolve } from 'path'
+import { createRequire } from 'module'
+import { execSync } from 'child_process'
+import type { UserConfig } from 'vite'
+
+function getModuleExportNames(name: string, root: string): string[] {
+  try {
+    const result = execSync(
+      `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
+      { cwd: root, encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
+    )
+    return JSON.parse(result.trim())
+  } catch {
+    return []
+  }
+}
+
+// Generate bridge/shim files for shared modules so that Vite's dep
+// optimizer bundles them instead of the real packages.  Every optimized
+// dep (react-redux, etc.) that imports "react" will therefore go through
+// the bridge, which reads from the federation share scope at runtime.
+function generateShimDir(
+  sharedNames: string[],
+  root: string
+): { shimDir: string; aliases: Record<string, string> } {
+  const shimDir = join(root, 'node_modules', '.federation-shims')
+  if (!existsSync(shimDir)) {
+    mkdirSync(shimDir, { recursive: true })
+  }
+
+  const aliases: Record<string, string> = {}
+  const nodeRequire = createRequire(join(root, 'package.json'))
+  for (const name of sharedNames) {
+    let realPath: string
+    try {
+      realPath = nodeRequire.resolve(name)
+    } catch {
+      continue
+    }
+
+    const safeName = name.replace(/[/@]/g, '_')
+    const escapedPath = realPath.replace(/\\/g, '/')
+
+    // Detect if the resolved entry is ESM
+    const isEsm = realPath.endsWith('.mjs') || (() => {
+      try {
+        let dir = realPath
+        while (dir !== join(dir, '..')) {
+          dir = join(dir, '..')
+          const pkgPath = join(dir, 'package.json')
+          if (existsSync(pkgPath)) {
+            return JSON.parse(fsReadFileSync(pkgPath, 'utf-8')).type === 'module'
+          }
+        }
+      } catch {}
+      return false
+    })()
+
+    // ALL shared modules use CJS shims so they go through the dep
+    // optimizer normally (avoiding CJS transitive dep issues from
+    // optimizeDeps.exclude).
+    //
+    // For CJS packages: require() the real entry directly.
+    // For ESM packages: enumerate exports at build time and emit
+    //   explicit `exports.X = mod.X` lines.  This avoids the dep
+    //   optimizer trying to trace ESM re-export chains through a
+    //   CJS require() wrapper (which causes "export not defined").
+    const shimFile = join(shimDir, `${safeName}.cjs`)
+
+    if (!isEsm) {
+      const shimCode = `
+var mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
+console.log('[federation-shim] ${name}:', mod ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));
+if (mod) {
+  module.exports = mod;
+} else {
+  module.exports = require('${escapedPath}');
+}
+`
+      writeFileSync(shimFile, shimCode)
+    } else {
+      const exportNames = getModuleExportNames(name, root)
+
+      if (!exportNames.length) {
+        // Export enumeration failed (e.g. the module references browser
+        // globals like `window` at the top level and can't be loaded in
+        // Node).  Fall back to a CJS-style shim — the dep optimizer
+        // will wrap consumers with __toESM() which is fine.
+        const shimCode = `
+var mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
+console.log('[federation-shim] ${name}:', mod ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));
+if (mod) {
+  module.exports = mod;
+} else {
+  module.exports = require('${escapedPath}');
+}
+`
+        writeFileSync(shimFile, shimCode)
+      } else {
+        const namedExports = exportNames.filter((n) => n !== 'default')
+        const hasDefault = exportNames.includes('default')
+
+        let shimCode = `var _shared = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];\n`
+        shimCode += `console.log('[federation-shim] ${name}:', _shared ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));\n`
+        shimCode += `var _mod = _shared || require('${escapedPath}');\n`
+        if (hasDefault) {
+          shimCode += `Object.defineProperty(exports, 'default', { enumerable: true, get: function() { return _mod.default ?? _mod; } });\n`
+        }
+        for (const n of namedExports) {
+          const escaped = n.replace(/'/g, "\\'")
+          shimCode += `Object.defineProperty(exports, '${escaped}', { enumerable: true, get: function() { return _mod['${escaped}']; } });\n`
+        }
+        writeFileSync(shimFile, shimCode)
+      }
+    }
+    aliases[name] = shimFile
+  }
+
+  return { shimDir, aliases }
+}
 
 export function devExposePlugin(
   options: VitePluginFederationOptions
 ): PluginHooks {
   parsedOptions.devExpose = parseExposeOptions(options)
 
+  // Build list of shared module names for init code generation
+  const sharedList: string[] = []
+
+  let moduleMap = ''
+  for (const item of parsedOptions.devExpose) {
+    const name = removeNonRegLetter(item[0], NAME_CHAR_REG)
+    moduleMap += `"${item[0]}":()=>{
+      return __federation_import('./__federation_expose_${name}.js').then(module =>Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`
+  }
+
   return {
-    name: 'originjs:expose-development'
+    name: 'hugs7:expose-development',
+    virtualFile: {
+      [`__remoteEntryHelper__${options.filename}`]: `
+const currentImports = {}
+const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
+let moduleMap = {${moduleMap}}
+const seen = {}
+async function __federation_import(name) {
+  currentImports[name] ??= import(/* @vite-ignore */ name)
+  return currentImports[name]
+};
+
+let __federation_shared_resolving;
+export const init =(shareScope) => {
+  globalThis.__federation_shared__= globalThis.__federation_shared__ || {};
+  Object.entries(shareScope).forEach(([key, value]) => {
+    for (const [versionKey, versionValue] of Object.entries(value)) {
+      const scope = versionValue.scope || 'default';
+      if (!globalThis.__federation_shared__[scope]) {
+        globalThis.__federation_shared__[scope] = {};
+      }
+
+      const shared = globalThis.__federation_shared__[scope];
+      (shared[key] = shared[key] || {})[versionKey] = versionValue;
+    }
+  });
+
+  // Kick off async resolution of shared modules. The get() function
+  // awaits this before loading exposed modules, so the bridge shims
+  // can synchronously read from the global when they evaluate.
+  if (!globalThis.__federation_shared_modules__) {
+    globalThis.__federation_shared_modules__ = {};
+  }
+  console.log('[federation-init] Resolving shared modules:', Object.keys(shareScope));
+  __federation_shared_resolving = Promise.all(Object.keys(shareScope).map(async (key) => {
+    try {
+      const versions = shareScope[key];
+      const ver = Object.keys(versions)[0];
+      if (ver) {
+        const factory = await versions[ver].get();
+        const mod = await factory();
+        globalThis.__federation_shared_modules__[key] = mod;
+        console.log('[federation-init] Resolved:', key, Object.keys(mod).slice(0,5));
+      }
+    } catch(e) {
+      console.warn('[federation-dev] Failed to pre-resolve shared module:', key, e);
+    }
+  }));
+};
+
+export const get = async (module) => {
+  if (__federation_shared_resolving) await __federation_shared_resolving;
+  console.log('[federation-get]', module, 'shared modules populated:', Object.keys(globalThis.__federation_shared_modules__ || {}));
+  if(!moduleMap[module]) throw new Error('Can not find remote module ' + module)
+  return moduleMap[module]();
+};`
+    },
+    config(config: UserConfig) {
+      // Only set up shims when this is a remote (has exposes) with shared modules
+      if (!parsedOptions.devExpose.length || !parsedOptions.devShared.length) {
+        return
+      }
+
+      // Populate sharedList from parsed options
+      for (const item of parsedOptions.devShared) {
+        sharedList.push(item[0])
+      }
+
+      const root = config.root ? resolve(config.root) : process.cwd()
+      const { aliases } = generateShimDir(sharedList, root)
+
+      // Set up resolve aliases so all imports of shared modules (including
+      // from pre-bundled deps) go through the bridge shims
+      if (!config.resolve) config.resolve = {}
+      if (!config.resolve.alias) config.resolve.alias = {}
+
+      // Use array-style aliases with regex for exact matching,
+      // so 'react' doesn't also match 'react/jsx-runtime' or 'react-dom'
+      if (!Array.isArray(config.resolve.alias)) {
+        // Convert object-style to array-style
+        const existing = config.resolve.alias as Record<string, string>
+        config.resolve.alias = Object.entries(existing).map(
+          ([find, replacement]) => ({ find, replacement })
+        )
+      }
+      for (const [from, to] of Object.entries(aliases)) {
+        // Exact match regex: ^react$ matches 'react' but not 'react/jsx-runtime'
+        ;(config.resolve.alias as any[]).push({
+          find: new RegExp(`^${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+          replacement: to
+        })
+      }
+
+
+    },
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const url = req.url
+        const setCorsHeaders = () => {
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.setHeader('Access-Control-Allow-Methods', '*')
+          res.setHeader('Access-Control-Allow-Headers', '*')
+        }
+
+        if (url === `/${options.filename}`) {
+          if (req.method === 'OPTIONS') {
+            setCorsHeaders()
+            res.statusCode = 204
+            res.end()
+            return
+          }
+          setCorsHeaders()
+          try {
+            const moduleId = `__remoteEntryHelper__${options.filename}`
+            const result = await server.transformRequest(moduleId)
+            if (result) {
+              res.setHeader('Content-Type', 'application/javascript')
+              res.end(result.code)
+            } else {
+              res.statusCode = 404
+              res.end('Module not found')
+            }
+          } catch (error) {
+            res.statusCode = 500
+            res.end('Internal server error')
+          }
+          return
+        }
+
+        if (url?.includes('__federation_expose_')) {
+          if (req.method === 'OPTIONS') {
+            setCorsHeaders()
+            res.statusCode = 204
+            res.end()
+            return
+          }
+          setCorsHeaders()
+          try {
+            const match = url.match(/__federation_expose_(.+?)\.js/)
+            if (match) {
+              const exposeName = match[1]
+              const exposeItem = parsedOptions.devExpose.find((item) => {
+                const itemName = removeNonRegLetter(item[0], NAME_CHAR_REG)
+                return itemName === exposeName
+              })
+              if (exposeItem && exposeItem[1] && exposeItem[1].import) {
+                const modulePath = exposeItem[1].import
+                const result = await server.transformRequest(modulePath)
+                if (result) {
+                  res.setHeader('Content-Type', 'application/javascript')
+                  res.end(result.code)
+                } else {
+                  res.statusCode = 404
+                  res.end(`Module not found: ${modulePath}`)
+                }
+              } else {
+                res.statusCode = 404
+                res.end(`Expose module not found: ${exposeName}`)
+              }
+            } else {
+              res.statusCode = 400
+              res.end('Invalid expose module URL')
+            }
+          } catch (error) {
+            console.error('Error loading expose module:', error)
+            res.statusCode = 500
+            res.end('Internal server error')
+          }
+          return
+        }
+
+        next()
+      })
+    }
   }
 }

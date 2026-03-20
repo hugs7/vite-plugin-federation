@@ -18,14 +18,13 @@ import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
 import { walk } from 'estree-walker'
 import MagicString from 'magic-string'
 import { readFileSync } from 'fs'
-import { posix } from 'path'
+
 import type { AcornNode, TransformPluginContext } from 'rollup'
-import type { ViteDevServer } from '../../types/viteDevServer'
+
 import {
   createRemotesMap,
   getFileExtname,
   getModuleMarker,
-  normalizePath,
   parseRemoteOptions,
   REMOTE_FROM_PARAMETER
 } from '../utils'
@@ -59,9 +58,8 @@ export function devRemotePlugin(
     .concat(needHandleFileType)
     .map((item) => item.toLowerCase())
   const transformFileTypeSet = new Set(options.transformFileTypes)
-  let viteDevServer: ViteDevServer
   return {
-    name: 'originjs:remote-development',
+    name: 'hugs7:remote-development',
     virtualFile: options.remotes
       ? {
           __federation__: `
@@ -112,7 +110,6 @@ async function __federation_method_ensure(remoteId) {
           import(/* @vite-ignore */ url).then(lib => {
             if (!remote.inited) {
               const shareScope = wrapShareScope(remote.from)
-              lib.init(shareScope);
               remote.lib = lib;
               remote.lib.init(shareScope);
               remote.inited = true;
@@ -168,10 +165,7 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
       }
     },
 
-    configureServer(server: ViteDevServer) {
-      // get moduleGraph for dev mode dynamic reference
-      viteDevServer = server
-    },
+    configureServer() {},
     async transform(this: TransformPluginContext, code: string, id: string) {
       if (builderInfo.isHost && !builderInfo.isRemote) {
         for (const arr of parsedOptions.devShared) {
@@ -380,35 +374,24 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
   ): Promise<string[]> {
     const res: string[] = []
     if (shared.length) {
-      const serverConfiguration = viteDevServer.config.server
-      const base = viteDevServer.config.base
-      const cwdPath = normalizePath(process.cwd())
-
       for (const item of shared) {
-        const moduleInfo = await this.resolve(item[1].packagePath, undefined, {
-          skipSelf: true
-        })
-
-        if (!moduleInfo) continue
-
-        const moduleFilePath = normalizePath(moduleInfo.id)
-        const idx = moduleFilePath.indexOf(cwdPath)
-
-        const relativePath =
-          idx === 0
-            ? posix.join(base, moduleFilePath.slice(cwdPath.length))
-            : null
-
         const sharedName = item[0]
         const obj = item[1]
-        let str = ''
         if (typeof obj === 'object') {
-          const origin = serverConfiguration.origin
-          const pathname = relativePath ?? `/@fs/${moduleInfo.id}`
-          const url = origin
-            ? `'${origin}${pathname}'`
-            : `window.location.origin+'${pathname}'`
-          str += `get:() => get(${url}, ${REMOTE_FROM_PARAMETER})`
+          // Use dynamic import() by bare specifier so the shared module
+          // resolves through Vite's dep optimizer — same module instance
+          // as the host app uses.  Dynamic import avoids the "export not
+          // defined" errors that static import * triggers on packages
+          // with stripped TypeScript type re-exports.
+          // Unwrap CJS-only deps whose dep-optimized entry has ONLY a
+          // default export (e.g. react.js: `export default require_react()`).
+          // If the module also has named exports (zustand, react-redux),
+          // return the full namespace to preserve them.
+          const str = `get:() => import('${sharedName}').then(m => {
+            const keys = Object.keys(m);
+            const hasNamed = keys.some(k => k !== 'default' && k !== '__esModule');
+            return () => hasNamed ? m : (m.default ?? m);
+          })`
           res.push(`'${sharedName}':{'${obj.version}':{${str}}}`)
         }
       }
