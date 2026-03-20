@@ -21,11 +21,74 @@ import {
 import { parsedOptions } from '../public'
 import type { VitePluginFederationOptions } from 'types'
 import type { PluginHooks } from '../../types/pluginHooks'
+import { mkdirSync, writeFileSync, existsSync } from 'fs'
+import { join, resolve } from 'path'
+import { createRequire } from 'module'
+import type { UserConfig } from 'vite'
+
+// Generate bridge/shim files for shared modules so that Vite's dep
+// optimizer bundles them instead of the real packages.  Every optimized
+// dep (react-redux, etc.) that imports "react" will therefore go through
+// the bridge, which reads from the federation share scope at runtime.
+function generateShimDir(
+  sharedNames: string[],
+  root: string
+): { shimDir: string; aliases: Record<string, string> } {
+  const shimDir = join(root, 'node_modules', '.federation-shims')
+  if (!existsSync(shimDir)) {
+    mkdirSync(shimDir, { recursive: true })
+  }
+
+  const aliases: Record<string, string> = {}
+  const nodeRequire = createRequire(join(root, 'package.json'))
+  for (const name of sharedNames) {
+    // Resolve the real package entry point BEFORE aliasing
+    let realPath: string
+    try {
+      realPath = nodeRequire.resolve(name)
+    } catch {
+      continue // skip if package can't be resolved
+    }
+
+    // Only shim packages that need singleton identity (react, react-dom).
+    // Other shared packages (react-router, zustand, etc.) don't need shimming
+    // because they just need to USE the same React, which they will via the
+    // shimmed react dep. CJS shims can't replicate ESM named exports, so
+    // shimming non-React packages breaks their export shapes.
+    const SINGLETON_PACKAGES = new Set(['react', 'react-dom'])
+    if (!SINGLETON_PACKAGES.has(name)) continue
+
+    const safeName = name.replace(/[/@]/g, '_')
+    const shimFile = join(shimDir, `${safeName}.cjs`)
+    // CJS bridge: synchronously reads from globalThis.__federation_shared_modules__
+    // which is populated by the remoteEntry's init() before any exposed
+    // module evaluates.  When running standalone (no share scope), falls
+    // back to requiring the real package via its absolute path.
+    const shimCode = `
+var mod;
+try {
+  mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
+} catch(e) {}
+if (mod) {
+  module.exports = mod;
+} else {
+  module.exports = require('${realPath.replace(/\\/g, '/')}');
+}
+`
+    writeFileSync(shimFile, shimCode)
+    aliases[name] = shimFile
+  }
+
+  return { shimDir, aliases }
+}
 
 export function devExposePlugin(
   options: VitePluginFederationOptions
 ): PluginHooks {
   parsedOptions.devExpose = parseExposeOptions(options)
+
+  // Build list of shared module names for init code generation
+  const sharedList: string[] = []
 
   let moduleMap = ''
   for (const item of parsedOptions.devExpose) {
@@ -43,14 +106,14 @@ const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
 let moduleMap = {${moduleMap}}
 const seen = {}
 async function __federation_import(name) {
-  currentImports[name] ??= import(name)
+  currentImports[name] ??= import(/* @vite-ignore */ name)
   return currentImports[name]
 };
 export const get =(module) => {
   if(!moduleMap[module]) throw new Error('Can not find remote module ' + module)
   return moduleMap[module]();
 };
-export const init =(shareScope) => {
+export const init = async (shareScope) => {
   globalThis.__federation_shared__= globalThis.__federation_shared__ || {};
   Object.entries(shareScope).forEach(([key, value]) => {
     for (const [versionKey, versionValue] of Object.entries(value)) {
@@ -60,7 +123,63 @@ export const init =(shareScope) => {
       (shared[key] = shared[key] || {})[versionKey] = versionValue;
     }
   });
-}`
+  // Eagerly resolve all shared modules and store them in a sync-accessible
+  // global so that pre-bundled deps (which use the bridge shims) can access
+  // the host's shared modules synchronously.
+  globalThis.__federation_shared_modules__ = globalThis.__federation_shared_modules__ || {};
+  const sharedKeys = Object.keys(shareScope);
+  await Promise.all(sharedKeys.map(async (key) => {
+    try {
+      const versions = shareScope[key];
+      const ver = Object.keys(versions)[0];
+      if (ver) {
+        const factory = await versions[ver].get();
+        const mod = await factory();
+        globalThis.__federation_shared_modules__[key] = mod?.default ?? mod;
+      }
+    } catch(e) {
+      console.warn('[federation-dev] Failed to pre-resolve shared module:', key, e);
+    }
+  }));
+};`
+    },
+    config(config: UserConfig) {
+      // Only set up shims when this is a remote (has exposes) with shared modules
+      if (!parsedOptions.devExpose.length || !parsedOptions.devShared.length) {
+        return
+      }
+
+      // Populate sharedList from parsed options
+      for (const item of parsedOptions.devShared) {
+        sharedList.push(item[0])
+      }
+
+      const root = config.root ? resolve(config.root) : process.cwd()
+      const { aliases } = generateShimDir(sharedList, root)
+
+      // Set up resolve aliases so all imports of shared modules (including
+      // from pre-bundled deps) go through the bridge shims
+      if (!config.resolve) config.resolve = {}
+      if (!config.resolve.alias) config.resolve.alias = {}
+
+      // Use array-style aliases with regex for exact matching,
+      // so 'react' doesn't also match 'react/jsx-runtime' or 'react-dom'
+      if (!Array.isArray(config.resolve.alias)) {
+        // Convert object-style to array-style
+        const existing = config.resolve.alias as Record<string, string>
+        config.resolve.alias = Object.entries(existing).map(
+          ([find, replacement]) => ({ find, replacement })
+        )
+      }
+      for (const [from, to] of Object.entries(aliases)) {
+        // Exact match regex: ^react$ matches 'react' but not 'react/jsx-runtime'
+        ;(config.resolve.alias as any[]).push({
+          find: new RegExp(`^${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+          replacement: to
+        })
+      }
+
+
     },
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
