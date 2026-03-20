@@ -10,8 +10,8 @@
     "dynamic-remote"
   ],
   "scripts": {
-    "build": "pnpm --parallel --filter \"./**\" build ",
-    "serve": "pnpm --parallel --filter \"./**\" serve",
+    "build": "pnpm --parallel --filter \"./**\" --filter \"!.\" build ",
+    "serve": "pnpm --parallel --filter \"./**\" --filter \"!.\" serve",
     "build:remotes": "pnpm --parallel --filter \"./home\" --filter \"./css-modules\" --filter \"./common-lib\" --filter \"./dynamic-remote\"  build",
     "serve:remotes": "pnpm --parallel --filter \"./home\" --filter \"./css-modules\" --filter \"./common-lib\" --filter \"./dynamic-remote\"  serve",
     "dev:hosts": "pnpm --filter \"./layout\" dev",

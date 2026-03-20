@@ -2,8 +2,8 @@
   "name": "vue3-demo-webpack-esm-var",
   "private": true,
   "scripts": {
-    "build": "pnpm --parallel --filter \"./**\" build ",
-    "serve": "pnpm --parallel --filter \"./**\" serve",
+    "build": "pnpm --parallel --filter \"./**\" --filter \"!.\" build ",
+    "serve": "pnpm --parallel --filter \"./**\" --filter \"!.\" serve",
     "build:remotes": "pnpm --parallel --filter \"./home\"  build",
     "serve:remotes": "pnpm --parallel --filter \"./home\"  serve",
     "dev:hosts": "pnpm --filter \"./layout\" dev",

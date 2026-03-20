@@ -9,8 +9,8 @@
   ],
   "scripts": {
     "start": "pnpm start",
-    "build": "pnpm --parallel --filter \"./**\" build ",
-    "serve": "pnpm --parallel --filter \"./**\" serve ",
+    "build": "pnpm --parallel --filter \"./**\" --filter \"!.\" build ",
+    "serve": "pnpm --parallel --filter \"./**\" --filter \"!.\" serve ",
     "restart": "pnpm stop & pnpm build & pnpm serve",
     "build:remotes": "pnpm --parallel --filter \"./team-blue\" --filter \"./team-green\"  build",
     "serve:remotes": "pnpm --parallel --filter \"./team-blue\" --filter \"./team-green\"  serve",

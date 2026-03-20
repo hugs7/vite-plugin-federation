@@ -58,8 +58,6 @@ export async function setup(): Promise<void> {
 export async function teardown(): Promise<void> {
   await browserServer?.close()
   if (!process.env.VITE_PRESERVE_BUILD_ARTIFACTS) {
-    // Best-effort cleanup. If the temp directory is still locked (Windows),
-    // the next run's setup will clean it before re-copying.
     await kill('5000,5001,5002,5003,5004').catch(() => {})
     if (process.platform === 'win32') {
       await new Promise((r) => setTimeout(r, 2000))
