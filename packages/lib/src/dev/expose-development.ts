@@ -21,10 +21,23 @@ import {
 import { parsedOptions } from '../public'
 import type { VitePluginFederationOptions } from 'types'
 import type { PluginHooks } from '../../types/pluginHooks'
-import { mkdirSync, writeFileSync, existsSync } from 'fs'
+import { mkdirSync, writeFileSync, existsSync, readFileSync as fsReadFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { createRequire } from 'module'
+import { execSync } from 'child_process'
 import type { UserConfig } from 'vite'
+
+function getModuleExportNames(name: string, root: string): string[] {
+  try {
+    const result = execSync(
+      `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
+      { cwd: root, encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
+    )
+    return JSON.parse(result.trim())
+  } catch {
+    return []
+  }
+}
 
 // Generate bridge/shim files for shared modules so that Vite's dep
 // optimizer bundles them instead of the real packages.  Every optimized
@@ -42,40 +55,72 @@ function generateShimDir(
   const aliases: Record<string, string> = {}
   const nodeRequire = createRequire(join(root, 'package.json'))
   for (const name of sharedNames) {
-    // Resolve the real package entry point BEFORE aliasing
     let realPath: string
     try {
       realPath = nodeRequire.resolve(name)
     } catch {
-      continue // skip if package can't be resolved
+      continue
     }
 
-    // Only shim packages that need singleton identity (react, react-dom).
-    // Other shared packages (react-router, zustand, etc.) don't need shimming
-    // because they just need to USE the same React, which they will via the
-    // shimmed react dep. CJS shims can't replicate ESM named exports, so
-    // shimming non-React packages breaks their export shapes.
-    const SINGLETON_PACKAGES = new Set(['react', 'react-dom'])
-    if (!SINGLETON_PACKAGES.has(name)) continue
-
     const safeName = name.replace(/[/@]/g, '_')
+    const escapedPath = realPath.replace(/\\/g, '/')
+
+    // Detect if the resolved entry is ESM
+    const isEsm = realPath.endsWith('.mjs') || (() => {
+      try {
+        let dir = realPath
+        while (dir !== join(dir, '..')) {
+          dir = join(dir, '..')
+          const pkgPath = join(dir, 'package.json')
+          if (existsSync(pkgPath)) {
+            return JSON.parse(fsReadFileSync(pkgPath, 'utf-8')).type === 'module'
+          }
+        }
+      } catch {}
+      return false
+    })()
+
+    // ALL shared modules use CJS shims so they go through the dep
+    // optimizer normally (avoiding CJS transitive dep issues from
+    // optimizeDeps.exclude).
+    //
+    // For CJS packages: require() the real entry directly.
+    // For ESM packages: enumerate exports at build time and emit
+    //   explicit `exports.X = mod.X` lines.  This avoids the dep
+    //   optimizer trying to trace ESM re-export chains through a
+    //   CJS require() wrapper (which causes "export not defined").
     const shimFile = join(shimDir, `${safeName}.cjs`)
-    // CJS bridge: synchronously reads from globalThis.__federation_shared_modules__
-    // which is populated by the remoteEntry's init() before any exposed
-    // module evaluates.  When running standalone (no share scope), falls
-    // back to requiring the real package via its absolute path.
-    const shimCode = `
-var mod;
-try {
-  mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
-} catch(e) {}
+
+    if (!isEsm) {
+      const shimCode = `
+var mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
+console.log('[federation-shim] ${name}:', mod ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));
 if (mod) {
   module.exports = mod;
 } else {
-  module.exports = require('${realPath.replace(/\\/g, '/')}');
+  module.exports = require('${escapedPath}');
 }
 `
-    writeFileSync(shimFile, shimCode)
+      writeFileSync(shimFile, shimCode)
+    } else {
+      const exportNames = getModuleExportNames(name, root)
+      if (!exportNames.length) continue
+
+      const namedExports = exportNames.filter((n) => n !== 'default')
+      const hasDefault = exportNames.includes('default')
+
+      let shimCode = `var _shared = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];\n`
+      shimCode += `console.log('[federation-shim] ${name}:', _shared ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));\n`
+      shimCode += `var _mod = _shared || require('${escapedPath}');\n`
+      if (hasDefault) {
+        shimCode += `Object.defineProperty(exports, 'default', { enumerable: true, get: function() { return _mod.default ?? _mod; } });\n`
+      }
+      for (const n of namedExports) {
+        const escaped = n.replace(/'/g, "\\'")
+        shimCode += `Object.defineProperty(exports, '${escaped}', { enumerable: true, get: function() { return _mod['${escaped}']; } });\n`
+      }
+      writeFileSync(shimFile, shimCode)
+    }
     aliases[name] = shimFile
   }
 
@@ -98,7 +143,7 @@ export function devExposePlugin(
   }
 
   return {
-    name: 'originjs:expose-development',
+    name: 'hugs7:expose-development',
     virtualFile: {
       [`__remoteEntryHelper__${options.filename}`]: `
 const currentImports = {}
@@ -109,38 +154,50 @@ async function __federation_import(name) {
   currentImports[name] ??= import(/* @vite-ignore */ name)
   return currentImports[name]
 };
-export const get =(module) => {
-  if(!moduleMap[module]) throw new Error('Can not find remote module ' + module)
-  return moduleMap[module]();
-};
-export const init = async (shareScope) => {
+
+let __federation_shared_resolving;
+export const init =(shareScope) => {
   globalThis.__federation_shared__= globalThis.__federation_shared__ || {};
   Object.entries(shareScope).forEach(([key, value]) => {
     for (const [versionKey, versionValue] of Object.entries(value)) {
       const scope = versionValue.scope || 'default';
-      globalThis.__federation_shared__[scope] = globalThis.__federation_shared__[scope] || {};
-      const shared= globalThis.__federation_shared__[scope];
+      if (!globalThis.__federation_shared__[scope]) {
+        globalThis.__federation_shared__[scope] = {};
+      }
+
+      const shared = globalThis.__federation_shared__[scope];
       (shared[key] = shared[key] || {})[versionKey] = versionValue;
     }
   });
-  // Eagerly resolve all shared modules and store them in a sync-accessible
-  // global so that pre-bundled deps (which use the bridge shims) can access
-  // the host's shared modules synchronously.
-  globalThis.__federation_shared_modules__ = globalThis.__federation_shared_modules__ || {};
-  const sharedKeys = Object.keys(shareScope);
-  await Promise.all(sharedKeys.map(async (key) => {
+
+  // Kick off async resolution of shared modules. The get() function
+  // awaits this before loading exposed modules, so the bridge shims
+  // can synchronously read from the global when they evaluate.
+  if (!globalThis.__federation_shared_modules__) {
+    globalThis.__federation_shared_modules__ = {};
+  }
+  console.log('[federation-init] Resolving shared modules:', Object.keys(shareScope));
+  __federation_shared_resolving = Promise.all(Object.keys(shareScope).map(async (key) => {
     try {
       const versions = shareScope[key];
       const ver = Object.keys(versions)[0];
       if (ver) {
         const factory = await versions[ver].get();
         const mod = await factory();
-        globalThis.__federation_shared_modules__[key] = mod?.default ?? mod;
+        globalThis.__federation_shared_modules__[key] = mod;
+        console.log('[federation-init] Resolved:', key, Object.keys(mod).slice(0,5));
       }
     } catch(e) {
       console.warn('[federation-dev] Failed to pre-resolve shared module:', key, e);
     }
   }));
+};
+
+export const get = async (module) => {
+  if (__federation_shared_resolving) await __federation_shared_resolving;
+  console.log('[federation-get]', module, 'shared modules populated:', Object.keys(globalThis.__federation_shared_modules__ || {}));
+  if(!moduleMap[module]) throw new Error('Can not find remote module ' + module)
+  return moduleMap[module]();
 };`
     },
     config(config: UserConfig) {
