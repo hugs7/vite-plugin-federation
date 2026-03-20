@@ -76,7 +76,9 @@ function generateShimDir(
             return JSON.parse(fsReadFileSync(pkgPath, 'utf-8')).type === 'module'
           }
         }
-      } catch {}
+      } catch {
+        // ignore – fall through to default (false)
+      }
       return false
     })()
 
