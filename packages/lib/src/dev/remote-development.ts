@@ -383,11 +383,15 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
           // as the host app uses.  Dynamic import avoids the "export not
           // defined" errors that static import * triggers on packages
           // with stripped TypeScript type re-exports.
-          // Use .default fallback for CJS deps whose dep-optimized entry
-          // only exports `default` (e.g. react.js: `export default require_react()`).
-          // For ESM deps (react-redux, react-router), the named exports are
-          // properly re-exported and `m` is already the correct namespace.
-          const str = `get:() => import('${sharedName}').then(m => () => m.default || m)`
+          // Unwrap CJS-only deps whose dep-optimized entry has ONLY a
+          // default export (e.g. react.js: `export default require_react()`).
+          // If the module also has named exports (zustand, react-redux),
+          // return the full namespace to preserve them.
+          const str = `get:() => import('${sharedName}').then(m => {
+            const keys = Object.keys(m);
+            const hasNamed = keys.some(k => k !== 'default' && k !== '__esModule');
+            return () => hasNamed ? m : (m.default ?? m);
+          })`
           res.push(`'${sharedName}':{'${obj.version}':{${str}}}`)
         }
       }

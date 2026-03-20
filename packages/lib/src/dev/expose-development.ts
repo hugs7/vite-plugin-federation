@@ -104,22 +104,38 @@ if (mod) {
       writeFileSync(shimFile, shimCode)
     } else {
       const exportNames = getModuleExportNames(name, root)
-      if (!exportNames.length) continue
 
-      const namedExports = exportNames.filter((n) => n !== 'default')
-      const hasDefault = exportNames.includes('default')
+      if (!exportNames.length) {
+        // Export enumeration failed (e.g. the module references browser
+        // globals like `window` at the top level and can't be loaded in
+        // Node).  Fall back to a CJS-style shim — the dep optimizer
+        // will wrap consumers with __toESM() which is fine.
+        const shimCode = `
+var mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
+console.log('[federation-shim] ${name}:', mod ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));
+if (mod) {
+  module.exports = mod;
+} else {
+  module.exports = require('${escapedPath}');
+}
+`
+        writeFileSync(shimFile, shimCode)
+      } else {
+        const namedExports = exportNames.filter((n) => n !== 'default')
+        const hasDefault = exportNames.includes('default')
 
-      let shimCode = `var _shared = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];\n`
-      shimCode += `console.log('[federation-shim] ${name}:', _shared ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));\n`
-      shimCode += `var _mod = _shared || require('${escapedPath}');\n`
-      if (hasDefault) {
-        shimCode += `Object.defineProperty(exports, 'default', { enumerable: true, get: function() { return _mod.default ?? _mod; } });\n`
+        let shimCode = `var _shared = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];\n`
+        shimCode += `console.log('[federation-shim] ${name}:', _shared ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));\n`
+        shimCode += `var _mod = _shared || require('${escapedPath}');\n`
+        if (hasDefault) {
+          shimCode += `Object.defineProperty(exports, 'default', { enumerable: true, get: function() { return _mod.default ?? _mod; } });\n`
+        }
+        for (const n of namedExports) {
+          const escaped = n.replace(/'/g, "\\'")
+          shimCode += `Object.defineProperty(exports, '${escaped}', { enumerable: true, get: function() { return _mod['${escaped}']; } });\n`
+        }
+        writeFileSync(shimFile, shimCode)
       }
-      for (const n of namedExports) {
-        const escaped = n.replace(/'/g, "\\'")
-        shimCode += `Object.defineProperty(exports, '${escaped}', { enumerable: true, get: function() { return _mod['${escaped}']; } });\n`
-      }
-      writeFileSync(shimFile, shimCode)
     }
     aliases[name] = shimFile
   }

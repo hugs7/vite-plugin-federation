@@ -24,6 +24,6 @@ export function devSharedPlugin(
   parsedOptions.devShared = parseSharedOptions(options)
 
   return {
-    name: 'originjs:shared-development'
+    name: 'hugs7:shared-development'
   }
 }
