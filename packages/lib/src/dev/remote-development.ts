@@ -58,12 +58,16 @@ export function devRemotePlugin(
     .concat(needHandleFileType)
     .map((item) => item.toLowerCase())
   const transformFileTypeSet = new Set(options.transformFileTypes)
+  const hasRemotes = !!options.remotes
+  const hasShared = parsedOptions.devShared.length > 0
+  const needsFederationModule = hasRemotes || hasShared
+
   return {
     name: 'hugs7:remote-development',
-    virtualFile: options.remotes
+    virtualFile: needsFederationModule
       ? {
           __federation__: `
-${createRemotesMap(devRemotes)}
+${hasRemotes ? createRemotesMap(devRemotes) : 'const remotesMap = {};'}
 const loadJS = async (url, fn) => {
   const resolvedUrl = typeof url === 'function' ? await url() : url;
   const script = document.createElement('script')
@@ -199,7 +203,7 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
       }
     },
     async transform(this: TransformPluginContext, code: string, id: string) {
-      if (builderInfo.isHost && !builderInfo.isRemote) {
+      if ((builderInfo.isHost || builderInfo.isShared) && !builderInfo.isRemote) {
         for (const arr of parsedOptions.devShared) {
           if (!arr[1].version && !arr[1].manuallyPackagePathSetting) {
             const packageJsonPath = (
