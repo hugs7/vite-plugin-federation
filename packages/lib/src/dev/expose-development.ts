@@ -327,6 +327,13 @@ export const get = async (module) => {
         // which resolves to the HOST page origin in cross-origin
         // federation.  Using an absolute origin works for both
         // standalone and federated modes.
+        //
+        // Also patch the page-reload debounce to trigger a reload
+        // when React Fast Refresh can't handle an update across the
+        // federation boundary.  The HMR accept callback in
+        // @vitejs/plugin-react calls import.meta.hot.invalidate()
+        // when fast refresh fails, which propagates up to a full
+        // reload — the patched base ensures the reload check works.
         if (url === '/@vite/client' || url?.startsWith('/@vite/client?')) {
           try {
             const clientResult = await server.transformRequest('/@vite/client')
@@ -350,6 +357,63 @@ export const get = async (module) => {
           } catch (error) {
             next()
           }
+          return
+        }
+
+        // Patch /@react-refresh so the MFE re-uses the HOST's
+        // refresh runtime singleton (stored on window by the
+        // HOST's patched /@react-refresh).  Without this, the
+        // MFE has its own allFamiliesByID / mountedRoots maps
+        // and performReactRefresh() doesn't trigger re-renders
+        // for roots mounted by the HOST's React renderer.
+        //
+        // In standalone mode (no HOST runtime on window), the
+        // MFE's own runtime is loaded and stored globally instead.
+        // Patch /@react-refresh: if the HOST already stored its
+        // refresh runtime globally, re-export that singleton so
+        // all component families and mounted roots are shared.
+        // In standalone mode, import the real runtime and store it.
+        if (url === '/@react-refresh' || url?.startsWith('/@react-refresh?')) {
+          const code = `
+import * as _localRuntime from '/@react-refresh-runtime';
+// In federation mode the HOST has already stored its runtime
+// singleton on window.  Re-use it so all component families
+// and mounted roots are tracked in one place.
+// In standalone mode, store this runtime for potential future use.
+var _rt = (typeof window !== 'undefined' && window.__vite_react_refresh_runtime__) || _localRuntime;
+if (typeof window !== 'undefined' && !window.__vite_react_refresh_runtime__) {
+  window.__vite_react_refresh_runtime__ = _localRuntime;
+}
+export var injectIntoGlobalHook = _rt.injectIntoGlobalHook;
+export var register = _rt.register;
+export var createSignatureFunctionForTransform = _rt.createSignatureFunctionForTransform;
+export var isLikelyComponentType = _rt.isLikelyComponentType;
+export var getFamilyByType = _rt.getFamilyByType;
+export var performReactRefresh = _rt.performReactRefresh;
+export var setSignature = _rt.setSignature;
+export var collectCustomHooksForSignature = _rt.collectCustomHooksForSignature;
+export var validateRefreshBoundaryAndEnqueueUpdate = _rt.validateRefreshBoundaryAndEnqueueUpdate;
+export var registerExportsForReactRefresh = _rt.registerExportsForReactRefresh;
+export var __hmr_import = _rt.__hmr_import;
+export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
+`
+          res.setHeader('Content-Type', 'application/javascript')
+          res.end(code)
+          return
+        }
+
+        // Serve the real react-refresh runtime under an alternate
+        // URL so the /@react-refresh wrapper can import it.
+        if (url === '/@react-refresh-runtime' || url?.startsWith('/@react-refresh-runtime?')) {
+          try {
+            const result = await server.transformRequest('/@react-refresh')
+            if (result) {
+              res.setHeader('Content-Type', 'application/javascript')
+              res.end(result.code)
+              return
+            }
+          } catch { /* fall through */ }
+          next()
           return
         }
 

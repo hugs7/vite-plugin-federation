@@ -165,7 +165,39 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
       }
     },
 
-    configureServer() {},
+    configureServer(server) {
+      // Patch /@react-refresh on the HOST so it stores itself as a
+      // global singleton.  When a federated remote loads its own
+      // /@react-refresh from a different origin, it can re-export
+      // this singleton — ensuring all component families and mounted
+      // roots are tracked in one place for React Fast Refresh.
+      if (parsedOptions.devRemote.length) {
+        server.middlewares.use(async (req, res, next) => {
+          const url = req.url
+          if (url === '/@react-refresh' || url?.startsWith('/@react-refresh?')) {
+            try {
+              const result = await server.transformRequest('/@react-refresh')
+              if (result) {
+                // Append a line that stores the module on the window
+                const code = result.code +
+                  `\nif(typeof window!=='undefined'){` +
+                  `window.__vite_react_refresh_runtime__={` +
+                  `injectIntoGlobalHook,register,createSignatureFunctionForTransform,` +
+                  `isLikelyComponentType,getFamilyByType,performReactRefresh,` +
+                  `setSignature,collectCustomHooksForSignature,` +
+                  `validateRefreshBoundaryAndEnqueueUpdate,` +
+                  `registerExportsForReactRefresh,__hmr_import` +
+                  `};};\n`
+                res.setHeader('Content-Type', 'application/javascript')
+                res.end(code)
+                return
+              }
+            } catch { /* fall through */ }
+          }
+          next()
+        })
+      }
+    },
     async transform(this: TransformPluginContext, code: string, id: string) {
       if (builderInfo.isHost && !builderInfo.isRemote) {
         for (const arr of parsedOptions.devShared) {
