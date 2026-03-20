@@ -42,7 +42,7 @@ export function prodSharedPlugin(
     options(inputOptions) {
       isRemote = !!parsedOptions.prodExpose.length
       isHost =
-        !!parsedOptions.prodRemote.length && !parsedOptions.prodExpose.length
+        (!!parsedOptions.prodRemote.length || !!parsedOptions.prodShared.length) && !parsedOptions.prodExpose.length
 
       if (shareName2Prop.size) {
         // remove item which is both in external and shared

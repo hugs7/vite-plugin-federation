@@ -111,13 +111,16 @@ export function prodRemotePlugin(
   const shareScope = options.shareScope || 'default'
   let resolvedConfig: ResolvedConfig
   let federationRuntimeEmitted = false
+  const hasRemotes = !!options.remotes
+  const hasShared = parsedOptions.prodShared.length > 0
+  const needsFederationModule = hasRemotes || hasShared
   return {
     name: 'hugs7:remote-production',
-    virtualFile: options.remotes
+    virtualFile: needsFederationModule
       ? {
           // language=JS
           __federation__: `
-                ${createRemotesMap(prodRemotes)}
+                ${hasRemotes ? createRemotesMap(prodRemotes) : 'const remotesMap = {};'}
                 const currentImports = {}
                 const loadJS = async (url, fn) => {
                     const resolvedUrl = typeof url === 'function' ? await url() : url;
@@ -290,7 +293,7 @@ export function prodRemotePlugin(
       // (e.g. in vendor-framework) would import federation functions from the
       // entry chunk, creating circular static imports that deadlock when
       // combined with TLA from await importShared().
-      if (builderInfo.isHost && options.remotes && !federationRuntimeEmitted) {
+      if (builderInfo.isHost && needsFederationModule && !federationRuntimeEmitted) {
         federationRuntimeEmitted = true
         this.emitFile({
           type: 'chunk',
