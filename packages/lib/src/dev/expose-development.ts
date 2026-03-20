@@ -143,6 +143,18 @@ if (mod) {
   return { shimDir, aliases }
 }
 
+// Convert an absolute filesystem path to a URL that Vite's dev server
+// can serve.  If the path is inside the project root, return a root-
+// relative path; otherwise use /@fs/ prefix.
+function toViteUrl(filePath: string, root: string): string {
+  const normalized = filePath.replace(/\\/g, '/')
+  const normalizedRoot = root.replace(/\\/g, '/').replace(/\/$/, '')
+  if (normalized.startsWith(normalizedRoot + '/')) {
+    return normalized.slice(normalizedRoot.length)
+  }
+  return `/@fs${normalized}`
+}
+
 export function devExposePlugin(
   options: VitePluginFederationOptions
 ): PluginHooks {
@@ -150,6 +162,7 @@ export function devExposePlugin(
 
   // Build list of shared module names for init code generation
   const sharedList: string[] = []
+  let resolvedRoot = process.cwd()
 
   let moduleMap = ''
   for (const item of parsedOptions.devExpose) {
@@ -172,6 +185,7 @@ async function __federation_import(name) {
 };
 
 let __federation_shared_resolving;
+let __federation_dev_client_loaded;
 export const init =(shareScope) => {
   globalThis.__federation_shared__= globalThis.__federation_shared__ || {};
   Object.entries(shareScope).forEach(([key, value]) => {
@@ -207,16 +221,32 @@ export const init =(shareScope) => {
       console.warn('[federation-dev] Failed to pre-resolve shared module:', key, e);
     }
   }));
+
+  // Load the remote's @vite/client so HMR updates from the remote
+  // dev server are received by this browser tab.  The @vite/client
+  // on the remote is patched (by our middleware) to use absolute URLs
+  // so HMR module re-imports resolve to the remote origin.
+  const remoteOrigin = new URL(import.meta.url).origin;
+  if (!globalThis.__federation_dev_clients__) {
+    globalThis.__federation_dev_clients__ = new Set();
+  }
+  if (!globalThis.__federation_dev_clients__.has(remoteOrigin)) {
+    globalThis.__federation_dev_clients__.add(remoteOrigin);
+    __federation_dev_client_loaded = import(/* @vite-ignore */ remoteOrigin + '/@vite/client');
+  }
 };
 
 export const get = async (module) => {
   if (__federation_shared_resolving) await __federation_shared_resolving;
+  if (__federation_dev_client_loaded) await __federation_dev_client_loaded;
   console.log('[federation-get]', module, 'shared modules populated:', Object.keys(globalThis.__federation_shared_modules__ || {}));
   if(!moduleMap[module]) throw new Error('Can not find remote module ' + module)
   return moduleMap[module]();
 };`
     },
     config(config: UserConfig) {
+      resolvedRoot = config.root ? resolve(config.root) : process.cwd()
+
       // Only set up shims when this is a remote (has exposes) with shared modules
       if (!parsedOptions.devExpose.length || !parsedOptions.devShared.length) {
         return
@@ -227,7 +257,7 @@ export const get = async (module) => {
         sharedList.push(item[0])
       }
 
-      const root = config.root ? resolve(config.root) : process.cwd()
+      const root = resolvedRoot
       const { aliases } = generateShimDir(sharedList, root)
 
       // Set up resolve aliases so all imports of shared modules (including
@@ -255,22 +285,26 @@ export const get = async (module) => {
 
     },
     configureServer(server) {
+      // Add CORS headers to ALL responses so the HOST browser can load
+      // source files, @vite/client, dep-optimized chunks, etc. from
+      // this remote dev server.
+      server.middlewares.use((req, res, next) => {
+        res.setHeader('Access-Control-Allow-Origin', '*')
+        res.setHeader('Access-Control-Allow-Methods', '*')
+        res.setHeader('Access-Control-Allow-Headers', '*')
+        if (req.method === 'OPTIONS') {
+          res.statusCode = 204
+          res.end()
+          return
+        }
+        next()
+      })
+
       server.middlewares.use(async (req, res, next) => {
         const url = req.url
-        const setCorsHeaders = () => {
-          res.setHeader('Access-Control-Allow-Origin', '*')
-          res.setHeader('Access-Control-Allow-Methods', '*')
-          res.setHeader('Access-Control-Allow-Headers', '*')
-        }
 
+        // Serve remoteEntry.js
         if (url === `/${options.filename}`) {
-          if (req.method === 'OPTIONS') {
-            setCorsHeaders()
-            res.statusCode = 204
-            res.end()
-            return
-          }
-          setCorsHeaders()
           try {
             const moduleId = `__remoteEntryHelper__${options.filename}`
             const result = await server.transformRequest(moduleId)
@@ -288,14 +322,105 @@ export const get = async (module) => {
           return
         }
 
-        if (url?.includes('__federation_expose_')) {
-          if (req.method === 'OPTIONS') {
-            setCorsHeaders()
-            res.statusCode = 204
-            res.end()
-            return
+        // Patch @vite/client so HMR module re-imports use the
+        // absolute remote origin.  The stock client uses base = "/"
+        // which resolves to the HOST page origin in cross-origin
+        // federation.  Using an absolute origin works for both
+        // standalone and federated modes.
+        //
+        // Also patch the page-reload debounce to trigger a reload
+        // when React Fast Refresh can't handle an update across the
+        // federation boundary.  The HMR accept callback in
+        // @vitejs/plugin-react calls import.meta.hot.invalidate()
+        // when fast refresh fails, which propagates up to a full
+        // reload — the patched base ensures the reload check works.
+        if (url === '/@vite/client' || url?.startsWith('/@vite/client?')) {
+          try {
+            const clientResult = await server.transformRequest('/@vite/client')
+            if (!clientResult) {
+              next()
+              return
+            }
+            const port = server.config.server.port ?? 5173
+            const remoteOrigin = `http://localhost:${port}`
+            let code = clientResult.code
+            code = code.replace(
+              /const base = "\/"\s*\|\|\s*"\/";/,
+              `const base = "${remoteOrigin}/";`
+            )
+            code = code.replace(
+              /const base\$1 = "\/"\s*\|\|\s*"\/";/,
+              `const base$1 = "${remoteOrigin}/";`
+            )
+            res.setHeader('Content-Type', 'application/javascript')
+            res.end(code)
+          } catch (error) {
+            next()
           }
-          setCorsHeaders()
+          return
+        }
+
+        // Patch /@react-refresh so the MFE re-uses the HOST's
+        // refresh runtime singleton (stored on window by the
+        // HOST's patched /@react-refresh).  Without this, the
+        // MFE has its own allFamiliesByID / mountedRoots maps
+        // and performReactRefresh() doesn't trigger re-renders
+        // for roots mounted by the HOST's React renderer.
+        //
+        // In standalone mode (no HOST runtime on window), the
+        // MFE's own runtime is loaded and stored globally instead.
+        // Patch /@react-refresh: if the HOST already stored its
+        // refresh runtime globally, re-export that singleton so
+        // all component families and mounted roots are shared.
+        // In standalone mode, import the real runtime and store it.
+        if (url === '/@react-refresh' || url?.startsWith('/@react-refresh?')) {
+          const code = `
+import * as _localRuntime from '/@react-refresh-runtime';
+// In federation mode the HOST has already stored its runtime
+// singleton on window.  Re-use it so all component families
+// and mounted roots are tracked in one place.
+// In standalone mode, store this runtime for potential future use.
+var _rt = (typeof window !== 'undefined' && window.__vite_react_refresh_runtime__) || _localRuntime;
+if (typeof window !== 'undefined' && !window.__vite_react_refresh_runtime__) {
+  window.__vite_react_refresh_runtime__ = _localRuntime;
+}
+export var injectIntoGlobalHook = _rt.injectIntoGlobalHook;
+export var register = _rt.register;
+export var createSignatureFunctionForTransform = _rt.createSignatureFunctionForTransform;
+export var isLikelyComponentType = _rt.isLikelyComponentType;
+export var getFamilyByType = _rt.getFamilyByType;
+export var performReactRefresh = _rt.performReactRefresh;
+export var setSignature = _rt.setSignature;
+export var collectCustomHooksForSignature = _rt.collectCustomHooksForSignature;
+export var validateRefreshBoundaryAndEnqueueUpdate = _rt.validateRefreshBoundaryAndEnqueueUpdate;
+export var registerExportsForReactRefresh = _rt.registerExportsForReactRefresh;
+export var __hmr_import = _rt.__hmr_import;
+export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
+`
+          res.setHeader('Content-Type', 'application/javascript')
+          res.end(code)
+          return
+        }
+
+        // Serve the real react-refresh runtime under an alternate
+        // URL so the /@react-refresh wrapper can import it.
+        if (url === '/@react-refresh-runtime' || url?.startsWith('/@react-refresh-runtime?')) {
+          try {
+            const result = await server.transformRequest('/@react-refresh')
+            if (result) {
+              res.setHeader('Content-Type', 'application/javascript')
+              res.end(result.code)
+              return
+            }
+          } catch { /* fall through */ }
+          next()
+          return
+        }
+
+        // Serve exposed modules as re-export stubs that redirect the
+        // browser to import the real source file.  Vite then tracks
+        // the real file in its module graph and sends HMR updates for it.
+        if (url?.includes('__federation_expose_')) {
           try {
             const match = url.match(/__federation_expose_(.+?)\.js/)
             if (match) {
@@ -306,14 +431,13 @@ export const get = async (module) => {
               })
               if (exposeItem && exposeItem[1] && exposeItem[1].import) {
                 const modulePath = exposeItem[1].import
-                const result = await server.transformRequest(modulePath)
-                if (result) {
-                  res.setHeader('Content-Type', 'application/javascript')
-                  res.end(result.code)
-                } else {
-                  res.statusCode = 404
-                  res.end(`Module not found: ${modulePath}`)
-                }
+                // Serve a thin re-export stub.  The browser follows
+                // the import to the real source file, which Vite serves
+                // with HMR metadata.
+                const viteUrl = toViteUrl(modulePath, resolvedRoot)
+                const code = `export { default } from '${viteUrl}';\nexport * from '${viteUrl}';`
+                res.setHeader('Content-Type', 'application/javascript')
+                res.end(code)
               } else {
                 res.statusCode = 404
                 res.end(`Expose module not found: ${exposeName}`)
