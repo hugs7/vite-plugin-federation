@@ -20,9 +20,22 @@ export async function setup(): Promise<void> {
   await fs.mkdirp(DIR)
   await fs.writeFile(path.join(DIR, 'wsEndpoint'), browserServer.wsEndpoint())
 
+  // Kill any leftover server processes before touching the temp directory
+  // so file handles are released (avoids EBUSY on Windows).
+  await kill('5000,5001,5002,5003,5004').catch(() => {})
+  if (process.platform === 'win32') {
+    await new Promise((r) => setTimeout(r, 2000))
+  }
+
   const tempDir = path.resolve(__dirname, '../temp')
   await fs.ensureDir(tempDir)
-  await fs.emptyDir(tempDir)
+  try {
+    await fs.emptyDir(tempDir)
+  } catch {
+    // Retry once after a short delay (Windows file-lock release).
+    await new Promise((r) => setTimeout(r, 2000))
+    await fs.emptyDir(tempDir)
+  }
   await fs
     .copy(path.resolve(__dirname, '../examples'), tempDir, {
       dereference: false,
@@ -43,12 +56,17 @@ export async function setup(): Promise<void> {
 }
 
 export async function teardown(): Promise<void> {
-  browserServer?.close()
+  await browserServer?.close()
   if (!process.env.VITE_PRESERVE_BUILD_ARTIFACTS) {
-    await fs.remove(path.resolve(__dirname, '../temp'), (err) => {
-      if (err) return console.log(err)
+    await kill('5000,5001,5002,5003,5004').catch(() => {})
+    if (process.platform === 'win32') {
+      await new Promise((r) => setTimeout(r, 2000))
+    }
+    try {
+      await fs.remove(path.resolve(__dirname, '../temp'))
       console.log('temp file is deleted')
-    })
-    kill('5000,5001,5002,5003').catch(console.log)
+    } catch {
+      console.log('temp directory still locked, will be cleaned on next run')
+    }
   }
 }

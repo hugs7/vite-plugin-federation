@@ -1,10 +1,10 @@
-import { execa } from 'execa';
+import { execa, type ExecaChildProcess } from 'execa'
 import { dirname, join, resolve } from 'node:path'
 import os from 'node:os'
 import fs from 'fs-extra'
 import { chromium } from 'playwright-chromium'
 import type { Browser, Page } from 'playwright-chromium'
-import type { File } from 'vitest'
+import type { RunnerTestFile } from 'vitest'
 import { beforeAll, afterAll } from 'vitest'
 
 export const workspaceRoot = resolve(__dirname, '../')
@@ -28,12 +28,13 @@ const DIR = join(os.tmpdir(), 'vitest_playwright_global_setup')
 
 let err: Error
 let skipError: boolean
+let serverProcesses: ExecaChildProcess[] = []
 
-beforeAll(async (s) => {
+beforeAll(async ({}, s) => {
   process.env.NODE_ENV = 'production'
-  const suite = s as File
+  const suite = s as RunnerTestFile
   // skip browser setup for non-examples tests
-  if (!suite.filepath.includes('examples')) {
+  if (!suite?.filepath?.includes('examples')) {
     return
   }
 
@@ -80,8 +81,10 @@ beforeAll(async (s) => {
         })
       }
       await execa('pnpm', ['run', 'build:remotes'], {cwd: testDir, stdio: 'inherit'})
-      execa('pnpm', ['run', 'serve:remotes'], {cwd: testDir, stdio: 'inherit'})
-      execa('pnpm', ['run', 'dev:hosts'], {cwd: testDir, stdio: 'inherit'})
+      serverProcesses.push(
+        execa('pnpm', ['run', 'serve:remotes'], {cwd: testDir, stdio: 'inherit', reject: false}),
+        execa('pnpm', ['run', 'dev:hosts'], {cwd: testDir, stdio: 'inherit', reject: false})
+      )
 
       const port = 5000
       // use resolved port/base from server
@@ -107,7 +110,14 @@ beforeAll(async (s) => {
 afterAll(async () => {
   await page?.close()
   skipError = true
-  await execa('pnpm', ['run', 'stop'], { cwd: testDir, stdio: 'inherit' })
+  try {
+    await execa('pnpm', ['run', 'stop'], { cwd: testDir, stdio: 'inherit' })
+  } catch {
+    // kill-port may exit non-zero when no process is found; safe to ignore.
+  }
+  // Wait for all server processes to fully exit so file handles are released.
+  await Promise.all(serverProcesses.map((p) => p.catch(() => {})))
+  serverProcesses = []
   if (browser) {
     await browser.close()
   }

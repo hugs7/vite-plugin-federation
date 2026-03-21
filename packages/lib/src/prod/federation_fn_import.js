@@ -5,12 +5,15 @@ const currentImports = {}
 // eslint-disable-next-line no-undef
 const moduleMap = __rf_var__moduleMap
 const moduleCache = Object.create(null)
-async function importShared(name, shareScope = 'default') {
-  return moduleCache[name]
-    ? new Promise((r) => r(moduleCache[name]))
-    : (await getSharedFromRuntime(name, shareScope)) || getSharedFromLocal(name)
+function importShared(name, shareScope = 'default') {
+  return moduleCache[name] ??
+    (moduleCache[name] = loadShared(name, shareScope))
 }
-// eslint-disable-next-line
+async function loadShared(name, shareScope) {
+  const module = (await getSharedFromRuntime(name, shareScope)) || await getSharedFromLocal(name)
+  moduleCache[name] = module
+  return module
+}
 async function __federation_import(name) {
   currentImports[name] ??= import(name)
   return currentImports[name]
@@ -30,8 +33,9 @@ async function getSharedFromRuntime(name, shareScope) {
         module = await (await versionValue.get())()
       } else {
         console.log(
-          `provider support ${name}(${versionKey}) is not satisfied requiredVersion(\${moduleMap[name].requiredVersion})`
+          `provider support ${name} is not satisfied requiredVersion(${moduleMap[name].requiredVersion}). Debug logging will show available modules and versions.`
         )
+        console.debug(moduleMap)
       }
     } else {
       const versionKey = Object.keys(versionObj)[0]

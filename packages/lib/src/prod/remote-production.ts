@@ -110,13 +110,17 @@ export function prodRemotePlugin(
 
   const shareScope = options.shareScope || 'default'
   let resolvedConfig: ResolvedConfig
+  let federationRuntimeEmitted = false
+  const hasRemotes = !!options.remotes
+  const hasShared = parsedOptions.prodShared.length > 0
+  const needsFederationModule = hasRemotes || hasShared
   return {
-    name: 'originjs:remote-production',
-    virtualFile: options.remotes
+    name: 'hugs7:remote-production',
+    virtualFile: needsFederationModule
       ? {
           // language=JS
           __federation__: `
-                ${createRemotesMap(prodRemotes)}
+                ${hasRemotes ? createRemotesMap(prodRemotes) : 'const remotesMap = {};'}
                 const currentImports = {}
                 const loadJS = async (url, fn) => {
                     const resolvedUrl = typeof url === 'function' ? await url() : url;
@@ -284,6 +288,21 @@ export function prodRemotePlugin(
         }
       }
 
+      // Emit the federation runtime as its own chunk to prevent it from being
+      // inlined into the entry. Without this, modules that use remote imports
+      // (e.g. in vendor-framework) would import federation functions from the
+      // entry chunk, creating circular static imports that deadlock when
+      // combined with TLA from await importShared().
+      if (builderInfo.isHost && needsFederationModule && !federationRuntimeEmitted) {
+        federationRuntimeEmitted = true
+        this.emitFile({
+          type: 'chunk',
+          id: '__federation__',
+          name: '__federation_runtime__',
+          preserveSignature: 'strict'
+        })
+      }
+
       if (builderInfo.isHost) {
         if (id === '\0virtual:__federation__') {
           const res: string[] = []
@@ -301,6 +320,14 @@ export function prodRemotePlugin(
       }
 
       if (builderInfo.isHost || builderInfo.isShared) {
+        // Skip node_modules: third-party libraries should keep their static
+        // imports. Transforming them to await importShared() creates TLA in
+        // vendor chunks that often contain the shared modules themselves,
+        // causing self-referential deadlocks during module evaluation.
+        if (id.includes('/node_modules/') || id.includes('\\node_modules\\')) {
+          return null
+        }
+
         let ast: AcornNode | null = null
         try {
           ast = this.parse(code)
@@ -355,7 +382,6 @@ export function prodRemotePlugin(
                     defaultImportDeclaration &&
                     namedImportDeclaration.length
                   ) {
-                    // import a, {b} from 'c' -> const a = await importShared('c'); const {b} = a;
                     const imports = namedImportDeclaration.join(',')
                     const line = `const ${defaultImportDeclaration} = await importShared('${moduleName}');\nconst {${imports}} = ${defaultImportDeclaration};\n`
                     magicString.overwrite(node.start, node.end, line)

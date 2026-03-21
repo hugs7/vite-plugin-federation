@@ -7,8 +7,8 @@
     "layout"
   ],
   "scripts": {
-    "build": "pnpm  --parallel --filter \"./**\" build",
-    "serve": "pnpm  --parallel --filter \"./**\" serve",
+    "build": "pnpm  --parallel --filter \"./**\" --filter \"!.\" build",
+    "serve": "pnpm  --parallel --filter \"./**\" --filter \"!.\" serve",
     "stop": "kill-port --port 5000,5001"
   },
   "devDependencies": {

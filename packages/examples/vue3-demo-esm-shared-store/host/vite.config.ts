@@ -42,7 +42,7 @@ export default defineConfig({
         target: 'esnext',
         minify: false,
         cssCodeSplit: true,
-        rollupOptions: {
+        rolldownOptions: {
             output: {
                 minifyInternalExports: false
             }

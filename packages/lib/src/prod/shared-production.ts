@@ -35,14 +35,14 @@ export function prodSharedPlugin(
   const id2Prop = new Map<string, any>()
 
   return {
-    name: 'originjs:shared-production',
+    name: 'hugs7:shared-production',
     virtualFile: {
       __federation_fn_import: federation_fn_import
     },
     options(inputOptions) {
       isRemote = !!parsedOptions.prodExpose.length
       isHost =
-        !!parsedOptions.prodRemote.length && !parsedOptions.prodExpose.length
+        (!!parsedOptions.prodRemote.length || !!parsedOptions.prodShared.length) && !parsedOptions.prodExpose.length
 
       if (shareName2Prop.size) {
         // remove item which is both in external and shared

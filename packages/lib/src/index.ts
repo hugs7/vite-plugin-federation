@@ -62,7 +62,8 @@ export default function federation(
       pluginList = []
     }
     builderInfo.isHost = !!(
-      parsedOptions.prodRemote.length || parsedOptions.devRemote.length
+      parsedOptions.prodRemote.length || parsedOptions.devRemote.length ||
+      parsedOptions.prodShared.length || parsedOptions.devShared.length
     )
     builderInfo.isRemote = !!(
       parsedOptions.prodExpose.length || parsedOptions.devExpose.length
@@ -81,7 +82,7 @@ export default function federation(
   }
 
   return {
-    name: 'originjs:federation',
+    name: 'hugs7:federation',
     // for scenario vite.config.js build.cssCodeSplit: false
     // vite:css-post plugin will summarize all the styles in the style.xxxxxx.css file
     // so, this plugin need run after vite:css-post in post plugin list

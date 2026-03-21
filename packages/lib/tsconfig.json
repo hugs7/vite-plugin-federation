@@ -3,9 +3,9 @@
   "exclude": ["dist", "node_modules", "test"],
   "compilerOptions": {
     "outDir": "dist",
-    "target": "es2019",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "target": "es2022",
+    "module": "es2022",
+    "moduleResolution": "bundler",
     "strict": true,
     "sourceMap": false,
     "noImplicitOverride": true,

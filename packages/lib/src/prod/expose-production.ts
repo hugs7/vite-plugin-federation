@@ -70,7 +70,7 @@ export function prodExposePlugin(
   // let viteConfigResolved: ResolvedConfig
 
   return {
-    name: 'originjs:expose-production',
+    name: 'hugs7:expose-production',
     virtualFile: {
       // code generated for remote
       // language=JS
@@ -211,7 +211,7 @@ export function prodExposePlugin(
               return res
             }, new Map())
         remoteEntryChunk.code = remoteEntryChunk.code.replace(
-          new RegExp(`(["'])${DYNAMIC_LOADING_CSS_PREFIX}.*?\\1`, 'g'),
+          new RegExp(`(["'\`])${DYNAMIC_LOADING_CSS_PREFIX}.*?\\1`, 'g'),
           (str) => {
             // when build.cssCodeSplit: false, all files are aggregated into style.xxxxxxxx.css
             if (

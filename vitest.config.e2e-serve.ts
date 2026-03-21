@@ -10,7 +10,7 @@ export default defineConfig({
     }
   },
   test: {
-    threads: false,
+    fileParallelism: false,
     include: ['./packages/examples/**/*.*serve*.spec.[tj]s'],
     setupFiles: ['./packages/examples/vitestSetup-serve.ts'],
     globalSetup: ['./packages/examples/vitestGlobalSetup.ts'],
@@ -23,7 +23,7 @@ export default defineConfig({
         return false
     }
   },
-  esbuild: {
-    target: 'node20'
+  oxc: {
+    target: 'node22'
   }
 })

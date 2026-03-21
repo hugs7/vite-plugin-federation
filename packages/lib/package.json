@@ -5,6 +5,10 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./types/index.d.ts",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./types/index.d.ts",
@@ -19,8 +23,8 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=14.0.0",
-    "pnpm": ">=7.0.1"
+    "node": ">=22.0.0",
+    "pnpm": ">=10"
   },
   "repository": {
     "type": "git",
@@ -46,13 +50,13 @@
   },
   "dependencies": {
     "estree-walker": "^3.0.2",
-    "magic-string": "^0.27.0"
+    "magic-string": "^0.30.0"
   },
   "devDependencies": {
     "@rollup/plugin-virtual": "^3.0.1",
-    "@types/estree": "^0.0.50",
+    "@types/estree": "^1.0.0",
     "conventional-changelog-cli": "^4.1.0",
-    "typescript": "^4.9.4",
-    "vite": "^4.0.5"
+    "typescript": "~5.9.3",
+    "vite": "^8.0.0"
   }
 }
