@@ -8,8 +8,8 @@
     "remote-B"
   ],
   "scripts": {
-    "build": "pnpm --parallel --filter \"./**\" build ",
-    "serve": "pnpm --parallel --filter \"./**\" serve",
+    "build": "pnpm --parallel --filter \"./**\" --filter \"!.\" build ",
+    "serve": "pnpm --parallel --filter \"./**\" --filter \"!.\" serve",
     "build:remotes": "pnpm --parallel --filter \"./remote-A\" --filter \"./remote-B\"  build",
     "serve:remotes": "pnpm --parallel --filter \"./remote-A\" --filter \"./remote-B\"  serve",
     "dev:hosts": "pnpm --filter \"./host\" dev",
