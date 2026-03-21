@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.7.0](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.6.0...@hugs7/vite-plugin-federation@1.7.0) (2026-03-21)
+
+
+### Bug Fixes
+
+* **dev:** generate CJS fallback shim for ESM packages that fail export enumeration ([af5e029](https://github.com/hugs7/vite-plugin-federation/commit/af5e02973796967d9973a63848668c5b1079e202))
+* generate share scope when shared modules configured without remotes ([751b0cd](https://github.com/hugs7/vite-plugin-federation/commit/751b0cdbbf79317c28c74092546fd51e6b4261c8))
+* lint error ([5ab9022](https://github.com/hugs7/vite-plugin-federation/commit/5ab902231ad8912e1cb38255fb2b6ada53741173))
+* prevent TLA deadlocks with Rolldown code-splitting ([93d845f](https://github.com/hugs7/vite-plugin-federation/commit/93d845f8d4e6c445ace7b9cf79f12c54f2e89e5b))
+* resolve ESLint errors in CI ([062bb34](https://github.com/hugs7/vite-plugin-federation/commit/062bb349689f2bddd1025972c3051ee2349b0dec))
+
+
+### Features
+
+* add debug logging for module resolution failures ([a49612c](https://github.com/hugs7/vite-plugin-federation/commit/a49612c57160d0f235ec32dd54c427ca08c9bd3e))
+* add dev server for remote entry and exposed modules ([c94a11c](https://github.com/hugs7/vite-plugin-federation/commit/c94a11cd39a9dc13f00f8b1ca31a5b4205ab6335))
+* dev expose server initial commit ([95512bc](https://github.com/hugs7/vite-plugin-federation/commit/95512bcab55c7d414b120b1181d27ca5db4e316f))
+* **dev:** cross-origin React Fast Refresh for federated remotes ([2ac73ba](https://github.com/hugs7/vite-plugin-federation/commit/2ac73ba5d48c6b78abe0190d00a6eeb17652acaf))
+* **dev:** shared module bridge shims and host share scope for dev federation ([fe2773b](https://github.com/hugs7/vite-plugin-federation/commit/fe2773ba91daa5032bb8890cf2e6075ae8915f81))
+* remote-hmr initial commit ([1e074f8](https://github.com/hugs7/vite-plugin-federation/commit/1e074f864170a8627798ca82722179a52d57c5de))
+* update example dependencies ([f79c0b2](https://github.com/hugs7/vite-plugin-federation/commit/f79c0b2231b8aa8e7fb5ae83f7d93cc5659e41a4))
+
+
+
+
+
 # 1.6.0 (2026-03-19)
 
 
