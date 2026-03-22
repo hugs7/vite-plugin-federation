@@ -31,9 +31,9 @@ import {
 import { builderInfo, parsedOptions, devRemotes } from '../public'
 import type { PluginHooks } from '../../types/pluginHooks'
 
-export function devRemotePlugin(
+export const devRemotePlugin = (
   options: VitePluginFederationOptions
-): PluginHooks {
+): PluginHooks => {
   parsedOptions.devRemote = parseRemoteOptions(options)
   // const remotes: { id: string; regexp: RegExp; config: RemotesConfig }[] = []
   for (const item of parsedOptions.devRemote) {

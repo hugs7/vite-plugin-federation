@@ -26,14 +26,60 @@ import { join, resolve } from 'path'
 import { createRequire } from 'module'
 import { execSync } from 'child_process'
 import type { UserConfig } from 'vite'
+import { FEDERATION_DEBUG_SNIPPET_CJS, FEDERATION_DEBUG_SNIPPET_ESM } from '../debug'
 
-function getModuleExportNames(name: string, root: string): string[] {
+/**
+ * Statically extract ESM export names from a file using es-module-lexer,
+ * run in a subprocess so the async `init()` can complete before `parse()`.
+ * This doesn't execute the module, so it works even when the module
+ * references browser-only globals like `window` at the top level.
+ */
+const getExportNamesStatically = (resolvedPath: string): string[] => {
+  try {
+    // Pass the file path via argv to avoid shell quoting issues.
+    // es-module-lexer exports may be strings (v0.x) or objects with .n (v1+),
+    // so we normalise both.
+    const script = [
+      "const{init,parse}=require('es-module-lexer');",
+      "const fs=require('fs');",
+      "init.then(()=>{",
+        "const code=fs.readFileSync(process.argv[1],'utf-8');",
+        "const[,exp]=parse(code);",
+        "const names=exp.map(e=>typeof e==='string'?e:e.n).filter(Boolean);",
+        "console.log(JSON.stringify(names));",
+      "});"
+    ].join('')
+    const result = execSync(`node -e "${script}" -- "${resolvedPath}"`, {
+      encoding: 'utf-8',
+      timeout: 10000,
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    return JSON.parse(result.trim())
+  } catch {
+    return []
+  }
+}
+
+const getModuleExportNames = (name: string, root: string): string[] => {
+  // First, try dynamic import() in a subprocess — this gives the most
+  // accurate picture since it evaluates the module.
   try {
     const result = execSync(
       `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
       { cwd: root, encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
     )
     return JSON.parse(result.trim())
+  } catch {
+    // Dynamic import failed — likely because the module references
+    // browser-only globals (e.g. `window`) at the top level.
+    // Fall back to static analysis of the ESM source.
+  }
+
+  // Resolve the module entry point and parse it statically
+  try {
+    const nodeRequire = createRequire(join(root, 'package.json'))
+    const resolvedPath = nodeRequire.resolve(name)
+    return getExportNamesStatically(resolvedPath)
   } catch {
     return []
   }
@@ -43,10 +89,10 @@ function getModuleExportNames(name: string, root: string): string[] {
 // optimizer bundles them instead of the real packages.  Every optimized
 // dep (react-redux, etc.) that imports "react" will therefore go through
 // the bridge, which reads from the federation share scope at runtime.
-function generateShimDir(
+const generateShimDir = (
   sharedNames: string[],
   root: string
-): { shimDir: string; aliases: Record<string, string> } {
+): { shimDir: string; aliases: Record<string, string> } => {
   const shimDir = join(root, 'node_modules', '.federation-shims')
   if (!existsSync(shimDir)) {
     mkdirSync(shimDir, { recursive: true })
@@ -94,9 +140,9 @@ function generateShimDir(
     const shimFile = join(shimDir, `${safeName}.cjs`)
 
     if (!isEsm) {
-      const shimCode = `
+      const shimCode = `${FEDERATION_DEBUG_SNIPPET_CJS}var _log = __fed_debug('federation:shim');
 var mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
-console.log('[federation-shim] ${name}:', mod ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));
+_log('${name}:', mod ? 'SHARED' : 'LOCAL');
 if (mod) {
   module.exports = mod;
 } else {
@@ -112,9 +158,9 @@ if (mod) {
         // globals like `window` at the top level and can't be loaded in
         // Node).  Fall back to a CJS-style shim — the dep optimizer
         // will wrap consumers with __toESM() which is fine.
-        const shimCode = `
+        const shimCode = `${FEDERATION_DEBUG_SNIPPET_CJS}var _log = __fed_debug('federation:shim');
 var mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
-console.log('[federation-shim] ${name}:', mod ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));
+_log('${name}:', mod ? 'SHARED' : 'LOCAL');
 if (mod) {
   module.exports = mod;
 } else {
@@ -126,8 +172,9 @@ if (mod) {
         const namedExports = exportNames.filter((n) => n !== 'default')
         const hasDefault = exportNames.includes('default')
 
-        let shimCode = `var _shared = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];\n`
-        shimCode += `console.log('[federation-shim] ${name}:', _shared ? 'SHARED' : 'LOCAL', new Error().stack.split('\\n').slice(0,4).join(' <- '));\n`
+        let shimCode = `${FEDERATION_DEBUG_SNIPPET_CJS}var _log = __fed_debug('federation:shim');\n`
+        shimCode += `var _shared = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];\n`
+        shimCode += `_log('${name}:', _shared ? 'SHARED' : 'LOCAL');\n`
         shimCode += `var _mod = _shared || require('${escapedPath}');\n`
         if (hasDefault) {
           shimCode += `Object.defineProperty(exports, 'default', { enumerable: true, get: function() { return _mod.default ?? _mod; } });\n`
@@ -148,7 +195,7 @@ if (mod) {
 // Convert an absolute filesystem path to a URL that Vite's dev server
 // can serve.  If the path is inside the project root, return a root-
 // relative path; otherwise use /@fs/ prefix.
-function toViteUrl(filePath: string, root: string): string {
+const toViteUrl = (filePath: string, root: string): string => {
   const normalized = filePath.replace(/\\/g, '/')
   const normalizedRoot = root.replace(/\\/g, '/').replace(/\/$/, '')
   if (normalized.startsWith(normalizedRoot + '/')) {
@@ -157,9 +204,9 @@ function toViteUrl(filePath: string, root: string): string {
   return `/@fs${normalized}`
 }
 
-export function devExposePlugin(
+export const devExposePlugin = (
   options: VitePluginFederationOptions
-): PluginHooks {
+): PluginHooks => {
   parsedOptions.devExpose = parseExposeOptions(options)
 
   // Build list of shared module names for init code generation
@@ -177,6 +224,9 @@ export function devExposePlugin(
     name: 'hugs7:expose-development',
     virtualFile: {
       [`__remoteEntryHelper__${options.filename}`]: `
+${FEDERATION_DEBUG_SNIPPET_ESM}
+const _logInit = __fed_debug('federation:init');
+const _logGet = __fed_debug('federation:get');
 const currentImports = {}
 const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
 let moduleMap = {${moduleMap}}
@@ -208,7 +258,7 @@ export const init =(shareScope) => {
   if (!globalThis.__federation_shared_modules__) {
     globalThis.__federation_shared_modules__ = {};
   }
-  console.log('[federation-init] Resolving shared modules:', Object.keys(shareScope));
+  _logInit('Resolving shared modules:', Object.keys(shareScope));
   __federation_shared_resolving = Promise.all(Object.keys(shareScope).map(async (key) => {
     try {
       const versions = shareScope[key];
@@ -217,10 +267,10 @@ export const init =(shareScope) => {
         const factory = await versions[ver].get();
         const mod = await factory();
         globalThis.__federation_shared_modules__[key] = mod;
-        console.log('[federation-init] Resolved:', key, Object.keys(mod).slice(0,5));
+        _logInit('Resolved:', key, Object.keys(mod).slice(0,5));
       }
     } catch(e) {
-      console.warn('[federation-dev] Failed to pre-resolve shared module:', key, e);
+      _logInit('Failed to pre-resolve shared module:', key, e);
     }
   }));
 
@@ -241,7 +291,7 @@ export const init =(shareScope) => {
 export const get = async (module) => {
   if (__federation_shared_resolving) await __federation_shared_resolving;
   if (__federation_dev_client_loaded) await __federation_dev_client_loaded;
-  console.log('[federation-get]', module, 'shared modules populated:', Object.keys(globalThis.__federation_shared_modules__ || {}));
+  _logGet(module, 'shared modules populated:', Object.keys(globalThis.__federation_shared_modules__ || {}));
   if(!moduleMap[module]) throw new Error('Can not find remote module ' + module)
   return moduleMap[module]();
 };`

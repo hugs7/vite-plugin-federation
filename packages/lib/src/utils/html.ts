@@ -10,10 +10,10 @@ export interface HtmlTagDescriptor {
 
 const unaryTags = new Set(['link', 'meta', 'base'])
 
-function serializeTag(
+const serializeTag = (
   { tag, attrs, children }: HtmlTagDescriptor,
   indent = ''
-): string {
+): string => {
   if (unaryTags.has(tag)) {
     return `<${tag}${serializeAttrs(attrs)}>`
   } else {
@@ -24,10 +24,10 @@ function serializeTag(
   }
 }
 
-function serializeTags(
+const serializeTags = (
   tags: HtmlTagDescriptor['children'],
   indent = ''
-): string {
+): string => {
   if (typeof tags === 'string') {
     return tags
   } else if (tags && tags.length) {
@@ -36,7 +36,7 @@ function serializeTags(
   return ''
 }
 
-function serializeAttrs(attrs: HtmlTagDescriptor['attrs']): string {
+const serializeAttrs = (attrs: HtmlTagDescriptor['attrs']): string => {
   let res = ''
   for (const key in attrs) {
     if (typeof attrs[key] === 'boolean') {
@@ -48,13 +48,13 @@ function serializeAttrs(attrs: HtmlTagDescriptor['attrs']): string {
   return res
 }
 
-function incrementIndent(indent = '') {
+const incrementIndent = (indent = '') => {
   return `${indent}${indent[0] === '\t' ? '\t' : '  '}`
 }
 
 const matchHtmlRegExp = /["'&<>]/
 
-function escapeHtml(string: any) {
+const escapeHtml = (string: any) => {
   const str = '' + string
   const match = matchHtmlRegExp.exec(str)
 
@@ -117,11 +117,11 @@ export const toPreloadTag = (href: string): HtmlTagDescriptor => ({
   }
 })
 
-export function injectToHead(
+export const injectToHead = (
   html: string,
   tags: HtmlTagDescriptor[],
   prepend = false
-) {
+) => {
   if (tags.length === 0) return html
 
   if (prepend) {
@@ -153,7 +153,7 @@ export function injectToHead(
   return prependInjectFallback(html, tags)
 }
 
-function prependInjectFallback(html: string, tags: HtmlTagDescriptor[]) {
+const prependInjectFallback = (html: string, tags: HtmlTagDescriptor[]) => {
   // prepend to the html tag, append after doctype, or the document start
   if (htmlPrependInjectRE.test(html)) {
     return html.replace(htmlPrependInjectRE, `$&\n${serializeTags(tags)}`)

@@ -54,9 +54,9 @@ export function findDependencies(
   }
 }
 
-export function parseSharedOptions(
+export const parseSharedOptions = (
   options: VitePluginFederationOptions
-): (string | ConfigTypeSet)[] {
+): (string | ConfigTypeSet)[] => {
   return parseOptions(
     options.shared || {},
     (value, key) => ({
@@ -80,9 +80,9 @@ export function parseSharedOptions(
   )
 }
 
-export function parseExposeOptions(
+export const parseExposeOptions = (
   options: VitePluginFederationOptions
-): (string | ConfigTypeSet)[] {
+): (string | ConfigTypeSet)[] => {
   return parseOptions(
     options.exposes,
     (item) => {
@@ -100,14 +100,14 @@ export function parseExposeOptions(
   )
 }
 
-export function createContentHash(path: string): string {
+export const createContentHash = (path: string): string => {
   const content = readFileSync(path, { encoding: 'utf-8' })
   return createHash('md5').update(content).digest('hex').toString().slice(0, 8)
 }
 
-export function parseRemoteOptions(
+export const parseRemoteOptions = (
   options: VitePluginFederationOptions
-): (string | ConfigTypeSet)[] {
+): (string | ConfigTypeSet)[] => {
   return parseOptions(
     options.remotes ? options.remotes : {},
     (item) => ({
@@ -127,11 +127,11 @@ export function parseRemoteOptions(
   )
 }
 
-export function parseOptions(
+export const parseOptions = (
   options: Exposes | Remotes | Shared | undefined,
   normalizeSimple: (value: any, key: any) => ConfigTypeSet,
   normalizeOptions: (value: any, key: any) => ConfigTypeSet
-): (string | ConfigTypeSet)[] {
+): (string | ConfigTypeSet)[] => {
   if (!options) {
     return []
   }
@@ -170,7 +170,7 @@ export function parseOptions(
 
 const letterReg = new RegExp('[0-9a-zA-Z]+')
 
-export function removeNonRegLetter(str: string, reg = letterReg): string {
+export const removeNonRegLetter = (str: string, reg = letterReg): string => {
   let needUpperCase = false
   let ret = ''
   for (const c of str) {
@@ -184,19 +184,19 @@ export function removeNonRegLetter(str: string, reg = letterReg): string {
   return ret
 }
 
-export function getModuleMarker(value: string, type?: string): string {
+export const getModuleMarker = (value: string, type?: string): string => {
   return type ? `__rf_${type}__${value}` : `__rf_placeholder__${value}`
 }
 
-export function normalizePath(id: string): string {
+export const normalizePath = (id: string): string => {
   return posix.normalize(id.replace(/\\/g, '/'))
 }
 
-export function uniqueArr<T>(arr: T[]): T[] {
+export const uniqueArr = <T>(arr: T[]): T[] => {
   return Array.from(new Set(arr))
 }
 
-export function isSameFilepath(src: string, dest: string): boolean {
+export const isSameFilepath = (src: string, dest: string): boolean => {
   if (!src || !dest) {
     return false
   }
@@ -218,7 +218,7 @@ export function isSameFilepath(src: string, dest: string): boolean {
 
 export type Remote = { id: string; regexp: RegExp; config: RemotesConfig }
 
-export function createRemotesMap(remotes: Remote[]): string {
+export const createRemotesMap = (remotes: Remote[]): string => {
   const createUrl = (remote: Remote) => {
     const external = remote.config.external[0]
     const externalType = remote.config.externalType
@@ -244,7 +244,7 @@ ${remotes
  * get file extname from url
  * @param url
  */
-export function getFileExtname(url: string): string {
+export const getFileExtname = (url: string): string => {
   const fileNameAndParamArr = normalizePath(url).split('/')
   const fileNameAndParam = fileNameAndParamArr[fileNameAndParamArr.length - 1]
   const fileName = fileNameAndParam.split('?')[0]
