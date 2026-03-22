@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.8.0](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.7.0...@hugs7/vite-plugin-federation@1.8.0) (2026-03-22)
+
+
+### Bug Fixes
+
+* fall back to static export analysis for browser-only shared modules ([0ca2bb0](https://github.com/hugs7/vite-plugin-federation/commit/0ca2bb018a9d8d62801b9a74f57cbcdf6648a7c8))
+
+
+### Features
+
+* use debug-style logging with localStorage.debug ([10341d0](https://github.com/hugs7/vite-plugin-federation/commit/10341d0b5a418ac8803c5ac919736b4e63c959cb))
+
+
+
+
+
 # [1.7.0](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.6.0...@hugs7/vite-plugin-federation@1.7.0) (2026-03-21)
 
 
