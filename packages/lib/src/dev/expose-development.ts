@@ -27,13 +27,58 @@ import { createRequire } from 'module'
 import { execSync } from 'child_process'
 import type { UserConfig } from 'vite'
 
+/**
+ * Statically extract ESM export names from a file using es-module-lexer,
+ * run in a subprocess so the async `init()` can complete before `parse()`.
+ * This doesn't execute the module, so it works even when the module
+ * references browser-only globals like `window` at the top level.
+ */
+function getExportNamesStatically(resolvedPath: string): string[] {
+  try {
+    // Pass the file path via argv to avoid shell quoting issues.
+    // es-module-lexer exports may be strings (v0.x) or objects with .n (v1+),
+    // so we normalise both.
+    const script = [
+      "const{init,parse}=require('es-module-lexer');",
+      "const fs=require('fs');",
+      "init.then(()=>{",
+        "const code=fs.readFileSync(process.argv[1],'utf-8');",
+        "const[,exp]=parse(code);",
+        "const names=exp.map(e=>typeof e==='string'?e:e.n).filter(Boolean);",
+        "console.log(JSON.stringify(names));",
+      "});"
+    ].join('')
+    const result = execSync(`node -e "${script}" -- "${resolvedPath}"`, {
+      encoding: 'utf-8',
+      timeout: 10000,
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
+    return JSON.parse(result.trim())
+  } catch {
+    return []
+  }
+}
+
 function getModuleExportNames(name: string, root: string): string[] {
+  // First, try dynamic import() in a subprocess — this gives the most
+  // accurate picture since it evaluates the module.
   try {
     const result = execSync(
       `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
       { cwd: root, encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
     )
     return JSON.parse(result.trim())
+  } catch {
+    // Dynamic import failed — likely because the module references
+    // browser-only globals (e.g. `window`) at the top level.
+    // Fall back to static analysis of the ESM source.
+  }
+
+  // Resolve the module entry point and parse it statically
+  try {
+    const nodeRequire = createRequire(join(root, 'package.json'))
+    const resolvedPath = nodeRequire.resolve(name)
+    return getExportNamesStatically(resolvedPath)
   } catch {
     return []
   }
