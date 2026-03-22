@@ -33,7 +33,7 @@ import type { UserConfig } from 'vite'
  * This doesn't execute the module, so it works even when the module
  * references browser-only globals like `window` at the top level.
  */
-function getExportNamesStatically(resolvedPath: string): string[] {
+const getExportNamesStatically = (resolvedPath: string): string[] => {
   try {
     // Pass the file path via argv to avoid shell quoting issues.
     // es-module-lexer exports may be strings (v0.x) or objects with .n (v1+),
@@ -59,7 +59,7 @@ function getExportNamesStatically(resolvedPath: string): string[] {
   }
 }
 
-function getModuleExportNames(name: string, root: string): string[] {
+const getModuleExportNames = (name: string, root: string): string[] => {
   // First, try dynamic import() in a subprocess — this gives the most
   // accurate picture since it evaluates the module.
   try {
@@ -88,10 +88,10 @@ function getModuleExportNames(name: string, root: string): string[] {
 // optimizer bundles them instead of the real packages.  Every optimized
 // dep (react-redux, etc.) that imports "react" will therefore go through
 // the bridge, which reads from the federation share scope at runtime.
-function generateShimDir(
+const generateShimDir = (
   sharedNames: string[],
   root: string
-): { shimDir: string; aliases: Record<string, string> } {
+): { shimDir: string; aliases: Record<string, string> } => {
   const shimDir = join(root, 'node_modules', '.federation-shims')
   if (!existsSync(shimDir)) {
     mkdirSync(shimDir, { recursive: true })
@@ -193,7 +193,7 @@ if (mod) {
 // Convert an absolute filesystem path to a URL that Vite's dev server
 // can serve.  If the path is inside the project root, return a root-
 // relative path; otherwise use /@fs/ prefix.
-function toViteUrl(filePath: string, root: string): string {
+const toViteUrl = (filePath: string, root: string): string => {
   const normalized = filePath.replace(/\\/g, '/')
   const normalizedRoot = root.replace(/\\/g, '/').replace(/\/$/, '')
   if (normalized.startsWith(normalizedRoot + '/')) {
@@ -202,9 +202,9 @@ function toViteUrl(filePath: string, root: string): string {
   return `/@fs${normalized}`
 }
 
-export function devExposePlugin(
+export const devExposePlugin = (
   options: VitePluginFederationOptions
-): PluginHooks {
+): PluginHooks => {
   parsedOptions.devExpose = parseExposeOptions(options)
 
   // Build list of shared module names for init code generation

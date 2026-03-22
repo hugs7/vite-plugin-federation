@@ -34,9 +34,9 @@ import { devSharedPlugin } from './dev/shared-development'
 import { devRemotePlugin } from './dev/remote-development'
 import { devExposePlugin } from './dev/expose-development'
 
-export default function federation(
+const federation = (
   options: VitePluginFederationOptions
-): Plugin {
+): Plugin => {
   options.filename = options.filename
     ? options.filename
     : DEFAULT_ENTRY_FILENAME
@@ -45,7 +45,7 @@ export default function federation(
   let virtualMod
   let registerCount = 0
 
-  function registerPlugins(mode: string, command: string) {
+  const registerPlugins = (mode: string, command: string) => {
     if (mode === 'production' || command === 'build') {
       pluginList = [
         prodSharedPlugin(options),
@@ -215,3 +215,5 @@ export default function federation(
     }
   }
 }
+
+export default federation

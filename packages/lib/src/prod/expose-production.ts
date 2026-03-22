@@ -39,9 +39,9 @@ import MagicString from 'magic-string'
 import { walk } from 'estree-walker'
 import type { ResolvedConfig } from 'vite'
 
-export function prodExposePlugin(
+export const prodExposePlugin = (
   options: VitePluginFederationOptions
-): PluginHooks {
+): PluginHooks => {
   let moduleMap = ''
   const hasOptions = parsedOptions.prodExpose.some((expose) => {
     return expose[0] === parseExposeOptions(options)[0]?.[0]

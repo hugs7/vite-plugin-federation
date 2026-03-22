@@ -22,9 +22,9 @@ import { readdirSync, readFileSync, statSync } from 'fs'
 const sharedFilePathReg = /__federation_shared_(.+)-.{8}\.js$/
 import federation_fn_import from './federation_fn_import.js?raw'
 
-export function prodSharedPlugin(
+export const prodSharedPlugin = (
   options: VitePluginFederationOptions
-): PluginHooks {
+): PluginHooks => {
   parsedOptions.prodShared = parseSharedOptions(options)
   const shareName2Prop = new Map<string, any>()
   parsedOptions.prodShared.forEach((value) =>

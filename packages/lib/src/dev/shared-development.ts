@@ -18,9 +18,9 @@ import { parseSharedOptions } from '../utils'
 import { parsedOptions } from '../public'
 import type { VitePluginFederationOptions } from 'types'
 
-export function devSharedPlugin(
+export const devSharedPlugin = (
   options: VitePluginFederationOptions
-): PluginHooks {
+): PluginHooks => {
   parsedOptions.devShared = parseSharedOptions(options)
 
   return {

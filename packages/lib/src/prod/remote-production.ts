@@ -45,7 +45,7 @@ const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
   ConfigTypeSet
 >()
 
-function joinUrlSegments(a: string, b: string): string {
+const joinUrlSegments = (a: string, b: string): string => {
   if (!a || !b) {
     return a || b || ''
   }
@@ -58,14 +58,14 @@ function joinUrlSegments(a: string, b: string): string {
   return a + b
 }
 
-function toOutputFilePathWithoutRuntime(
+const toOutputFilePathWithoutRuntime = (
   filename: string,
   type: 'asset' | 'public',
   hostId: string,
   hostType: 'js' | 'css' | 'html',
   config: ResolvedConfig,
   toRelative: (filename: string, hostId: string) => string
-): string {
+): string => {
   const { renderBuiltUrl } = config.experimental
   let relative = config.base === '' || config.base === './'
   if (renderBuiltUrl) {
@@ -95,9 +95,9 @@ function toOutputFilePathWithoutRuntime(
   }
 }
 
-export function prodRemotePlugin(
+export const prodRemotePlugin = (
   options: VitePluginFederationOptions
-): PluginHooks {
+): PluginHooks => {
   parsedOptions.prodRemote = parseRemoteOptions(options)
   // const remotes: Remote[] = []
   for (const item of parsedOptions.prodRemote) {
