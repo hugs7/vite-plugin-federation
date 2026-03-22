@@ -1,5 +1,17 @@
 import { satisfy } from '__federation_fn_satisfy'
 
+const __fed_debug = (() => {
+  let pattern;
+  try { pattern = (typeof localStorage !== 'undefined' && localStorage.debug) || ''; } catch(e) { pattern = ''; } // eslint-disable-line no-undef
+  return (ns) => {
+    if (!pattern) return () => {};
+    const re = new RegExp('^' + pattern.replace(/\*/g, '.*?') + '$');
+    if (!re.test(ns)) return () => {};
+    return (...args) => console.debug('%c' + ns, 'color: #d97706', ...args);
+  };
+})();
+const _log = __fed_debug('federation:shared');
+
 const currentImports = {}
 
 // eslint-disable-next-line no-undef
@@ -32,10 +44,10 @@ async function getSharedFromRuntime(name, shareScope) {
         const versionValue = versionObj[versionKey]
         module = await (await versionValue.get())()
       } else {
-        console.log(
-          `provider support ${name} is not satisfied requiredVersion(${moduleMap[name].requiredVersion}). Debug logging will show available modules and versions.`
+        _log(
+          `provider support ${name} is not satisfied requiredVersion(${moduleMap[name].requiredVersion}).`,
+          moduleMap
         )
-        console.debug(moduleMap)
       }
     } else {
       const versionKey = Object.keys(versionObj)[0]
