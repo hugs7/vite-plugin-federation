@@ -161,7 +161,7 @@ export const devExposePlugin = (
   for (const item of parsedOptions.devExpose) {
     const name = removeNonRegLetter(item[0], NAME_CHAR_REG)
     moduleMap += `"${item[0]}":()=>{
-      return __federation_import('./__federation_expose_${name}.js').then(module =>Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`
+      return __federation_import('./__federation_expose_${name}.js').then(module => Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`
   }
 
   return {
