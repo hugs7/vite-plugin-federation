@@ -3,10 +3,12 @@ import { satisfy } from '__federation_fn_satisfy'
 const __fed_debug = (() => {
   let pattern
   try {
+    // eslint-disable-next-line no-undef
     pattern = (typeof localStorage !== 'undefined' && localStorage.debug) || ''
   } catch (e) {
     pattern = ''
-  } // eslint-disable-line no-undef
+  }
+
   return (ns) => {
     if (!pattern) return () => {}
     const re = new RegExp('^' + pattern.replace(/\*/g, '.*?') + '$')
