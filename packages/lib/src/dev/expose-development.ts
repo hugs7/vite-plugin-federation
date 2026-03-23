@@ -15,7 +15,6 @@
 
 import { execSync } from 'child_process'
 import { createRequire } from 'module'
-import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
 import type { VitePluginFederationOptions } from 'types'
 import type { UserConfig } from 'vite'
@@ -88,43 +87,6 @@ interface SharedModuleMeta {
   localUrl: string
   /** Enumerated export names */
   exports: string[]
-}
-
-/**
- * Resolve the ESM entry point of a package (what Vite would use with
- * the "import" condition).  Falls back to the CJS entry.
- */
-const resolveEsmEntry = (
-  name: string,
-  nodeRequire: NodeRequire
-): string | null => {
-  try {
-    const pkgJsonPath = nodeRequire.resolve(`${name}/package.json`)
-    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
-    const pkgDir = pkgJsonPath.replace(/\/package\.json$/, '')
-
-    // Check exports["."].import first
-    const exp = pkgJson.exports?.['.']
-    if (exp) {
-      const importEntry =
-        typeof exp === 'string'
-          ? exp
-          : exp.import?.default ?? exp.import ?? exp.module?.default ?? exp.module
-      if (typeof importEntry === 'string') {
-        return join(pkgDir, importEntry)
-      }
-    }
-
-    // Fall back to "module" field
-    if (pkgJson.module) {
-      return join(pkgDir, pkgJson.module)
-    }
-
-    // Fall back to CJS entry
-    return nodeRequire.resolve(name)
-  } catch {
-    return null
-  }
 }
 
 /**
@@ -306,64 +268,45 @@ export const get = async (module) => {
         sharedModuleMeta.set(name, { localUrl, exports })
       }
 
-      // Exclude shared modules from Vite's dep optimizer to prevent
-      // duplicate singleton state.  Without this, pre-bundled packages
-      // like react-dom inline their own copy of react, creating two
-      // separate ReactSharedInternals objects which breaks hooks.
+      // Mark shared modules as external during dep pre-bundling so
+      // they aren't inlined into pre-bundled chunks.  This prevents
+      // duplicate singletons (e.g. react-dom inlining its own react).
       //
-      // We only exclude shared modules that are dependencies of OTHER
-      // shared modules (to prevent inlining).  Packages like zustand
-      // and react-redux can stay pre-bundled — the dep optimizer will
-      // keep their imports of excluded packages as external references,
-      // which then resolve through the shared wrapper at runtime.
+      // We add a rolldown plugin to optimizeDeps that marks shared
+      // module imports as external.  The externalized imports resolve
+      // through Vite's normal pipeline at runtime, where our
+      // resolveId hook redirects them to the shared wrapper.
+      //
+      // We DON'T use optimizeDeps.exclude because shared modules
+      // like react are CJS and need the optimizer's CJS-to-ESM
+      // conversion.  Instead, we keep them in the optimizer but
+      // prevent them from being inlined into other chunks.
       if (sharedList.length) {
         if (!config.optimizeDeps) {
           config.optimizeDeps = {}
         }
-        if (!config.optimizeDeps.exclude) {
-          config.optimizeDeps.exclude = []
+        if (!config.optimizeDeps.rolldownOptions) {
+          config.optimizeDeps.rolldownOptions = {}
         }
-
-        // Find which shared modules are imported by other shared modules.
-        // These must be excluded to prevent the optimizer from inlining
-        // them into the pre-bundled chunks of their dependents.
         const sharedSet = new Set(sharedList)
-        const depsOfShared = new Set<string>()
-        for (const name of sharedList) {
-          const esmEntry = resolveEsmEntry(name, nodeRequire)
-          if (!esmEntry) continue
-          try {
-            const code = readFileSync(esmEntry, 'utf-8')
-            const importRegex = /from\s+['"]([^'"]+)['"]/g
-            let match: RegExpExecArray | null
-            while ((match = importRegex.exec(code)) !== null) {
-              const specifier = match[1]
-              if (specifier.startsWith('.') || specifier.startsWith('/')) {
-                continue
-              }
-              const pkgName = specifier
-                .split('/')
-                .slice(0, specifier.startsWith('@') ? 2 : 1)
-                .join('/')
-              if (sharedSet.has(pkgName) && pkgName !== name) {
-                depsOfShared.add(pkgName)
-              }
+        const existingPlugins = config.optimizeDeps.rolldownOptions.plugins
+        const externalPlugin = {
+          name: 'federation-shared-external',
+          resolveId(source: string) {
+            // Mark shared modules as external when imported by other
+            // pre-bundled deps (e.g. react-dom importing react).
+            // The bare specifier will be preserved in the output and
+            // resolved by Vite's plugin pipeline at runtime.
+            if (sharedSet.has(source)) {
+              return { id: source, external: true }
             }
-          } catch {
-            // skip
+            return null
           }
         }
-
-        // Always exclude react — it's the most common singleton.
-        // Also exclude any shared module that is a dep of another
-        // shared module (to prevent inlining during pre-bundling).
-        const toExclude = new Set(depsOfShared)
-        toExclude.add('react')
-        toExclude.add('react-dom')
-
-        config.optimizeDeps.exclude = config.optimizeDeps.exclude.concat(
-          [...toExclude]
-        )
+        config.optimizeDeps.rolldownOptions.plugins = [
+          ...(Array.isArray(existingPlugins) ? existingPlugins : existingPlugins ? [existingPlugins] : []),
+          externalPlugin
+        ]
       }
     },
 
