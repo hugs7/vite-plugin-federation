@@ -13,19 +13,15 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import {
-  parseExposeOptions,
-  removeNonRegLetter,
-  NAME_CHAR_REG
-} from '../utils'
-import { parsedOptions } from '../public'
-import type { VitePluginFederationOptions } from 'types'
-import type { PluginHooks } from '../../types/pluginHooks'
-import { existsSync, readFileSync as fsReadFileSync } from 'fs'
-import { join, resolve } from 'path'
-import { createRequire } from 'module'
 import { execSync } from 'child_process'
+import { createRequire } from 'module'
+import { join, resolve } from 'path'
+import type { VitePluginFederationOptions } from 'types'
 import type { UserConfig } from 'vite'
+import type { PluginHooks } from '../../types/pluginHooks'
+import { parsedOptions } from '../public'
+import { NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter } from '../utils'
+
 import { FEDERATION_DEBUG_SNIPPET_ESM } from '../debug'
 
 const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:'
@@ -42,12 +38,12 @@ const getExportNamesStatically = (resolvedPath: string): string[] => {
     const script = [
       "const{init,parse}=require('es-module-lexer');",
       "const fs=require('fs');",
-      "init.then(()=>{",
-        "const code=fs.readFileSync(process.argv[1],'utf-8');",
-        "const[,exp]=parse(code);",
-        "const names=exp.map(e=>typeof e==='string'?e:e.n).filter(Boolean);",
-        "console.log(JSON.stringify(names));",
-      "});"
+      'init.then(()=>{',
+      "const code=fs.readFileSync(process.argv[1],'utf-8');",
+      'const[,exp]=parse(code);',
+      "const names=exp.map(e=>typeof e==='string'?e:e.n).filter(Boolean);",
+      'console.log(JSON.stringify(names));',
+      '});'
     ].join('')
     const result = execSync(`node -e "${script}" -- "${resolvedPath}"`, {
       encoding: 'utf-8',
@@ -64,7 +60,12 @@ const getModuleExportNames = (name: string, root: string): string[] => {
   try {
     const result = execSync(
       `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
-      { cwd: root, encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
+      {
+        cwd: root,
+        encoding: 'utf-8',
+        timeout: 10000,
+        stdio: ['pipe', 'pipe', 'pipe']
+      }
     )
     return JSON.parse(result.trim())
   } catch {
@@ -93,13 +94,19 @@ interface SharedModuleMeta {
  * At runtime, checks globalThis.__federation_shared_modules__ first (set by
  * the host's init()), falling back to a dynamic import of the local package.
  */
-function buildSharedWrapperCode(name: string, meta: SharedModuleMeta): string {
+const buildSharedWrapperCode = (
+  name: string,
+  meta: SharedModuleMeta
+): string => {
   const named = meta.exports.filter((e) => e !== 'default')
   const hasDefault = meta.exports.includes('default')
 
   // Use the base shared module name for the globalThis lookup
   // (e.g. 'react' for both 'react' and 'react/jsx-runtime')
-  const baseName = name.split('/').slice(0, name.startsWith('@') ? 2 : 1).join('/')
+  const baseName = name
+    .split('/')
+    .slice(0, name.startsWith('@') ? 2 : 1)
+    .join('/')
   const isSubPath = name !== baseName
 
   let code = ''
@@ -260,7 +267,6 @@ export const get = async (module) => {
         const exports = getModuleExportNames(name, root)
         sharedModuleMeta.set(name, { localUrl, exports })
       }
-
     },
 
     resolveId(id: string) {
@@ -285,7 +291,10 @@ export const get = async (module) => {
         return null
       }
 
-      return { code: buildSharedWrapperCode(specifier, meta), moduleType: 'js' as const }
+      return {
+        code: buildSharedWrapperCode(specifier, meta),
+        moduleType: 'js' as const
+      }
     },
     configureServer(server) {
       // Add CORS headers to ALL responses so the HOST browser can load
@@ -407,7 +416,10 @@ export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
 
         // Serve the real react-refresh runtime under an alternate
         // URL so the /@react-refresh wrapper can import it.
-        if (url === '/@react-refresh-runtime' || url?.startsWith('/@react-refresh-runtime?')) {
+        if (
+          url === '/@react-refresh-runtime' ||
+          url?.startsWith('/@react-refresh-runtime?')
+        ) {
           try {
             const result = await server.transformRequest('/@react-refresh')
             if (result) {
@@ -415,7 +427,9 @@ export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
               res.end(result.code)
               return
             }
-          } catch { /* fall through */ }
+          } catch {
+            /* fall through */
+          }
           next()
           return
         }
