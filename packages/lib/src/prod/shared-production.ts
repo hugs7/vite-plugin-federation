@@ -42,7 +42,9 @@ export const prodSharedPlugin = (
     options(inputOptions) {
       isRemote = !!parsedOptions.prodExpose.length
       isHost =
-        (!!parsedOptions.prodRemote.length || !!parsedOptions.prodShared.length) && !parsedOptions.prodExpose.length
+        (!!parsedOptions.prodRemote.length ||
+          !!parsedOptions.prodShared.length) &&
+        !parsedOptions.prodExpose.length
 
       if (shareName2Prop.size) {
         // remove item which is both in external and shared
@@ -127,7 +129,7 @@ export const prodSharedPlugin = (
             try {
               const idResolve = await this.resolve(id)
               if (idResolve?.id) {
-                (parsedOptions.prodShared as any[]).push([
+                ;(parsedOptions.prodShared as any[]).push([
                   `${monoRepo.root[0]}/${basename(id)}`,
                   {
                     id: idResolve?.id,

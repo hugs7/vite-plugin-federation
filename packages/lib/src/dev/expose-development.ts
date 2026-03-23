@@ -15,6 +15,7 @@
 
 import { execSync } from 'child_process'
 import { createRequire } from 'module'
+import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
 import type { VitePluginFederationOptions } from 'types'
 import type { UserConfig } from 'vite'
@@ -87,6 +88,85 @@ interface SharedModuleMeta {
   localUrl: string
   /** Enumerated export names */
   exports: string[]
+}
+
+/**
+ * Resolve the ESM entry point of a package (what Vite would use with
+ * the "import" condition).  Falls back to the CJS entry.
+ */
+const resolveEsmEntry = (
+  name: string,
+  nodeRequire: NodeRequire
+): string | null => {
+  try {
+    const pkgJsonPath = nodeRequire.resolve(`${name}/package.json`)
+    const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
+    const pkgDir = pkgJsonPath.replace(/\/package\.json$/, '')
+
+    // Check exports["."].import first
+    const exp = pkgJson.exports?.['.']
+    if (exp) {
+      const importEntry =
+        typeof exp === 'string'
+          ? exp
+          : exp.import?.default ?? exp.import ?? exp.module?.default ?? exp.module
+      if (typeof importEntry === 'string') {
+        return join(pkgDir, importEntry)
+      }
+    }
+
+    // Fall back to "module" field
+    if (pkgJson.module) {
+      return join(pkgDir, pkgJson.module)
+    }
+
+    // Fall back to CJS entry
+    return nodeRequire.resolve(name)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Scan a shared module's ESM entry to find bare import specifiers that
+ * point to CJS packages.  These need to be listed in
+ * optimizeDeps.include so Vite still performs CJS-to-ESM conversion
+ * even though the parent shared module is excluded from pre-bundling.
+ */
+const findNonEsmImports = (
+  esmEntryPath: string,
+  nodeRequire: NodeRequire
+): string[] => {
+  const deps: string[] = []
+  try {
+    const code = readFileSync(esmEntryPath, 'utf-8')
+    // Match ESM static imports: import ... from 'specifier'
+    const importRegex = /from\s+['"]([^'"]+)['"]/g
+    let match: RegExpExecArray | null
+    while ((match = importRegex.exec(code)) !== null) {
+      const specifier = match[1]
+      // Only bare specifiers (not relative/absolute paths)
+      if (specifier.startsWith('.') || specifier.startsWith('/')) continue
+      // Check if the resolved file is CJS (no "type":"module" in its package.json)
+      try {
+        const pkgName = specifier
+          .split('/')
+          .slice(0, specifier.startsWith('@') ? 2 : 1)
+          .join('/')
+        const pkgJsonPath = nodeRequire.resolve(`${pkgName}/package.json`)
+        const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
+        if (pkgJson.type !== 'module') {
+          deps.push(specifier)
+        }
+      } catch {
+        // If we can't resolve, include it to be safe
+        deps.push(specifier)
+      }
+    }
+  } catch {
+    // If we can't read the entry, skip
+  }
+  return [...new Set(deps)]
 }
 
 /**
@@ -268,11 +348,15 @@ export const get = async (module) => {
         sharedModuleMeta.set(name, { localUrl, exports })
       }
 
-      // Exclude shared modules from Vite's dep optimizer so they are
-      // not pre-bundled with their own copies of shared dependencies.
+      // Exclude shared modules from Vite's dep optimizer so they go
+      // through our resolveId/load hooks instead of being pre-bundled.
       // Without this, pre-bundled packages like react-dom inline their
       // own copy of react, creating duplicate singletons (e.g. two
       // separate ReactSharedInternals objects) which breaks hooks.
+      //
+      // CJS transitive deps of excluded packages won't get Vite's
+      // automatic CJS-to-ESM conversion, so we explicitly include
+      // them using the "pkg > cjs-dep" syntax.
       if (sharedList.length) {
         if (!config.optimizeDeps) {
           config.optimizeDeps = {}
@@ -280,9 +364,31 @@ export const get = async (module) => {
         if (!config.optimizeDeps.exclude) {
           config.optimizeDeps.exclude = []
         }
+        if (!config.optimizeDeps.include) {
+          config.optimizeDeps.include = []
+        }
         config.optimizeDeps.exclude = config.optimizeDeps.exclude.concat(
           sharedList
         )
+
+        // Discover CJS transitive deps of excluded shared modules
+        // so Vite can still pre-bundle them for CJS-to-ESM conversion.
+        const sharedSet = new Set(sharedList)
+        for (const name of sharedList) {
+          const esmEntry = resolveEsmEntry(name, nodeRequire)
+          if (!esmEntry) continue
+          const deps = findNonEsmImports(esmEntry, nodeRequire)
+          for (const dep of deps) {
+            // Skip deps that are themselves shared (already excluded)
+            const depPkgName = dep
+              .split('/')
+              .slice(0, dep.startsWith('@') ? 2 : 1)
+              .join('/')
+            if (!sharedSet.has(depPkgName)) {
+              config.optimizeDeps.include.push(`${name} > ${dep}`)
+            }
+          }
+        }
       }
     },
 
