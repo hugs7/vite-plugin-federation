@@ -292,12 +292,13 @@ export const get = async (module) => {
         const existingPlugins = config.optimizeDeps.rolldownOptions.plugins
         const externalPlugin = {
           name: 'federation-shared-external',
-          resolveId(source: string) {
-            // Mark shared modules as external when imported by other
-            // pre-bundled deps (e.g. react-dom importing react).
-            // The bare specifier will be preserved in the output and
-            // resolved by Vite's plugin pipeline at runtime.
-            if (sharedSet.has(source)) {
+          resolveId(source: string, importer: string | undefined) {
+            // Only externalize when imported BY another package (importer
+            // is set), not when being pre-bundled as a top-level entry
+            // (importer is undefined).  This lets react/react-dom get
+            // proper CJS-to-ESM conversion as standalone entries, while
+            // preventing them from being inlined into other chunks.
+            if (importer && sharedSet.has(source)) {
               return { id: source, external: true }
             }
             return null
