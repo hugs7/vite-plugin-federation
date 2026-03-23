@@ -156,7 +156,7 @@ export const prodSharedPlugin = (
       outputOption.hoistTransitiveImports = false
 
       const manualChunkFunc = (id: string) => {
-        //  if id is in shared dependencies, return id ,else return vite function value
+        //  if id is in shared dependencies, return id, else return vite function value
         const find = parsedOptions.prodShared.find((arr) =>
           arr[1].dependencies?.has(id)
         )

@@ -132,7 +132,7 @@ function __federation_method_unwrapDefault(module) {
   return (module?.__esModule || module?.[Symbol.toStringTag] === 'Module')?module.default:module
 }
 
-function __federation_method_wrapDefault(module ,need){
+function __federation_method_wrapDefault(module, need){
   if (!module?.default && need) {
     let obj = Object.create(null);
     obj.default = module;
