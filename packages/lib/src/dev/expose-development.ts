@@ -13,20 +13,19 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import {
-  parseExposeOptions,
-  removeNonRegLetter,
-  NAME_CHAR_REG
-} from '../utils'
-import { parsedOptions } from '../public'
-import type { VitePluginFederationOptions } from 'types'
-import type { PluginHooks } from '../../types/pluginHooks'
-import { mkdirSync, writeFileSync, existsSync, readFileSync as fsReadFileSync } from 'fs'
-import { join, resolve } from 'path'
-import { createRequire } from 'module'
 import { execSync } from 'child_process'
+import { createRequire } from 'module'
+import { join, resolve } from 'path'
+import type { VitePluginFederationOptions } from 'types'
 import type { UserConfig } from 'vite'
-import { FEDERATION_DEBUG_SNIPPET_CJS, FEDERATION_DEBUG_SNIPPET_ESM } from '../debug'
+import type { PluginHooks } from '../../types/pluginHooks'
+import { parsedOptions } from '../public'
+import { NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter } from '../utils'
+
+import { FEDERATION_DEBUG_SNIPPET_ESM } from '../debug'
+
+const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:'
+const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
 
 /**
  * Statically extract ESM export names from a file using es-module-lexer,
@@ -36,18 +35,15 @@ import { FEDERATION_DEBUG_SNIPPET_CJS, FEDERATION_DEBUG_SNIPPET_ESM } from '../d
  */
 const getExportNamesStatically = (resolvedPath: string): string[] => {
   try {
-    // Pass the file path via argv to avoid shell quoting issues.
-    // es-module-lexer exports may be strings (v0.x) or objects with .n (v1+),
-    // so we normalise both.
     const script = [
       "const{init,parse}=require('es-module-lexer');",
       "const fs=require('fs');",
-      "init.then(()=>{",
-        "const code=fs.readFileSync(process.argv[1],'utf-8');",
-        "const[,exp]=parse(code);",
-        "const names=exp.map(e=>typeof e==='string'?e:e.n).filter(Boolean);",
-        "console.log(JSON.stringify(names));",
-      "});"
+      'init.then(()=>{',
+      "const code=fs.readFileSync(process.argv[1],'utf-8');",
+      'const[,exp]=parse(code);',
+      "const names=exp.map(e=>typeof e==='string'?e:e.n).filter(Boolean);",
+      'console.log(JSON.stringify(names));',
+      '});'
     ].join('')
     const result = execSync(`node -e "${script}" -- "${resolvedPath}"`, {
       encoding: 'utf-8',
@@ -61,21 +57,21 @@ const getExportNamesStatically = (resolvedPath: string): string[] => {
 }
 
 const getModuleExportNames = (name: string, root: string): string[] => {
-  // First, try dynamic import() in a subprocess — this gives the most
-  // accurate picture since it evaluates the module.
   try {
     const result = execSync(
       `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
-      { cwd: root, encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] }
+      {
+        cwd: root,
+        encoding: 'utf-8',
+        timeout: 10000,
+        stdio: ['pipe', 'pipe', 'pipe']
+      }
     )
     return JSON.parse(result.trim())
   } catch {
-    // Dynamic import failed — likely because the module references
-    // browser-only globals (e.g. `window`) at the top level.
-    // Fall back to static analysis of the ESM source.
+    // Dynamic import failed — fall back to static analysis
   }
 
-  // Resolve the module entry point and parse it statically
   try {
     const nodeRequire = createRequire(join(root, 'package.json'))
     const resolvedPath = nodeRequire.resolve(name)
@@ -85,112 +81,60 @@ const getModuleExportNames = (name: string, root: string): string[] => {
   }
 }
 
-// Generate bridge/shim files for shared modules so that Vite's dep
-// optimizer bundles them instead of the real packages.  Every optimized
-// dep (react-redux, etc.) that imports "react" will therefore go through
-// the bridge, which reads from the federation share scope at runtime.
-const generateShimDir = (
-  sharedNames: string[],
-  root: string
-): { shimDir: string; aliases: Record<string, string> } => {
-  const shimDir = join(root, 'node_modules', '.federation-shims')
-  if (!existsSync(shimDir)) {
-    mkdirSync(shimDir, { recursive: true })
+/** Metadata for a shared virtual module */
+interface SharedModuleMeta {
+  /** Vite-serveable URL for the real local module (/@fs/... or root-relative) */
+  localUrl: string
+  /** Enumerated export names */
+  exports: string[]
+}
+
+/**
+ * Build ESM wrapper code for a shared virtual module.
+ * At runtime, checks globalThis.__federation_shared_modules__ first (set by
+ * the host's init()), falling back to a dynamic import of the local package.
+ */
+const buildSharedWrapperCode = (
+  name: string,
+  meta: SharedModuleMeta
+): string => {
+  const named = meta.exports.filter((e) => e !== 'default')
+  const hasDefault = meta.exports.includes('default')
+
+  // Use the base shared module name for the globalThis lookup
+  // (e.g. 'react' for both 'react' and 'react/jsx-runtime')
+  const baseName = name
+    .split('/')
+    .slice(0, name.startsWith('@') ? 2 : 1)
+    .join('/')
+  const isSubPath = name !== baseName
+
+  let code = ''
+
+  if (isSubPath) {
+    // For sub-path imports (e.g. react/jsx-runtime), we can't look them
+    // up in the shared modules map directly. Import from the local package.
+    code += `const __mod = await import(/* @vite-ignore */ ${JSON.stringify(meta.localUrl)});\n`
+  } else {
+    code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`
+    code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(meta.localUrl)});\n`
   }
 
-  const aliases: Record<string, string> = {}
-  const nodeRequire = createRequire(join(root, 'package.json'))
-  for (const name of sharedNames) {
-    let realPath: string
-    try {
-      realPath = nodeRequire.resolve(name)
-    } catch {
-      continue
+  if (hasDefault) {
+    code += `export default (__mod.default ?? __mod);\n`
+  }
+  for (const e of named) {
+    // Use safe identifier check — most exports are valid JS identifiers
+    if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e)) {
+      code += `export const ${e} = __mod[${JSON.stringify(e)}];\n`
     }
-
-    const safeName = name.replace(/[/@]/g, '_')
-    const escapedPath = realPath.replace(/\\/g, '/')
-
-    // Detect if the resolved entry is ESM
-    const isEsm = realPath.endsWith('.mjs') || (() => {
-      try {
-        let dir = realPath
-        while (dir !== join(dir, '..')) {
-          dir = join(dir, '..')
-          const pkgPath = join(dir, 'package.json')
-          if (existsSync(pkgPath)) {
-            return JSON.parse(fsReadFileSync(pkgPath, 'utf-8')).type === 'module'
-          }
-        }
-      } catch {
-        // ignore – fall through to default (false)
-      }
-      return false
-    })()
-
-    // ALL shared modules use CJS shims so they go through the dep
-    // optimizer normally (avoiding CJS transitive dep issues from
-    // optimizeDeps.exclude).
-    //
-    // For CJS packages: require() the real entry directly.
-    // For ESM packages: enumerate exports at build time and emit
-    //   explicit `exports.X = mod.X` lines.  This avoids the dep
-    //   optimizer trying to trace ESM re-export chains through a
-    //   CJS require() wrapper (which causes "export not defined").
-    const shimFile = join(shimDir, `${safeName}.cjs`)
-
-    if (!isEsm) {
-      const shimCode = `${FEDERATION_DEBUG_SNIPPET_CJS}var _log = __fed_debug('federation:shim');
-var mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
-_log('${name}:', mod ? 'SHARED' : 'LOCAL');
-if (mod) {
-  module.exports = mod;
-} else {
-  module.exports = require('${escapedPath}');
-}
-`
-      writeFileSync(shimFile, shimCode)
-    } else {
-      const exportNames = getModuleExportNames(name, root)
-
-      if (!exportNames.length) {
-        // Export enumeration failed (e.g. the module references browser
-        // globals like `window` at the top level and can't be loaded in
-        // Node).  Fall back to a CJS-style shim — the dep optimizer
-        // will wrap consumers with __toESM() which is fine.
-        const shimCode = `${FEDERATION_DEBUG_SNIPPET_CJS}var _log = __fed_debug('federation:shim');
-var mod = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];
-_log('${name}:', mod ? 'SHARED' : 'LOCAL');
-if (mod) {
-  module.exports = mod;
-} else {
-  module.exports = require('${escapedPath}');
-}
-`
-        writeFileSync(shimFile, shimCode)
-      } else {
-        const namedExports = exportNames.filter((n) => n !== 'default')
-        const hasDefault = exportNames.includes('default')
-
-        let shimCode = `${FEDERATION_DEBUG_SNIPPET_CJS}var _log = __fed_debug('federation:shim');\n`
-        shimCode += `var _shared = globalThis.__federation_shared_modules__ && globalThis.__federation_shared_modules__['${name}'];\n`
-        shimCode += `_log('${name}:', _shared ? 'SHARED' : 'LOCAL');\n`
-        shimCode += `var _mod = _shared || require('${escapedPath}');\n`
-        if (hasDefault) {
-          shimCode += `Object.defineProperty(exports, 'default', { enumerable: true, get: function() { return _mod.default ?? _mod; } });\n`
-        }
-        for (const n of namedExports) {
-          const escaped = n.replace(/'/g, "\\'")
-          shimCode += `Object.defineProperty(exports, '${escaped}', { enumerable: true, get: function() { return _mod['${escaped}']; } });\n`
-        }
-        writeFileSync(shimFile, shimCode)
-      }
-    }
-    aliases[name] = shimFile
   }
 
-  return { shimDir, aliases }
+  return code
 }
+
+/** Map of shared specifier -> metadata, populated in config() */
+const sharedModuleMeta = new Map<string, SharedModuleMeta>()
 
 // Convert an absolute filesystem path to a URL that Vite's dev server
 // can serve.  If the path is inside the project root, return a root-
@@ -299,42 +243,58 @@ export const get = async (module) => {
     config(config: UserConfig) {
       resolvedRoot = config.root ? resolve(config.root) : process.cwd()
 
-      // Only set up shims when this is a remote (has exposes) with shared modules
+      // Only set up shared wrappers when this is a remote with shared modules
       if (!parsedOptions.devExpose.length || !parsedOptions.devShared.length) {
         return
       }
 
-      // Populate sharedList from parsed options
-      for (const item of parsedOptions.devShared) {
-        sharedList.push(item[0])
-      }
-
       const root = resolvedRoot
-      const { aliases } = generateShimDir(sharedList, root)
+      const nodeRequire = createRequire(join(root, 'package.json'))
 
-      // Set up resolve aliases so all imports of shared modules (including
-      // from pre-bundled deps) go through the bridge shims
-      if (!config.resolve) config.resolve = {}
-      if (!config.resolve.alias) config.resolve.alias = {}
+      // Populate sharedList and discover exports for each shared module
+      for (const item of parsedOptions.devShared) {
+        const name = item[0]
+        sharedList.push(name)
 
-      // Use array-style aliases with regex for exact matching,
-      // so 'react' doesn't also match 'react/jsx-runtime' or 'react-dom'
-      if (!Array.isArray(config.resolve.alias)) {
-        // Convert object-style to array-style
-        const existing = config.resolve.alias as Record<string, string>
-        config.resolve.alias = Object.entries(existing).map(
-          ([find, replacement]) => ({ find, replacement })
-        )
+        let realPath: string
+        try {
+          realPath = nodeRequire.resolve(name)
+        } catch {
+          continue
+        }
+
+        const localUrl = toViteUrl(realPath, root)
+        const exports = getModuleExportNames(name, root)
+        sharedModuleMeta.set(name, { localUrl, exports })
       }
-      for (const [from, to] of Object.entries(aliases)) {
-        // Exact match regex: ^react$ matches 'react' but not 'react/jsx-runtime'
-        ;(config.resolve.alias as any[]).push({
-          find: new RegExp(`^${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
-          replacement: to
-        })
+    },
+
+    resolveId(id: string) {
+      // Intercept bare shared specifiers so they resolve to virtual wrappers
+      // instead of the real package.  This gives us a single entry point
+      // that can switch between the host's shared module and the local one.
+      if (sharedModuleMeta.has(id)) {
+        return { id: RESOLVED_SHARED_PREFIX + id }
       }
 
+      return null
+    },
 
+    load(id: string) {
+      if (!id.startsWith(RESOLVED_SHARED_PREFIX)) {
+        return null
+      }
+
+      const specifier = id.slice(RESOLVED_SHARED_PREFIX.length)
+      const meta = sharedModuleMeta.get(specifier)
+      if (!meta) {
+        return null
+      }
+
+      return {
+        code: buildSharedWrapperCode(specifier, meta),
+        moduleType: 'js' as const
+      }
     },
     configureServer(server) {
       // Add CORS headers to ALL responses so the HOST browser can load
@@ -456,7 +416,10 @@ export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
 
         // Serve the real react-refresh runtime under an alternate
         // URL so the /@react-refresh wrapper can import it.
-        if (url === '/@react-refresh-runtime' || url?.startsWith('/@react-refresh-runtime?')) {
+        if (
+          url === '/@react-refresh-runtime' ||
+          url?.startsWith('/@react-refresh-runtime?')
+        ) {
           try {
             const result = await server.transformRequest('/@react-refresh')
             if (result) {
@@ -464,7 +427,9 @@ export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
               res.end(result.code)
               return
             }
-          } catch { /* fall through */ }
+          } catch {
+            /* fall through */
+          }
           next()
           return
         }

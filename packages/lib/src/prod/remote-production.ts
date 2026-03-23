@@ -320,12 +320,36 @@ export const prodRemotePlugin = (
       }
 
       if (builderInfo.isHost || builderInfo.isShared) {
-        // Skip node_modules: third-party libraries should keep their static
-        // imports. Transforming them to await importShared() creates TLA in
-        // vendor chunks that often contain the shared modules themselves,
-        // causing self-referential deadlocks during module evaluation.
-        if (id.includes('/node_modules/') || id.includes('\\node_modules\\')) {
-          return null
+        const isNodeModules =
+          id.includes('/node_modules/') || id.includes('\\node_modules\\')
+
+        if (isNodeModules) {
+          if (!builderInfo.isRemote) {
+            // Host-only builds: skip node_modules entirely — transforming
+            // them to await importShared() creates TLA in vendor chunks
+            // that often contain the shared modules themselves, causing
+            // self-referential deadlocks during module evaluation.
+            return null
+          }
+
+          // Remote builds: allow the transform for third-party libraries
+          // so their shared-module imports (e.g. react) go through
+          // importShared() — preventing duplicate module instances at
+          // runtime.  However, skip files that belong to a shared module's
+          // own package to avoid self-referential deadlocks (e.g.
+          // react/index.js importing itself via importShared('react')).
+          const normalizedId = id.replace(/\\/g, '/')
+          const isSharedModuleSource = parsedOptions.prodShared.some(
+            (sharedInfo) => {
+              const sharedName = sharedInfo[0]
+              // Match node_modules/<sharedName>/ or node_modules/@scope/pkg/
+              const pattern = `/node_modules/${sharedName}/`
+              return normalizedId.includes(pattern)
+            }
+          )
+          if (isSharedModuleSource) {
+            return null
+          }
         }
 
         let ast: AcornNode | null = null

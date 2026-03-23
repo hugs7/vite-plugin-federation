@@ -135,6 +135,14 @@ const federation = (
     },
 
     async resolveId(...args) {
+      // Check sub-plugins first (e.g. shared module virtual resolution)
+      for (const pluginHook of pluginList) {
+        const result = await pluginHook.resolveId?.call(this, ...args)
+        if (result) {
+          return result
+        }
+      }
+
       const v = virtualMod.resolveId.call(this, ...args)
       if (v) {
         return v
@@ -164,6 +172,14 @@ const federation = (
     },
 
     load(...args) {
+      // Check sub-plugins first
+      for (const pluginHook of pluginList) {
+        const result = pluginHook.load?.call(this, ...args)
+        if (result) {
+          return result
+        }
+      }
+
       const v = virtualMod.load.call(this, ...args)
       if (v) {
         return v
