@@ -297,6 +297,50 @@ export const get = async (module) => {
       }
     },
 
+    transform(code: string, id: string) {
+      // Replace CJS stubs for excluded shared modules with proper
+      // ESM wrappers.  When react/react-dom are excluded from the
+      // dep optimizer, Vite creates stubs with only a default export.
+      // We replace them with the shared wrapper (for base packages)
+      // or a properly transformed version (for sub-paths).
+      if (!id.includes('.vite/deps/') || sharedModuleMeta.size === 0) {
+        return null
+      }
+
+      const fileMatch = id.match(/\.vite\/deps\/(.+)\.js$/)
+      if (!fileMatch) return null
+
+      const fileName = fileMatch[1]
+      for (const [name, meta] of sharedModuleMeta) {
+        const baseName = name.replace(/\//g, '_')
+        if (fileName === baseName) {
+          return { code: buildSharedWrapperCode(name, meta) }
+        }
+        if (fileName.startsWith(baseName + '_')) {
+          const subPath = fileName
+            .slice(baseName.length + 1)
+            .replace(/_/g, '/')
+          const specifier = `${name}/${subPath}`
+          try {
+            const nodeReq = createRequire(
+              join(resolvedRoot, 'package.json')
+            )
+            const resolvedPath = nodeReq.resolve(specifier)
+            const exports = getModuleExportNames(specifier, resolvedRoot)
+            const subMeta: SharedModuleMeta = {
+              localUrl: toViteUrl(resolvedPath, resolvedRoot),
+              exports
+            }
+            return { code: buildSharedWrapperCode(specifier, subMeta) }
+          } catch {
+            // fall through
+          }
+        }
+      }
+
+      return null
+    },
+
     resolveId(id: string) {
       // Intercept bare shared specifiers so they resolve to virtual wrappers
       // instead of the real package.  This gives us a single entry point
@@ -342,60 +386,6 @@ export const get = async (module) => {
 
       server.middlewares.use(async (req, res, next) => {
         const url = req.url
-
-        // Intercept requests for pre-bundled stubs of excluded packages.
-        // When react/react-dom are excluded from the dep optimizer,
-        // Vite creates CJS stubs in .vite/deps/ that lack named ESM
-        // exports (both for the base package and sub-paths like
-        // react/jsx-runtime → react_jsx-runtime.js).
-        //
-        // For base packages (e.g. react.js), serve the shared wrapper.
-        // For sub-paths (e.g. react_jsx-runtime.js), use Vite's own
-        // transformRequest to properly serve the module with CJS interop.
-        if (url && sharedModuleMeta.size > 0) {
-          const urlPath = url.split('?')[0]
-          const depsMatch = urlPath.match(
-            /^\/node_modules\/\.vite\/deps\/(.+)\.js$/
-          )
-          if (depsMatch) {
-            const fileName = depsMatch[1]
-            for (const [name, meta] of sharedModuleMeta) {
-              const baseName = name.replace(/\//g, '_')
-              if (fileName === baseName) {
-                // Base package (e.g. react) — serve shared wrapper
-                const code = buildSharedWrapperCode(name, meta)
-                res.setHeader('Content-Type', 'application/javascript')
-                res.end(code)
-                return
-              }
-              if (fileName.startsWith(baseName + '_')) {
-                // Sub-path (e.g. react_jsx-runtime) — convert the
-                // dep file name back to a specifier, resolve to a
-                // file path, and let Vite transform it with CJS interop.
-                const subPath = fileName
-                  .slice(baseName.length + 1)
-                  .replace(/_/g, '/')
-                const specifier = `${name}/${subPath}`
-                try {
-                  // Resolve bare specifier to filesystem path
-                  const nodeRequire = createRequire(
-                    join(resolvedRoot, 'package.json')
-                  )
-                  const resolvedPath = nodeRequire.resolve(specifier)
-                  const viteUrl = toViteUrl(resolvedPath, resolvedRoot)
-                  const result = await server.transformRequest(viteUrl)
-                  if (result) {
-                    res.setHeader('Content-Type', 'application/javascript')
-                    res.end(result.code)
-                    return
-                  }
-                } catch {
-                  // fall through to default handling
-                }
-              }
-            }
-          }
-        }
 
         // Serve remoteEntry.js
         if (url === `/${options.filename}`) {
