@@ -343,27 +343,50 @@ export const get = async (module) => {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url
 
-        // Intercept requests for pre-bundled shared modules.
-        // When shared modules are excluded from the dep optimizer,
-        // Vite creates CJS stubs in .vite/deps/ that lack named
-        // ESM exports.  Serve our shared wrapper code instead,
-        // which provides proper named exports and delegates to
-        // the host's shared module at runtime.
+        // Intercept requests for pre-bundled stubs of excluded packages.
+        // When react/react-dom are excluded from the dep optimizer,
+        // Vite creates CJS stubs in .vite/deps/ that lack named ESM
+        // exports (both for the base package and sub-paths like
+        // react/jsx-runtime → react_jsx-runtime.js).
+        //
+        // For base packages (e.g. react.js), serve the shared wrapper.
+        // For sub-paths (e.g. react_jsx-runtime.js), use Vite's own
+        // transformRequest to properly serve the module with CJS interop.
         if (url && sharedModuleMeta.size > 0) {
-          // Strip query string for matching
           const urlPath = url.split('?')[0]
-          for (const [name, meta] of sharedModuleMeta) {
-            // Match URLs like /node_modules/.vite/deps/react.js
-            // Vite uses the package name with / replaced by _
-            // e.g. @reduxjs/toolkit -> @reduxjs_toolkit.js
-            const depFileName = name.replace(/\//g, '_')
-            if (
-              urlPath === `/node_modules/.vite/deps/${depFileName}.js`
-            ) {
-              const code = buildSharedWrapperCode(name, meta)
-              res.setHeader('Content-Type', 'application/javascript')
-              res.end(code)
-              return
+          const depsMatch = urlPath.match(
+            /^\/node_modules\/\.vite\/deps\/(.+)\.js$/
+          )
+          if (depsMatch) {
+            const fileName = depsMatch[1]
+            for (const [name, meta] of sharedModuleMeta) {
+              const baseName = name.replace(/\//g, '_')
+              if (fileName === baseName) {
+                // Base package (e.g. react) — serve shared wrapper
+                const code = buildSharedWrapperCode(name, meta)
+                res.setHeader('Content-Type', 'application/javascript')
+                res.end(code)
+                return
+              }
+              if (fileName.startsWith(baseName + '_')) {
+                // Sub-path (e.g. react_jsx-runtime) — convert the
+                // dep file name back to a specifier and let Vite
+                // transform it properly (with CJS interop).
+                const subPath = fileName
+                  .slice(baseName.length + 1)
+                  .replace(/_/g, '/')
+                const specifier = `${name}/${subPath}`
+                try {
+                  const result = await server.transformRequest(specifier)
+                  if (result) {
+                    res.setHeader('Content-Type', 'application/javascript')
+                    res.end(result.code)
+                    return
+                  }
+                } catch {
+                  // fall through to default handling
+                }
+              }
             }
           }
         }
