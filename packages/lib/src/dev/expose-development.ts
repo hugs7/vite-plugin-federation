@@ -268,27 +268,32 @@ export const get = async (module) => {
         sharedModuleMeta.set(name, { localUrl, exports })
       }
 
-      // Exclude shared modules from Vite's dep optimizer.  This is
-      // necessary because pre-bundled deps (like @westpac/ui or the
-      // viteframework) inline shared modules, creating duplicate
-      // singletons.  For example, a pre-bundled react-redux would
-      // use a local copy of react with its own ReactSharedInternals,
-      // causing hooks to fail.
+      // Exclude react and react-dom from Vite's dep optimizer.
+      // These are the core singleton modules — react holds mutable
+      // state (ReactSharedInternals.H) that react-dom writes to
+      // during rendering and hooks read from.  If they're pre-bundled,
+      // other pre-bundled deps inline their own copies, creating
+      // duplicate singletons that break hooks.
       //
-      // Excluding forces all imports of shared modules — from user
-      // code AND pre-bundled deps — to resolve through Vite's plugin
-      // pipeline, where our resolveId hook redirects to the shared
-      // wrapper.
-      if (sharedList.length) {
+      // Other shared modules (zustand, react-redux, etc.) can stay
+      // pre-bundled — the optimizer will keep their imports of
+      // excluded deps (react) as external references.  The middleware
+      // below intercepts the CJS stubs Vite creates for excluded deps
+      // and serves our shared wrapper with proper named ESM exports.
+      {
         if (!config.optimizeDeps) {
           config.optimizeDeps = {}
         }
         if (!config.optimizeDeps.exclude) {
           config.optimizeDeps.exclude = []
         }
-        config.optimizeDeps.exclude = config.optimizeDeps.exclude.concat(
-          sharedList
+        const toExclude = sharedList.filter(
+          (name) => name === 'react' || name === 'react-dom'
         )
+        if (toExclude.length) {
+          config.optimizeDeps.exclude =
+            config.optimizeDeps.exclude.concat(toExclude)
+        }
       }
     },
 
