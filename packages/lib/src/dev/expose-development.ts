@@ -377,12 +377,17 @@ export const get = async (module) => {
       // This must be the FIRST middleware to run before Vite serves the
       // stub from disk.
       if (sharedModuleMeta.size > 0) {
+        console.log(
+          '[federation] Shared stub middleware registered for:',
+          [...sharedModuleMeta.keys()]
+        )
         server.middlewares.use(async (req, res, next) => {
           const url = req.url
           if (!url || !url.includes('.vite/deps/')) {
             next()
             return
           }
+          console.log('[federation] .vite/deps/ request:', url)
           const urlPath = url.split('?')[0]
           const depsMatch = urlPath.match(
             /\/node_modules\/\.vite\/deps\/(.+)\.js$/
