@@ -268,47 +268,16 @@ export const get = async (module) => {
         sharedModuleMeta.set(name, { localUrl, exports })
       }
 
-      // Mark shared modules as external during dep pre-bundling so
-      // they aren't inlined into pre-bundled chunks.  This prevents
-      // duplicate singletons (e.g. react-dom inlining its own react).
+      // No changes to dep optimization are needed.  Pre-bundled deps
+      // (like icon libraries) may inline their own copy of react —
+      // that's fine because they only use it for createElement/Fragment,
+      // not for hooks or mutable singleton state.
       //
-      // We add a rolldown plugin to optimizeDeps that marks shared
-      // module imports as external.  The externalized imports resolve
-      // through Vite's normal pipeline at runtime, where our
-      // resolveId hook redirects them to the shared wrapper.
-      //
-      // We DON'T use optimizeDeps.exclude because shared modules
-      // like react are CJS and need the optimizer's CJS-to-ESM
-      // conversion.  Instead, we keep them in the optimizer but
-      // prevent them from being inlined into other chunks.
-      if (sharedList.length) {
-        if (!config.optimizeDeps) {
-          config.optimizeDeps = {}
-        }
-        if (!config.optimizeDeps.rolldownOptions) {
-          config.optimizeDeps.rolldownOptions = {}
-        }
-        const sharedSet = new Set(sharedList)
-        const existingPlugins = config.optimizeDeps.rolldownOptions.plugins
-        const externalPlugin = {
-          name: 'federation-shared-external',
-          resolveId(source: string, importer: string | undefined) {
-            // Only externalize when imported BY another package (importer
-            // is set), not when being pre-bundled as a top-level entry
-            // (importer is undefined).  This lets react/react-dom get
-            // proper CJS-to-ESM conversion as standalone entries, while
-            // preventing them from being inlined into other chunks.
-            if (importer && sharedSet.has(source)) {
-              return { id: source, external: true }
-            }
-            return null
-          }
-        }
-        config.optimizeDeps.rolldownOptions.plugins = [
-          ...(Array.isArray(existingPlugins) ? existingPlugins : existingPlugins ? [existingPlugins] : []),
-          externalPlugin
-        ]
-      }
+      // The shared wrapper (resolveId/load hooks) intercepts user
+      // source code imports of shared modules and redirects them to
+      // the host's shared instances.  Hooks and rendering go through
+      // the shared react/react-dom, ensuring a single
+      // ReactSharedInternals instance.
     },
 
     resolveId(id: string) {
