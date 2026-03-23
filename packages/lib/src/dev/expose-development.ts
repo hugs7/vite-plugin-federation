@@ -268,16 +268,28 @@ export const get = async (module) => {
         sharedModuleMeta.set(name, { localUrl, exports })
       }
 
-      // No changes to dep optimization are needed.  Pre-bundled deps
-      // (like icon libraries) may inline their own copy of react —
-      // that's fine because they only use it for createElement/Fragment,
-      // not for hooks or mutable singleton state.
+      // Exclude shared modules from Vite's dep optimizer.  This is
+      // necessary because pre-bundled deps (like @westpac/ui or the
+      // viteframework) inline shared modules, creating duplicate
+      // singletons.  For example, a pre-bundled react-redux would
+      // use a local copy of react with its own ReactSharedInternals,
+      // causing hooks to fail.
       //
-      // The shared wrapper (resolveId/load hooks) intercepts user
-      // source code imports of shared modules and redirects them to
-      // the host's shared instances.  Hooks and rendering go through
-      // the shared react/react-dom, ensuring a single
-      // ReactSharedInternals instance.
+      // Excluding forces all imports of shared modules — from user
+      // code AND pre-bundled deps — to resolve through Vite's plugin
+      // pipeline, where our resolveId hook redirects to the shared
+      // wrapper.
+      if (sharedList.length) {
+        if (!config.optimizeDeps) {
+          config.optimizeDeps = {}
+        }
+        if (!config.optimizeDeps.exclude) {
+          config.optimizeDeps.exclude = []
+        }
+        config.optimizeDeps.exclude = config.optimizeDeps.exclude.concat(
+          sharedList
+        )
+      }
     },
 
     resolveId(id: string) {
@@ -325,6 +337,31 @@ export const get = async (module) => {
 
       server.middlewares.use(async (req, res, next) => {
         const url = req.url
+
+        // Intercept requests for pre-bundled shared modules.
+        // When shared modules are excluded from the dep optimizer,
+        // Vite creates CJS stubs in .vite/deps/ that lack named
+        // ESM exports.  Serve our shared wrapper code instead,
+        // which provides proper named exports and delegates to
+        // the host's shared module at runtime.
+        if (url && sharedModuleMeta.size > 0) {
+          // Strip query string for matching
+          const urlPath = url.split('?')[0]
+          for (const [name, meta] of sharedModuleMeta) {
+            // Match URLs like /node_modules/.vite/deps/react.js
+            // Vite uses the package name with / replaced by _
+            // e.g. @reduxjs/toolkit -> @reduxjs_toolkit.js
+            const depFileName = name.replace(/\//g, '_')
+            if (
+              urlPath === `/node_modules/.vite/deps/${depFileName}.js`
+            ) {
+              const code = buildSharedWrapperCode(name, meta)
+              res.setHeader('Content-Type', 'application/javascript')
+              res.end(code)
+              return
+            }
+          }
+        }
 
         // Serve remoteEntry.js
         if (url === `/${options.filename}`) {
