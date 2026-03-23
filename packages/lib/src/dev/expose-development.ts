@@ -376,10 +376,10 @@ export const get = async (module) => {
       // Fragment, useState).  We replace them with the shared wrapper.
       // This must be the FIRST middleware to run before Vite serves the
       // stub from disk.
-      if (sharedModuleMeta.size > 0) {
+      console.log("[federation-debug] configureServer: sharedModuleMeta.size =", sharedModuleMeta.size, "entries:", [...sharedModuleMeta.keys()]); console.log("[federation-debug-SPA] configureServer: sharedModuleMeta.size =", sharedModuleMeta.size); if (sharedModuleMeta.size > 0) {
         server.middlewares.use((req, res, next) => {
           const url = req.url
-          if (!url || !url.includes('.vite/deps/')) {
+          console.log('[federation-debug] middleware hit:', url); if (!url || !url.includes('.vite/deps/')) {
             next()
             return
           }
@@ -402,7 +402,11 @@ export const get = async (module) => {
               return
             }
             if (fileName.startsWith(baseName + '_')) {
-              // Sub-path (e.g. react/jsx-runtime)
+              // Sub-path (e.g. react/jsx-runtime) — resolve to the
+              // actual file and use server.transformRequest to serve
+              // it with proper CJS-to-ESM conversion.  We can't use
+              // buildSharedWrapperCode here because its browser-side
+              // import() would hit Vite's server.fs.allow restriction.
               const subPath = fileName
                 .slice(baseName.length + 1)
                 .replace(/_/g, '/')
@@ -412,16 +416,14 @@ export const get = async (module) => {
                   join(resolvedRoot, 'package.json')
                 )
                 const resolvedPath = nodeReq.resolve(specifier)
-                const exports = getModuleExportNames(specifier, resolvedRoot)
-                const subMeta: SharedModuleMeta = {
-                  localUrl: toViteUrl(resolvedPath, resolvedRoot),
-                  exports
+                const viteUrl = toViteUrl(resolvedPath, resolvedRoot)
+                const result = await (server as any).transformRequest(viteUrl)
+                if (result) {
+                  res.setHeader('Content-Type', 'application/javascript')
+                  res.setHeader('Access-Control-Allow-Origin', '*')
+                  res.end(result.code)
+                  return
                 }
-                const code = buildSharedWrapperCode(specifier, subMeta)
-                res.setHeader('Content-Type', 'application/javascript')
-                res.setHeader('Access-Control-Allow-Origin', '*')
-                res.end(code)
-                return
               } catch {
                 // fall through
               }
