@@ -13,31 +13,31 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { resolve, parse, basename, extname, relative, dirname } from 'path'
-import {
-  getModuleMarker,
-  normalizePath,
-  parseExposeOptions,
-  removeNonRegLetter,
-  NAME_CHAR_REG
-} from '../utils'
+import { Node, walk } from 'estree-walker'
+import MagicString from 'magic-string'
+import { basename, dirname, extname, parse, relative, resolve } from 'path'
+import type { AcornNode, OutputAsset, OutputChunk } from 'rollup'
+import type { VitePluginFederationOptions } from 'types'
+import type { ResolvedConfig } from 'vite'
+import type { PluginHooks } from '../../types/pluginHooks'
 import {
   builderInfo,
   DYNAMIC_LOADING_CSS,
   DYNAMIC_LOADING_CSS_PREFIX,
-  EXPOSES_MAP,
   EXPOSES_KEY_MAP,
+  EXPOSES_MAP,
   EXTERNALS,
   parsedOptions,
   SHARED,
   viteConfigResolved
 } from '../public'
-import type { AcornNode, OutputAsset, OutputChunk } from 'rollup'
-import type { VitePluginFederationOptions } from 'types'
-import type { PluginHooks } from '../../types/pluginHooks'
-import MagicString from 'magic-string'
-import { walk } from 'estree-walker'
-import type { ResolvedConfig } from 'vite'
+import {
+  getModuleMarker,
+  NAME_CHAR_REG,
+  normalizePath,
+  parseExposeOptions,
+  removeNonRegLetter
+} from '../utils'
 
 export const prodExposePlugin = (
   options: VitePluginFederationOptions
@@ -309,7 +309,7 @@ export const prodExposePlugin = (
         }
         const magicString = new MagicString(remoteEntryChunk.code)
         // let cssFunctionName: string = DYNAMIC_LOADING_CSS
-        walk(ast, {
+        walk(ast as Node, {
           enter(node: any) {
             if (
               node &&
