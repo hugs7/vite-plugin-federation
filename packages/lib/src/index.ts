@@ -13,30 +13,29 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import virtual from '@rollup/plugin-virtual'
+import { dirname } from 'path'
+import type { ModuleInfo } from 'rollup'
+import { fileURLToPath } from 'url'
 import type {
   ConfigEnv,
   Plugin,
+  ResolvedConfig,
   UserConfig,
-  ViteDevServer,
-  ResolvedConfig
+  ViteDevServer
 } from 'vite'
-import virtual from '@rollup/plugin-virtual'
-import { dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { prodRemotePlugin } from './prod/remote-production'
-import type { VitePluginFederationOptions } from '../types'
-import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions } from './public'
-import type { PluginHooks } from '../types/pluginHooks'
-import type { ModuleInfo } from 'rollup'
-import { prodSharedPlugin } from './prod/shared-production'
-import { prodExposePlugin } from './prod/expose-production'
-import { devSharedPlugin } from './dev/shared-development'
-import { devRemotePlugin } from './dev/remote-development'
-import { devExposePlugin } from './dev/expose-development'
 
-const federation = (
-  options: VitePluginFederationOptions
-): Plugin => {
+import type { VitePluginFederationOptions } from '../types'
+import type { PluginHooks } from '../types/pluginHooks'
+import { devExposePlugin } from './dev/expose-development'
+import { devRemotePlugin } from './dev/remote-development'
+import { devSharedPlugin } from './dev/shared-development'
+import { prodExposePlugin } from './prod/expose-production'
+import { prodRemotePlugin } from './prod/remote-production'
+import { prodSharedPlugin } from './prod/shared-production'
+import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions } from './public'
+
+const federation = (options: VitePluginFederationOptions): Plugin => {
   options.filename = options.filename
     ? options.filename
     : DEFAULT_ENTRY_FILENAME
@@ -62,8 +61,10 @@ const federation = (
       pluginList = []
     }
     builderInfo.isHost = !!(
-      parsedOptions.prodRemote.length || parsedOptions.devRemote.length ||
-      parsedOptions.prodShared.length || parsedOptions.devShared.length
+      parsedOptions.prodRemote.length ||
+      parsedOptions.devRemote.length ||
+      parsedOptions.prodShared.length ||
+      parsedOptions.devShared.length
     )
     builderInfo.isRemote = !!(
       parsedOptions.prodExpose.length || parsedOptions.devExpose.length
