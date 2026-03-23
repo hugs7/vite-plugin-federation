@@ -370,14 +370,20 @@ export const get = async (module) => {
               }
               if (fileName.startsWith(baseName + '_')) {
                 // Sub-path (e.g. react_jsx-runtime) — convert the
-                // dep file name back to a specifier and let Vite
-                // transform it properly (with CJS interop).
+                // dep file name back to a specifier, resolve to a
+                // file path, and let Vite transform it with CJS interop.
                 const subPath = fileName
                   .slice(baseName.length + 1)
                   .replace(/_/g, '/')
                 const specifier = `${name}/${subPath}`
                 try {
-                  const result = await server.transformRequest(specifier)
+                  // Resolve bare specifier to filesystem path
+                  const nodeRequire = createRequire(
+                    join(resolvedRoot, 'package.json')
+                  )
+                  const resolvedPath = nodeRequire.resolve(specifier)
+                  const viteUrl = toViteUrl(resolvedPath, resolvedRoot)
+                  const result = await server.transformRequest(viteUrl)
                   if (result) {
                     res.setHeader('Content-Type', 'application/javascript')
                     res.end(result.code)
