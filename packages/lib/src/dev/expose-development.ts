@@ -182,7 +182,7 @@ async function __federation_import(name) {
 
 let __federation_shared_resolving;
 let __federation_dev_client_loaded;
-export const init =(shareScope) => {
+export const init = (shareScope) => {
   globalThis.__federation_shared__= globalThis.__federation_shared__ || {};
   Object.entries(shareScope).forEach(([key, value]) => {
     for (const [versionKey, versionValue] of Object.entries(value)) {
@@ -266,6 +266,23 @@ export const get = async (module) => {
         const localUrl = toViteUrl(realPath, root)
         const exports = getModuleExportNames(name, root)
         sharedModuleMeta.set(name, { localUrl, exports })
+      }
+
+      // Exclude shared modules from Vite's dep optimizer so they are
+      // not pre-bundled with their own copies of shared dependencies.
+      // Without this, pre-bundled packages like react-dom inline their
+      // own copy of react, creating duplicate singletons (e.g. two
+      // separate ReactSharedInternals objects) which breaks hooks.
+      if (sharedList.length) {
+        if (!config.optimizeDeps) {
+          config.optimizeDeps = {}
+        }
+        if (!config.optimizeDeps.exclude) {
+          config.optimizeDeps.exclude = []
+        }
+        config.optimizeDeps.exclude = config.optimizeDeps.exclude.concat(
+          sharedList
+        )
       }
     },
 
