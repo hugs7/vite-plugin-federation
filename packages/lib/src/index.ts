@@ -36,9 +36,9 @@ import { prodSharedPlugin } from './prod/shared-production'
 import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions } from './public'
 
 const federation = (options: VitePluginFederationOptions): Plugin => {
-  options.filename = options.filename
-    ? options.filename
-    : DEFAULT_ENTRY_FILENAME
+  if (!options.filename) {
+    options.filename = DEFAULT_ENTRY_FILENAME
+  }
 
   let pluginList: PluginHooks[] = []
   let virtualMod
