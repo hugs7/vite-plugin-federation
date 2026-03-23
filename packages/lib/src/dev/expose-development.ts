@@ -376,10 +376,10 @@ export const get = async (module) => {
       // Fragment, useState).  We replace them with the shared wrapper.
       // This must be the FIRST middleware to run before Vite serves the
       // stub from disk.
-      console.log("[federation-debug] configureServer: sharedModuleMeta.size =", sharedModuleMeta.size, "entries:", [...sharedModuleMeta.keys()]); console.log("[federation-debug-SPA] configureServer: sharedModuleMeta.size =", sharedModuleMeta.size); if (sharedModuleMeta.size > 0) {
-        server.middlewares.use((req, res, next) => {
+      if (sharedModuleMeta.size > 0) {
+        server.middlewares.use(async (req, res, next) => {
           const url = req.url
-          console.log('[federation-debug] middleware hit:', url); if (!url || !url.includes('.vite/deps/')) {
+          if (!url || !url.includes('.vite/deps/')) {
             next()
             return
           }
@@ -417,7 +417,7 @@ export const get = async (module) => {
                 )
                 const resolvedPath = nodeReq.resolve(specifier)
                 const viteUrl = toViteUrl(resolvedPath, resolvedRoot)
-                const result = await (server as any).transformRequest(viteUrl)
+                const result = await server.transformRequest(viteUrl)
                 if (result) {
                   res.setHeader('Content-Type', 'application/javascript')
                   res.setHeader('Access-Control-Allow-Origin', '*')
