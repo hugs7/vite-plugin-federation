@@ -295,6 +295,23 @@ export const get = async (module) => {
             config.optimizeDeps.exclude.concat(toExclude)
         }
       }
+
+      // Allow Vite to serve files from node_modules so that
+      // server.transformRequest can access excluded shared modules
+      // (react, react-dom) and their sub-paths (jsx-runtime etc.)
+      // without hitting server.fs.allow restrictions.
+      if (!config.server) {
+        config.server = {}
+      }
+      if (!config.server.fs) {
+        config.server.fs = {}
+      }
+      if (!config.server.fs.allow) {
+        config.server.fs.allow = []
+      }
+      // Allow the workspace root and node_modules
+      config.server.fs.allow.push(root, join(root, '..'))
+      
     },
 
     transform(code: string, id: string) {
@@ -429,8 +446,8 @@ export const get = async (module) => {
                   res.end(result.code)
                   return
                 }
-              } catch {
-                // fall through
+              } catch (err) {
+                console.error('[federation] transformRequest failed for', specifier, err)
               }
             }
           }
