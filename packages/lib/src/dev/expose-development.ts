@@ -369,6 +369,68 @@ export const get = async (module) => {
       }
     },
     configureServer(server) {
+      // Intercept requests for pre-bundled stubs of excluded shared
+      // modules BEFORE Vite's static file serving.  When react/react-dom
+      // are excluded from the dep optimizer, Vite creates CJS stubs in
+      // .vite/deps/ with only a default export (no named exports like
+      // Fragment, useState).  We replace them with the shared wrapper.
+      // This must be the FIRST middleware to run before Vite serves the
+      // stub from disk.
+      if (sharedModuleMeta.size > 0) {
+        server.middlewares.use((req, res, next) => {
+          const url = req.url
+          if (!url || !url.includes('.vite/deps/')) {
+            next()
+            return
+          }
+          const urlPath = url.split('?')[0]
+          const depsMatch = urlPath.match(
+            /\/node_modules\/\.vite\/deps\/(.+)\.js$/
+          )
+          if (!depsMatch) {
+            next()
+            return
+          }
+          const fileName = depsMatch[1]
+          for (const [name, meta] of sharedModuleMeta) {
+            const baseName = name.replace(/\//g, '_')
+            if (fileName === baseName) {
+              const code = buildSharedWrapperCode(name, meta)
+              res.setHeader('Content-Type', 'application/javascript')
+              res.setHeader('Access-Control-Allow-Origin', '*')
+              res.end(code)
+              return
+            }
+            if (fileName.startsWith(baseName + '_')) {
+              // Sub-path (e.g. react/jsx-runtime)
+              const subPath = fileName
+                .slice(baseName.length + 1)
+                .replace(/_/g, '/')
+              const specifier = `${name}/${subPath}`
+              try {
+                const nodeReq = createRequire(
+                  join(resolvedRoot, 'package.json')
+                )
+                const resolvedPath = nodeReq.resolve(specifier)
+                const exports = getModuleExportNames(specifier, resolvedRoot)
+                const subMeta: SharedModuleMeta = {
+                  localUrl: toViteUrl(resolvedPath, resolvedRoot),
+                  exports
+                }
+                const code = buildSharedWrapperCode(specifier, subMeta)
+                res.setHeader('Content-Type', 'application/javascript')
+                res.setHeader('Access-Control-Allow-Origin', '*')
+                res.end(code)
+                return
+              } catch {
+                // fall through
+              }
+            }
+          }
+          next()
+        })
+      }
+
       // Add CORS headers to ALL responses so the HOST browser can load
       // source files, @vite/client, dep-optimized chunks, etc. from
       // this remote dev server.
