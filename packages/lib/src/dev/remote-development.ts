@@ -30,6 +30,7 @@ import {
 } from '../utils'
 import { builderInfo, parsedOptions, devRemotes } from '../public'
 import type { PluginHooks } from '../../types/pluginHooks'
+import { Node } from 'estree'
 
 export const devRemotePlugin = (
   options: VitePluginFederationOptions
@@ -132,7 +133,7 @@ function __federation_method_unwrapDefault(module) {
   return (module?.__esModule || module?.[Symbol.toStringTag] === 'Module')?module.default:module
 }
 
-function __federation_method_wrapDefault(module ,need){
+function __federation_method_wrapDefault(module, need){
   if (!module?.default && need) {
     let obj = Object.create(null);
     obj.default = module;
@@ -178,12 +179,16 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
       if (parsedOptions.devRemote.length) {
         server.middlewares.use(async (req, res, next) => {
           const url = req.url
-          if (url === '/@react-refresh' || url?.startsWith('/@react-refresh?')) {
+          if (
+            url === '/@react-refresh' ||
+            url?.startsWith('/@react-refresh?')
+          ) {
             try {
               const result = await server.transformRequest('/@react-refresh')
               if (result) {
                 // Append a line that stores the module on the window
-                const code = result.code +
+                const code =
+                  result.code +
                   `\nif(typeof window!=='undefined'){` +
                   `window.__vite_react_refresh_runtime__={` +
                   `injectIntoGlobalHook,register,createSignatureFunctionForTransform,` +
@@ -196,14 +201,19 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
                 res.end(code)
                 return
               }
-            } catch { /* fall through */ }
+            } catch {
+              /* fall through */
+            }
           }
           next()
         })
       }
     },
     async transform(this: TransformPluginContext, code: string, id: string) {
-      if ((builderInfo.isHost || builderInfo.isShared) && !builderInfo.isRemote) {
+      if (
+        (builderInfo.isHost || builderInfo.isShared) &&
+        !builderInfo.isRemote
+      ) {
         for (const arr of parsedOptions.devShared) {
           if (!arr[1].version && !arr[1].manuallyPackagePathSetting) {
             const packageJsonPath = (
@@ -252,7 +262,7 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
 
       let requiresRuntime = false
       let manualRequired: any = null // set static import if exists
-      walk(ast, {
+      walk(ast as Node, {
         enter(node: any) {
           if (
             node.type === 'ImportDeclaration' &&

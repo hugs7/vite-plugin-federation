@@ -36,9 +36,9 @@ import { prodSharedPlugin } from './prod/shared-production'
 import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions } from './public'
 
 const federation = (options: VitePluginFederationOptions): Plugin => {
-  options.filename = options.filename
-    ? options.filename
-    : DEFAULT_ENTRY_FILENAME
+  if (!options.filename) {
+    options.filename = DEFAULT_ENTRY_FILENAME
+  }
 
   let pluginList: PluginHooks[] = []
   let virtualMod
@@ -88,9 +88,8 @@ const federation = (options: VitePluginFederationOptions): Plugin => {
     // vite:css-post plugin will summarize all the styles in the style.xxxxxx.css file
     // so, this plugin need run after vite:css-post in post plugin list
     enforce: 'post',
-    // apply:'build',
     options(_options) {
-      // rollup doesnt has options.mode and options.command
+      // rollup doesn't have options.mode and options.command
       if (!registerCount++) {
         registerPlugins((options.mode = options.mode ?? 'production'), '')
       }
@@ -115,7 +114,7 @@ const federation = (options: VitePluginFederationOptions): Plugin => {
         pluginHook.config?.call(this, config, env)
       }
 
-      // only run when builder is vite,rollup doesnt has hook named `config`
+      // only run when builder is vite since rollup doesn't have hook named `config`
       builderInfo.builder = 'vite'
       builderInfo.assetsDir = config?.build?.assetsDir ?? 'assets'
     },
