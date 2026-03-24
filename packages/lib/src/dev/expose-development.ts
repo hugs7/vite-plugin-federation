@@ -21,7 +21,7 @@ import type { VitePluginFederationOptions } from 'types';
 import type { UserConfig } from 'vite';
 
 import type { PluginHooks } from '../../types/pluginHooks';
-import { parsedOptions, pluginName } from '../public';
+import { parsedOptions, pluginName, sendJS } from '../public';
 import {
   FEDERATION_DEBUG_SNIPPET_ESM,
   FEDERATION_IMPORT_SNIPPET
@@ -677,9 +677,7 @@ export const get = async (module) => {
 
           const originUrl = getServerOrigin(server);
           const code = buildSharedWrapperCode(matchedName, meta, originUrl);
-          res.setHeader('Content-Type', 'application/javascript');
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          res.end(code);
+          sendJS(res, code);
         });
       }
 
@@ -707,8 +705,7 @@ export const get = async (module) => {
             const moduleId = `__remoteEntryHelper__${options.filename}`;
             const result = await server.transformRequest(moduleId);
             if (result) {
-              res.setHeader('Content-Type', 'application/javascript');
-              res.end(result.code);
+              sendJS(res, result.code);
             } else {
               res.statusCode = 404;
               res.end('Module not found');
@@ -749,8 +746,7 @@ export const get = async (module) => {
               /const base\$1 = "\/"\s*\|\|\s*"\/";/,
               `const base$1 = "${remoteOrigin}/";`
             );
-            res.setHeader('Content-Type', 'application/javascript');
-            res.end(code);
+            sendJS(res, code);
           } catch (error) {
             next();
           }
@@ -794,8 +790,7 @@ export var registerExportsForReactRefresh = _rt.registerExportsForReactRefresh;
 export var __hmr_import = _rt.__hmr_import;
 export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
 `;
-          res.setHeader('Content-Type', 'application/javascript');
-          res.end(code);
+          sendJS(res, code);
           return;
         }
 
@@ -808,8 +803,7 @@ export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
           try {
             const result = await server.transformRequest('/@react-refresh');
             if (result) {
-              res.setHeader('Content-Type', 'application/javascript');
-              res.end(result.code);
+              sendJS(res, result.code);
               return;
             }
           } catch {
@@ -838,8 +832,7 @@ export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
                 // with HMR metadata.
                 const viteUrl = toViteUrl(modulePath, resolvedRoot);
                 const code = `export { default } from '${viteUrl}';\nexport * from '${viteUrl}';`;
-                res.setHeader('Content-Type', 'application/javascript');
-                res.end(code);
+                sendJS(res, code);
               } else {
                 res.statusCode = 404;
                 res.end(`Expose module not found: ${exposeName}`);

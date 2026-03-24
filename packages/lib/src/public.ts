@@ -13,6 +13,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import type { ServerResponse } from 'http';
 import type { ConfigTypeSet, RemotesConfig } from 'types';
 import type { ResolvedConfig } from 'vite';
 
@@ -62,4 +63,23 @@ export const prodRemotes: Remote[] = [];
 
 export const viteConfigResolved: { config: ResolvedConfig | undefined } = {
   config: undefined
+};
+
+export const MIME_TYPES = {
+  JS: 'application/javascript'
+} as const;
+
+/** Send a JS response with Content-Type + CORS headers. */
+export const sendJS = (res: ServerResponse, code: string): void =>
+  sendResponse(res, code, MIME_TYPES.JS);
+
+/** Send a response with the given Content-Type + CORS headers. */
+export const sendResponse = (
+  res: ServerResponse,
+  body: string,
+  contentType: string
+): void => {
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.end(body);
 };

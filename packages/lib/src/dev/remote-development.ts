@@ -22,7 +22,13 @@ import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
 import type { UserConfig } from 'vite';
 
 import type { PluginHooks } from '../../types/pluginHooks';
-import { builderInfo, devRemotes, parsedOptions, pluginName } from '../public';
+import {
+  builderInfo,
+  devRemotes,
+  parsedOptions,
+  pluginName,
+  sendJS
+} from '../public';
 import {
   FEDERATION_METHOD_GET_REMOTE,
   FEDERATION_METHOD_SET_REMOTE,
@@ -185,8 +191,7 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
                   `validateRefreshBoundaryAndEnqueueUpdate,` +
                   `registerExportsForReactRefresh,__hmr_import` +
                   `};};\n`;
-                res.setHeader('Content-Type', 'application/javascript');
-                res.end(code);
+                sendJS(res, code);
                 return;
               }
             } catch {
