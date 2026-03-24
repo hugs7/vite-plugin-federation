@@ -9,7 +9,7 @@ export default defineConfig({
     },
     target: 'node22',
     minify: false,
-    sourcemap: true,
+    sourcemap: !process.env.CI,
     rolldownOptions: {
       external: [
         'fs',
