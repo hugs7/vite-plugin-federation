@@ -220,12 +220,10 @@ export const devExposePlugin = (
   const cjsSubDeps = new Set<string>()
   let resolvedRoot = process.cwd()
 
-  let moduleMap = ''
-  for (const item of parsedOptions.devExpose) {
-    const name = removeNonRegLetter(item[0], NAME_CHAR_REG)
-    moduleMap += `"${item[0]}":()=>{
-      return __federation_import('./__federation_expose_${name}.js').then(module => Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`
-  }
+  const exposeEntries = parsedOptions.devExpose.map((item) => {
+    const sanitized = removeNonRegLetter(item[0], NAME_CHAR_REG)
+    return `${JSON.stringify(item[0])}: './__federation_expose_${sanitized}.js'`
+  })
 
   return {
     name: 'hugs7:expose-development',
@@ -234,14 +232,20 @@ export const devExposePlugin = (
 ${FEDERATION_DEBUG_SNIPPET_ESM}
 const _logInit = __fed_debug('federation:init');
 const _logGet = __fed_debug('federation:get');
-const currentImports = {}
+const currentImports = {};
 const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
-let moduleMap = {${moduleMap}}
-const seen = {}
 async function __federation_import(name) {
-  currentImports[name] ??= import(/* @vite-ignore */ name)
-  return currentImports[name]
-};
+  currentImports[name] ??= import(/* @vite-ignore */ name);
+  return currentImports[name];
+}
+function __federation_expose_loader(url) {
+  return () => __federation_import(url).then(module =>
+    Object.keys(module).every(k => exportSet.has(k)) ? () => module.default : () => module
+  );
+}
+const moduleMap = Object.fromEntries(
+  Object.entries({${exposeEntries.join(',')}}).map(([key, url]) => [key, __federation_expose_loader(url)])
+);
 
 let __federation_shared_resolving;
 let __federation_dev_client_loaded;
