@@ -133,6 +133,7 @@ const buildSharedWrapperCode = (
 
   let code = ''
   code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`
+  code += `console.log('[federation:shared-wrapper] ${name}:', __shared ? 'USING SHARED' : 'FALLBACK to local', Object.keys(__shared || {}).slice(0,5));\n`
   code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(importUrl)});\n`
 
   if (hasDefault) {
@@ -392,6 +393,7 @@ export const get = async (module) => {
       // stay pre-bundled to avoid cascading CJS failures.
       if (!excludedShared.has(id)) return null
 
+      console.log(`[federation] resolveId intercepted: ${id}`)
       return RESOLVED_SHARED_PREFIX + id
     },
 
@@ -524,11 +526,51 @@ export const get = async (module) => {
         })
       }
 
-      // NOTE: Raw /node_modules/ interception was removed.  Excluded
-      // shared modules are handled by the resolveId/load virtual wrapper
-      // approach, which intercepts bare specifier imports in pre-bundled
-      // deps.  CJS shared modules stay pre-bundled and are patched by
-      // the .vite/deps/ middleware above.
+      // Intercept requests for excluded shared modules served from
+      // node_modules (e.g. /@fs/.../sso/build/index.es.js).
+      // Since the main plugin runs with enforce:'post', our resolveId
+      // cannot intercept bare specifiers before Vite's internal resolver.
+      // Instead, Vite resolves them to file URLs, and we intercept those
+      // URLs here — serving a shared wrapper that checks the host's
+      // globalThis.__federation_shared_modules__ first.
+      if (excludedShared.size > 0) {
+        // Build a map: URL path (without query) → shared module name
+        const excludedUrlMap = new Map<string, string>()
+        for (const name of excludedShared) {
+          const meta = sharedModuleMeta.get(name)
+          if (meta) {
+            excludedUrlMap.set(meta.localUrl, name)
+          }
+        }
+        console.log(
+          '[federation] Excluded shared URL interception:',
+          [...excludedUrlMap.entries()].map(([url, name]) => `${name} → ${url}`)
+        )
+
+        server.middlewares.use((req, res, next) => {
+          const url = req.url
+          if (!url) { next(); return }
+
+          // Skip the fallback URL — __fed_raw is the escape hatch so
+          // the wrapper's fallback import loads the REAL module file.
+          if (url.includes('__fed_raw')) { next(); return }
+
+          const urlPath = url.split('?')[0]
+          const matchedName = excludedUrlMap.get(urlPath)
+          if (!matchedName) { next(); return }
+
+          const meta = sharedModuleMeta.get(matchedName)
+          if (!meta) { next(); return }
+
+          console.log(`[federation] Intercepting excluded shared: ${urlPath} → wrapper for ${matchedName}`)
+          const port = server.config.server.port ?? 5173
+          const originUrl = `http://localhost:${port}`
+          const code = buildSharedWrapperCode(matchedName, meta, originUrl)
+          res.setHeader('Content-Type', 'application/javascript')
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.end(code)
+        })
+      }
 
       // Add CORS headers to ALL responses so the HOST browser can load
       // source files, @vite/client, dep-optimized chunks, etc. from
