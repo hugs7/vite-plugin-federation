@@ -49,6 +49,7 @@
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s --commit-path ."
   },
   "dependencies": {
+    "es-module-lexer": "^2.0.0",
     "estree-walker": "^3.0.2",
     "magic-string": "^0.30.0"
   },
