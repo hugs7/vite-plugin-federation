@@ -42,7 +42,7 @@ import {
 export const prodExposePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
-  let moduleMap = ''
+  const exposeEntries: string[] = []
   const hasOptions = parsedOptions.prodExpose.some((expose) => {
     return expose[0] === parseExposeOptions(options)[0]?.[0]
   })
@@ -62,9 +62,14 @@ export const prodExposePlugin = (
       item[0],
       `__federation_expose_${removeNonRegLetter(item[0], NAME_CHAR_REG)}`
     )
-    moduleMap += `\n"${item[0]}":()=>{
-      ${DYNAMIC_LOADING_CSS}('${DYNAMIC_LOADING_CSS_PREFIX}${exposeFilepath}', ${item[1].dontAppendStylesToHead}, '${item[0]}')
-      return __federation_import('\${__federation_expose_${item[0]}}').then(module =>Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`
+    exposeEntries.push(
+      `${JSON.stringify(item[0])}: {` +
+        `url: '\${__federation_expose_${item[0]}}',` +
+        `css: '${DYNAMIC_LOADING_CSS_PREFIX}${exposeFilepath}',` +
+        `noStyles: ${item[1].dontAppendStylesToHead},` +
+        `name: ${JSON.stringify(item[0])}` +
+      `}`
+    )
   }
 
   // let viteConfigResolved: ResolvedConfig
@@ -75,10 +80,19 @@ export const prodExposePlugin = (
       // code generated for remote
       // language=JS
       [`__remoteEntryHelper__${options.filename}`]: `
-      const currentImports = {}
+      const currentImports = {};
       const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
-      let moduleMap = {${moduleMap}}
-      const seen = {}
+      function __federation_expose_loader(entry) {
+        return () => {
+          ${DYNAMIC_LOADING_CSS}(entry.css, entry.noStyles, entry.name);
+          return __federation_import(entry.url).then(module =>
+            Object.keys(module).every(k => exportSet.has(k)) ? () => module.default : () => module
+          );
+        };
+      }
+      const moduleMap = Object.fromEntries(
+        Object.entries({${exposeEntries.join(',')}}).map(([key, entry]) => [key, __federation_expose_loader(entry)])
+      );
       export const ${DYNAMIC_LOADING_CSS} = (cssFilePaths, dontAppendStylesToHead, exposeItemName) => {
         const metaUrl = import.meta.url;
         if (typeof metaUrl === 'undefined') {
