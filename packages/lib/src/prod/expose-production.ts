@@ -38,6 +38,7 @@ import {
   parseExposeOptions,
   removeNonRegLetter
 } from '../utils'
+import { FEDERATION_IMPORT_SNIPPET } from '../runtime-snippets'
 
 export const prodExposePlugin = (
   options: VitePluginFederationOptions
@@ -80,7 +81,7 @@ export const prodExposePlugin = (
       // code generated for remote
       // language=JS
       [`__remoteEntryHelper__${options.filename}`]: `
-      const currentImports = {};
+      ${FEDERATION_IMPORT_SNIPPET}
       const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
 
       const __federation_expose_loader = (entry) => () => {
@@ -146,10 +147,6 @@ export const prodExposePlugin = (
           element.href = href;
           document.head.appendChild(element);
         });
-      };
-      const __federation_import = async (name) => {
-        currentImports[name] ??= import(name);
-        return currentImports[name];
       };
       export const get = (module) => {
         if(!moduleMap[module]) throw new Error('Can not find remote module ' + module)

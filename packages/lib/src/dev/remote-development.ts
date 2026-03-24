@@ -31,6 +31,12 @@ import {
 import { builderInfo, parsedOptions, devRemotes } from '../public'
 import type { PluginHooks } from '../../types/pluginHooks'
 import { Node } from 'estree'
+import {
+  FEDERATION_METHOD_UNWRAP_DEFAULT,
+  FEDERATION_METHOD_WRAP_DEFAULT,
+  FEDERATION_METHOD_GET_REMOTE,
+  FEDERATION_METHOD_SET_REMOTE
+} from '../runtime-snippets'
 
 export const devRemotePlugin = (
   options: VitePluginFederationOptions
@@ -129,27 +135,10 @@ async function __federation_method_ensure(remoteId) {
   }
 }
 
-function __federation_method_unwrapDefault(module) {
-  return (module?.__esModule || module?.[Symbol.toStringTag] === 'Module')?module.default:module
-}
-
-function __federation_method_wrapDefault(module, need){
-  if (!module?.default && need) {
-    let obj = Object.create(null);
-    obj.default = module;
-    obj.__esModule = true;
-    return obj;
-  }
-  return module; 
-}
-
-function __federation_method_getRemote(remoteName, componentName) {
-  return __federation_method_ensure(remoteName).then((remote) => remote.get(componentName).then(factory => factory()));
-}
-
-function __federation_method_setRemote(remoteName, remoteConfig) {
-  remotesMap[remoteName] = remoteConfig;
-}
+${FEDERATION_METHOD_UNWRAP_DEFAULT}
+${FEDERATION_METHOD_WRAP_DEFAULT}
+${FEDERATION_METHOD_GET_REMOTE}
+${FEDERATION_METHOD_SET_REMOTE}
 export {__federation_method_ensure, __federation_method_getRemote , __federation_method_setRemote , __federation_method_unwrapDefault , __federation_method_wrapDefault}
 ;`
         }

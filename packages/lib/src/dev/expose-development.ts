@@ -23,7 +23,7 @@ import type { PluginHooks } from '../../types/pluginHooks'
 import { parsedOptions } from '../public'
 import { NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter } from '../utils'
 
-import { FEDERATION_DEBUG_SNIPPET_ESM } from '../debug'
+import { FEDERATION_DEBUG_SNIPPET_ESM, FEDERATION_IMPORT_SNIPPET } from '../runtime-snippets'
 
 /**
  * Detect whether a resolved module file is CJS (uses require/module.exports).
@@ -232,13 +232,8 @@ export const devExposePlugin = (
 ${FEDERATION_DEBUG_SNIPPET_ESM}
 const _logInit = __fed_debug('federation:init');
 const _logGet = __fed_debug('federation:get');
-const currentImports = {};
+${FEDERATION_IMPORT_SNIPPET}
 const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
-
-const __federation_import = async (name) => {
-  currentImports[name] ??= import(/* @vite-ignore */ name);
-  return currentImports[name];
-};
 
 const __federation_expose_loader = (url) => () =>
   __federation_import(url).then(module =>
