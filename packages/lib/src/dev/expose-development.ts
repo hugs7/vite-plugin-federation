@@ -14,6 +14,7 @@
 // *****************************************************************************
 
 import { execSync } from 'child_process'
+import { init, parse } from 'es-module-lexer'
 import { readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join, resolve } from 'path'
@@ -43,36 +44,46 @@ const isCjsFile = (filePath: string): boolean => {
 const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:'
 const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
 
+let lexerReady: Promise<void> | undefined
+
 /**
- * Statically extract ESM export names from a file using es-module-lexer,
- * run in a subprocess so the async `init()` can complete before `parse()`.
- * This doesn't execute the module, so it works even when the module
- * references browser-only globals like `window` at the top level.
+ * Statically extract ESM export names from a file using es-module-lexer.
+ * Runs in-process (no subprocess) for speed. Doesn't execute the module,
+ * so it works even when the module references browser-only globals like
+ * `window` or `localStorage` at the top level.
  */
-const getExportNamesStatically = (resolvedPath: string): string[] => {
+const getExportNamesStatically = async (
+  resolvedPath: string
+): Promise<string[]> => {
   try {
-    const script = [
-      "const{init,parse}=require('es-module-lexer');",
-      "const fs=require('fs');",
-      'init.then(()=>{',
-      "const code=fs.readFileSync(process.argv[1],'utf-8');",
-      'const[,exp]=parse(code);',
-      "const names=exp.map(e=>typeof e==='string'?e:e.n).filter(Boolean);",
-      'console.log(JSON.stringify(names));',
-      '});'
-    ].join('')
-    const result = execSync(`node -e "${script}" -- "${resolvedPath}"`, {
-      encoding: 'utf-8',
-      timeout: 10000,
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
-    return JSON.parse(result.trim())
+    if (!lexerReady) lexerReady = init
+    await lexerReady
+    const code = readFileSync(resolvedPath, 'utf-8')
+    const [, exports] = parse(code)
+    return exports
+      .map((e) => (typeof e === 'string' ? e : e.n))
+      .filter(Boolean)
   } catch {
     return []
   }
 }
 
-const getModuleExportNames = (name: string, root: string): string[] => {
+const getModuleExportNames = async (
+  name: string,
+  root: string
+): Promise<string[]> => {
+  // Prefer static analysis — it only parses the file without executing it,
+  // so browser-only modules (e.g. SSO with localStorage) won't trigger
+  // Node.js warnings or side-effects.
+  try {
+    const nodeRequire = createRequire(join(root, 'package.json'))
+    const resolvedPath = nodeRequire.resolve(name)
+    const names = await getExportNamesStatically(resolvedPath)
+    if (names.length > 0) return names
+  } catch {
+    /* resolution failed — try dynamic import */
+  }
+
   try {
     const result = execSync(
       `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
@@ -84,14 +95,6 @@ const getModuleExportNames = (name: string, root: string): string[] => {
       }
     )
     return JSON.parse(result.trim())
-  } catch {
-    // Dynamic import failed — fall back to static analysis
-  }
-
-  try {
-    const nodeRequire = createRequire(join(root, 'package.json'))
-    const resolvedPath = nodeRequire.resolve(name)
-    return getExportNamesStatically(resolvedPath)
   } catch {
     return []
   }
@@ -262,7 +265,7 @@ export const get = async (module) => {
   return moduleMap[module]();
 };`
     },
-    config(config: UserConfig) {
+    async config(config: UserConfig) {
       resolvedRoot = config.root ? resolve(config.root) : process.cwd()
 
       // Only set up shared wrappers when this is a remote with shared modules
@@ -286,7 +289,7 @@ export const get = async (module) => {
         }
 
         const localUrl = toViteUrl(realPath, root)
-        const exports = getModuleExportNames(name, root)
+        const exports = await getModuleExportNames(name, root)
         const cjs = isCjsFile(realPath)
         const meta: SharedModuleMeta = { localUrl, exports, isCjs: cjs }
         if (cjs) {
@@ -306,7 +309,7 @@ export const get = async (module) => {
           try {
             const realPath = nodeRequire.resolve(specifier)
             const localUrl = toViteUrl(realPath, root)
-            const exports = getModuleExportNames(specifier, root)
+            const exports = await getModuleExportNames(specifier, root)
             if (exports.length > 0) {
               const cjs = isCjsFile(realPath)
               const subMeta: SharedModuleMeta = {
@@ -375,7 +378,9 @@ export const get = async (module) => {
               const chunkSrc = readFileSync(join(entryDir, rel), 'utf-8')
               const bareDeps = [
                 ...chunkSrc.matchAll(/from\s+['"]([^'"./][^'"]*)['"]/g)
-              ].map((m) => m[1])
+              ]
+                .map((m) => m[1])
+                .filter((d) => !d.includes('$'))
               for (const dep of bareDeps) {
                 const pkg = dep.startsWith('@')
                   ? dep.split('/').slice(0, 2).join('/')
@@ -400,18 +405,7 @@ export const get = async (module) => {
         excludedShared.add(name)
       }
 
-      console.log('[federation] CJS shared modules (stay pre-bundled):', [
-        ...cjsShared
-      ])
-      console.log(
-        '[federation] Excluded from dep optimization (virtual wrappers):',
-        [...safeToExclude]
-      )
-      if (cjsSubDeps.size > 0) {
-        console.log('[federation] CJS sub-deps force-included:', [
-          ...cjsSubDeps
-        ])
-      }
+      
       if (safeToExclude.size > 0) {
         config.optimizeDeps ??= {}
         config.optimizeDeps.exclude = [
@@ -445,7 +439,6 @@ export const get = async (module) => {
       // stay pre-bundled to avoid cascading CJS failures.
       if (!excludedShared.has(id)) return null
 
-      console.log(`[federation] resolveId intercepted: ${id}`)
       return RESOLVED_SHARED_PREFIX + id
     },
 
@@ -476,9 +469,6 @@ export const get = async (module) => {
       // This ensures other pre-bundled deps importing `{ t }` from react.js
       // also get the host's shared instance.
       if (sharedModuleMeta.size > 0) {
-        console.log('[federation] .vite/deps/ middleware registered for:', [
-          ...sharedModuleMeta.keys()
-        ])
         server.middlewares.use(async (req, res, next) => {
           const url = req.url
           if (!url || !url.includes('.vite/deps/')) {
@@ -662,9 +652,6 @@ export const get = async (module) => {
             if (urlPath.includes(`/node_modules/${dep}/`)) {
               const depFile = dep.replace(/\//g, '_')
               const preBundledUrl = `/node_modules/.vite/deps/${depFile}.js`
-              console.log(
-                `[federation] Redirecting CJS sub-dep: ${dep} → ${preBundledUrl}`
-              )
               res.writeHead(302, { Location: preBundledUrl })
               res.end()
               return
@@ -690,11 +677,6 @@ export const get = async (module) => {
             excludedUrlMap.set(meta.localUrl, name)
           }
         }
-        console.log(
-          '[federation] Excluded shared URL interception:',
-          [...excludedUrlMap.entries()].map(([url, name]) => `${name} → ${url}`)
-        )
-
         server.middlewares.use((req, res, next) => {
           const url = req.url
           if (!url) {
@@ -722,9 +704,6 @@ export const get = async (module) => {
             return
           }
 
-          console.log(
-            `[federation] Intercepting excluded shared: ${urlPath} → wrapper for ${matchedName}`
-          )
           const port = server.config.server.port ?? 5173
           const originUrl = `http://localhost:${port}`
           const code = buildSharedWrapperCode(matchedName, meta, originUrl)
