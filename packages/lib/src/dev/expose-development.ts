@@ -234,15 +234,17 @@ const _logInit = __fed_debug('federation:init');
 const _logGet = __fed_debug('federation:get');
 const currentImports = {};
 const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
-async function __federation_import(name) {
+
+const __federation_import = async (name) => {
   currentImports[name] ??= import(/* @vite-ignore */ name);
   return currentImports[name];
-}
-function __federation_expose_loader(url) {
-  return () => __federation_import(url).then(module =>
+};
+
+const __federation_expose_loader = (url) => () =>
+  __federation_import(url).then(module =>
     Object.keys(module).every(k => exportSet.has(k)) ? () => module.default : () => module
   );
-}
+
 const moduleMap = Object.fromEntries(
   Object.entries({${exposeEntries.join(',')}}).map(([key, url]) => [key, __federation_expose_loader(url)])
 );
