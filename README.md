@@ -17,7 +17,7 @@
 
 <p align="center">
   A maintained, modernised fork of <a href="https://github.com/originjs/vite-plugin-federation">originjs/vite-plugin-federation</a> —<br/>
-  rebuilt for <strong>Vite 6+</strong>, <strong>Rolldown</strong>, <strong>Node 22+</strong>, and true dev-mode federation with React Fast Refresh.
+  rebuilt for <strong>Vite 8+</strong>, <strong>Rolldown</strong>, <strong>Node 22+</strong>, and true dev-mode federation with React Fast Refresh.
 </p>
 
 ---
@@ -57,7 +57,7 @@ Fixes top-level `await` deadlocks that occur with Rolldown's code-splitting. Whe
 ### 📦 Modern Tooling & Node.js
 
 - **Node.js 22+** minimum (dropped legacy Node support)
-- **Vite 6+** and **Rolldown** support
+- **Vite 8+** and **Rolldown** support
 - Updated all dependencies to latest versions
 - Fixed CI pipeline for modern Node.js and npm
 

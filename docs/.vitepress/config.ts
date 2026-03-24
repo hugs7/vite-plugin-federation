@@ -48,7 +48,7 @@ export default defineConfig({
       ]
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/nicolo-ribaudo/vite-plugin-federation' }
+      { icon: 'github', link: 'https://github.com/hugs7/vite-plugin-federation' }
     ],
     search: {
       provider: 'local'

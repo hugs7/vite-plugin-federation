@@ -103,7 +103,7 @@ init_react();
 __esmMin_react.createElement(...)  // undefined if anonymous init!
 ```
 
-The anonymous `__esmMin` init caused `import_react` (or equivalent) to be `undefined` for components like `@westpac/ui`'s `ButtonGroupButton`:
+The anonymous `__esmMin` init caused `import_react` (or equivalent) to be `undefined` for some UI library components:
 
 ```
 TypeError: Cannot read properties of undefined (reading 'useRef')

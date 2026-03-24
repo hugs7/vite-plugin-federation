@@ -41,7 +41,7 @@ For ESM modules with named exports, `buildSharedWrapperCode` generates:
 
 ```js
 const __shared = globalThis.__federation_shared_modules__?.['react-redux'];
-const __mod = __shared ?? await import(/* @vite-ignore */ '/@fs/.../react-redux/dist/react-redux.mjs');
+const __mod = __shared ?? await import(/* @vite-ignore */ '/@fs/.../react-redux/dist/react-redux.mjs?__fed_raw');
 export default (__mod.default ?? __mod);
 export const Provider = __mod['Provider'];
 export const useSelector = __mod['useSelector'];

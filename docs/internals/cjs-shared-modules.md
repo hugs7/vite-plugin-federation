@@ -26,7 +26,7 @@ import { t as require_react } from "./react.js";
 ```
 
 ```js
-// node_modules/.vite/deps/@westpac_ui_ButtonGroup.js
+// node_modules/.vite/deps/some-ui-library.js
 import { t as require_react } from "./react.js";
 // uses require_react() internally
 ```
@@ -70,21 +70,25 @@ The `buildSharedWrapperCode` function generates:
 
 ```js
 // For 'react' (CJS, only has default export):
+// CJS modules use the pre-bundled dep URL (browsers can't load raw CJS)
 const __shared = globalThis.__federation_shared_modules__?.['react'];
-const __mod = __shared ?? await import('/@fs/.../node_modules/react/index.js');
+const __mod = __shared ?? await import('/node_modules/.vite/deps/react.js');
 export default (__mod.default ?? __mod);
 ```
 
 ```js
 // For 'react-redux' (ESM, has named exports):
+// ESM modules use the local URL with ?__fed_raw to bypass the shared wrapper middleware
 const __shared = globalThis.__federation_shared_modules__?.['react-redux'];
-const __mod = __shared ?? await import('/@fs/.../node_modules/react-redux/dist/react-redux.mjs');
+const __mod = __shared ?? await import('/@fs/.../node_modules/react-redux/dist/react-redux.mjs?__fed_raw');
 export default (__mod.default ?? __mod);
 export const Provider = __mod['Provider'];
 export const useSelector = __mod['useSelector'];
 export const useDispatch = __mod['useDispatch'];
 // ... all other named exports
 ```
+
+When running in the context of a remote dev server, the import URLs are prefixed with the absolute origin (e.g. `http://localhost:6001/node_modules/.vite/deps/react.js`) so the browser resolves them against the remote, not the host page origin.
 
 ### How Export Names Are Discovered
 
@@ -149,7 +153,7 @@ An earlier approach used `resolve.alias` to redirect `react` to a shim file. Thi
 1. Rolldown's dep optimizer saw the alias target as a different module
 2. It generated lazy `__esmMin` init wrappers instead of top-level imports
 3. Some `__esmMin` inits were generated as anonymous functions (a Rolldown bug)
-4. This made `import_react` undefined for components like `@westpac/ui`'s `ButtonGroupButton`
+4. This made `import_react` undefined for some UI library components
 
 The virtual wrapper approach avoids this because it only intercepts at the Vite plugin level, not at the Rolldown optimizer level. The dep optimizer still processes `react` normally — the interception happens when application code imports it.
 

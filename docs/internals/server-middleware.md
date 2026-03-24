@@ -40,7 +40,7 @@ Uses `server.transformRequest()` to process the virtual module through Vite's fu
 ### 3. @vite/client Patching
 
 ```ts
-if (url === '/@vite/client') {
+if (url === '/@vite/client' || url?.startsWith('/@vite/client?')) {
   const clientResult = await server.transformRequest('/@vite/client')
   const port = server.config.server.port ?? 5173
   const remoteOrigin = `http://localhost:${port}`
@@ -49,13 +49,17 @@ if (url === '/@vite/client') {
     /const base = "\/"\s*\|\|\s*"\/";/,
     `const base = "${remoteOrigin}/";`
   )
+  code = code.replace(
+    /const base\$1 = "\/"\s*\|\|\s*"\/";/,
+    `const base$1 = "${remoteOrigin}/";`
+  )
   res.end(code)
 }
 ```
 
 **Why this is needed**: When the host browser loads `@vite/client` from the remote, it runs in the host's page context. The stock client uses `base = "/"` which resolves to `localhost:3000` (the host). HMR module re-imports need to go to `localhost:6001` (the remote).
 
-The patch replaces the base URL with an absolute remote origin, so HMR `import()` calls resolve to the correct server.
+The patch replaces both the `base` and `base$1` URL variables with an absolute remote origin, so HMR `import()` calls resolve to the correct server.
 
 ### 4. @react-refresh Singleton (Remote Side)
 
