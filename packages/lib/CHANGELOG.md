@@ -3,6 +3,43 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.2](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.8.1...@hugs7/vite-plugin-federation@1.8.2) (2026-03-24)
+
+
+### Bug Fixes
+
+* add middleware BEFORE Vite internals to intercept CJS stubs ([b1c3465](https://github.com/hugs7/vite-plugin-federation/commit/b1c3465f5aff275fb006ddfed4aa9a705e150716))
+* add server.fs.allow for node_modules + error logging in middleware ([fa1f33b](https://github.com/hugs7/vite-plugin-federation/commit/fa1f33bd22b7db940bcd03e2d715b8fd419ad474))
+* build errors - async middleware and remove debug logging ([891667d](https://github.com/hugs7/vite-plugin-federation/commit/891667dad132bc452d60ffc74d1b18940df49724))
+* compile error inspecting chunk ([c6219d8](https://github.com/hugs7/vite-plugin-federation/commit/c6219d85a2009f6f3ac443c934be1b4babfa1eea))
+* **dev:** exclude all non-CJS shared modules, intercept via middleware ([e0dfec4](https://github.com/hugs7/vite-plugin-federation/commit/e0dfec4ba4b10bb61361e891f4653631d8830398))
+* **dev:** only exclude self-contained ESM shared modules from dep optimization ([e2e288a](https://github.com/hugs7/vite-plugin-federation/commit/e2e288a0d736972338e79e569755f52b64acf9f8))
+* exclude shared modules from dep optimizer + auto-include CJS transitive deps ([e34f58f](https://github.com/hugs7/vite-plugin-federation/commit/e34f58f89e11bdd27b071a2d99b007541e13933f))
+* exclude shared modules from dep optimizer to prevent duplicate React instances ([99661f9](https://github.com/hugs7/vite-plugin-federation/commit/99661f94c7ddb1ac8813e4f21c1bf03c9939df40))
+* exclude shared modules from optimizer + serve wrapper via middleware ([413aac3](https://github.com/hugs7/vite-plugin-federation/commit/413aac39bb4f9e6fbf6415191e709d31186dd50e))
+* handle sub-path imports of excluded packages (react/jsx-runtime etc) ([0ed6043](https://github.com/hugs7/vite-plugin-federation/commit/0ed6043dc8fe4c71afe891a249e579c0b3d73f17))
+* handle top level imports + subdependencies ([1d8c957](https://github.com/hugs7/vite-plugin-federation/commit/1d8c95725cb8f17d54bd4b2b63ac5eb8ae3ec871))
+* intercept requests for shared modules ([f9ad72e](https://github.com/hugs7/vite-plugin-federation/commit/f9ad72e010795f596cb29cbe519073d0cc3e377a))
+* intercept response instead of reading from disk for CJS interop patching ([3f1ef93](https://github.com/hugs7/vite-plugin-federation/commit/3f1ef9318a06706a24deed1d46252f210169bfd9))
+* node type ([b9640f4](https://github.com/hugs7/vite-plugin-federation/commit/b9640f4b361a8b139a8b44ca9837a97be2b90212))
+* only exclude react and react-dom from dep optimizer ([7fc6a83](https://github.com/hugs7/vite-plugin-federation/commit/7fc6a832993a7a94c3fd3969f92442cebd3a2f02))
+* only exclude shared modules that are deps of other shared modules ([c424483](https://github.com/hugs7/vite-plugin-federation/commit/c42448336585805b5cd9d955c09b1c7890003a5b))
+* only externalize shared modules when imported by other packages ([a3e1a41](https://github.com/hugs7/vite-plugin-federation/commit/a3e1a4181c4dbb5ce356c5fa5bef5b7fdbe38440))
+* pre-compute sub-path exports and patch CJS interop for named re-exports ([9dfffc8](https://github.com/hugs7/vite-plugin-federation/commit/9dfffc891cb471ad3d491d9eca1f11f1f0af62c7))
+* resolve sub-path specifiers to filesystem paths before transformRequest ([2f76a5f](https://github.com/hugs7/vite-plugin-federation/commit/2f76a5fc3734556338e0b3e7e9420e3dd8a6bd94))
+* use rolldown plugin to externalize shared modules during dep pre-bundling ([15eb4c4](https://github.com/hugs7/vite-plugin-federation/commit/15eb4c4060025ec36aba36407b9ae9b736293d8c))
+* use server.transformRequest for sub-path stubs to avoid fs.allow 403 ([4a72c3c](https://github.com/hugs7/vite-plugin-federation/commit/4a72c3ceb97247de7ab1c51c1c613b08f722d8ef))
+* use transform hook instead of middleware to intercept CJS stubs ([3afa8d8](https://github.com/hugs7/vite-plugin-federation/commit/3afa8d873f859c7963265511dc3c7eea4a039fdd))
+
+
+### Reverts
+
+* remove dep optimizer changes, rely on shared wrapper for user code only ([843b602](https://github.com/hugs7/vite-plugin-federation/commit/843b602591696ff3125e9804a69dc52ba9dc897e))
+
+
+
+
+
 ## [1.8.1](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.8.0...@hugs7/vite-plugin-federation@1.8.1) (2026-03-23)
 
 
