@@ -479,14 +479,16 @@ export const get = async (module) => {
           const origEnd = res.end.bind(res);
           const chunks: Buffer[] = [];
 
+          const ensureBuffer = (chunk: any) =>
+            Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+
           res.write = function (chunk: any) {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            chunks.push(ensureBuffer(chunk));
             return true;
           } as any;
 
           res.end = function (chunk?: any) {
-            if (chunk)
-              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            if (chunk) chunks.push(ensureBuffer(chunks));
             let fileCode = Buffer.concat(chunks).toString('utf-8');
 
             const exportNames = matchedMeta!.exports.filter(
