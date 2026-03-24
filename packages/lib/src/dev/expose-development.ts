@@ -40,9 +40,6 @@ const isCjsFile = (filePath: string): boolean => {
   }
 }
 
-const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:'
-const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
-
 /**
  * Statically extract ESM export names from a file using es-module-lexer,
  * run in a subprocess so the async `init()` can complete before `parse()`.
@@ -123,7 +120,7 @@ const buildSharedWrapperCode = (
   const hasDefault = meta.exports.includes('default')
 
   // CJS modules use the pre-bundled dep URL (browsers can't load raw CJS).
-  // ESM modules use localUrl with ?__fed_raw to bypass our raw middleware.
+  // ESM modules use localUrl with ?__fed_raw to bypass our URL interception middleware.
   const baseUrl =
     meta.isCjs && meta.depUrl ? meta.depUrl : meta.localUrl + '?__fed_raw'
   // When originUrl is provided, prefix the import URL so the browser
@@ -132,15 +129,13 @@ const buildSharedWrapperCode = (
 
   let code = ''
   code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`
-  code += `console.log('[federation:shared-wrapper] ${name}:', __shared ? 'USING SHARED' : 'FALLBACK to local', Object.keys(__shared || {}).slice(0,5));\n`
   code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(importUrl)});\n`
 
   if (hasDefault) {
     code += `export default (__mod.default ?? __mod);\n`
   }
   for (const e of named) {
-    // Use safe identifier check — most exports are valid JS identifiers
-    if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e)) {
+    if (VALID_JS_IDENTIFIER.test(e)) {
       code += `export const ${e} = __mod[${JSON.stringify(e)}];\n`
     }
   }
@@ -163,6 +158,54 @@ const toViteUrl = (filePath: string, root: string): string => {
   return `/@fs${normalized}`
 }
 
+/** Regex matching valid JavaScript identifiers */
+const VALID_JS_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
+
+/** Convert a bare specifier to its pre-bundled dep URL under .vite/deps/ */
+const toPrebundledDepUrl = (specifier: string): string =>
+  `/node_modules/.vite/deps/${specifier.replace(/\//g, '_')}.js`
+
+/** Extract the base package name from a bare specifier (handles scoped packages) */
+const getBasePackageName = (specifier: string): string =>
+  specifier.startsWith('@')
+    ? specifier.split('/').slice(0, 2).join('/')
+    : specifier.split('/')[0]
+
+/** Get the origin URL for the dev server */
+const getServerOrigin = (server: { config: { server: { port?: number } } }): string => {
+  const port = server.config.server.port ?? 5173
+  return `http://localhost:${port}`
+}
+
+/** Strip query string from a URL */
+const stripQuery = (url: string): string => url.split('?')[0]
+
+/**
+ * Resolve a shared module specifier and build its metadata.
+ * Returns null if the specifier cannot be resolved.
+ */
+const createSharedMeta = (
+  specifier: string,
+  nodeRequire: NodeRequire,
+  root: string,
+  requireExports = false
+): SharedModuleMeta | null => {
+  try {
+    const realPath = nodeRequire.resolve(specifier)
+    const localUrl = toViteUrl(realPath, root)
+    const exports = getModuleExportNames(specifier, root)
+    if (requireExports && exports.length === 0) return null
+    const cjs = isCjsFile(realPath)
+    const meta: SharedModuleMeta = { localUrl, exports, isCjs: cjs }
+    if (cjs) {
+      meta.depUrl = toPrebundledDepUrl(specifier)
+    }
+    return meta
+  } catch {
+    return null
+  }
+}
+
 export const devExposePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
@@ -173,8 +216,6 @@ export const devExposePlugin = (
   // Modules actually excluded from dep optimization (only these get
   // wrapper/patch treatment in middleware and transform)
   const excludedShared = new Set<string>()
-  // CJS modules that must stay pre-bundled (detected at config time)
-  const cjsShared = new Set<string>()
   // CJS sub-deps of excluded modules that need force-inclusion
   const cjsSubDeps = new Set<string>()
   let resolvedRoot = process.cwd()
@@ -278,22 +319,10 @@ export const get = async (module) => {
         const name = item[0]
         sharedList.push(name)
 
-        let realPath: string
-        try {
-          realPath = nodeRequire.resolve(name)
-        } catch {
-          continue
+        const meta = createSharedMeta(name, nodeRequire, root)
+        if (meta) {
+          sharedModuleMeta.set(name, meta)
         }
-
-        const localUrl = toViteUrl(realPath, root)
-        const exports = getModuleExportNames(name, root)
-        const cjs = isCjsFile(realPath)
-        const meta: SharedModuleMeta = { localUrl, exports, isCjs: cjs }
-        if (cjs) {
-          meta.depUrl = `/node_modules/.vite/deps/${name.replace(/\//g, '_')}.js`
-          cjsShared.add(name)
-        }
-        sharedModuleMeta.set(name, meta)
       }
 
       // Discover sub-paths of shared modules (e.g. react/jsx-runtime).
@@ -303,60 +332,32 @@ export const get = async (module) => {
         for (const sub of knownSubPaths) {
           const specifier = baseName + sub
           if (sharedModuleMeta.has(specifier)) continue
-          try {
-            const realPath = nodeRequire.resolve(specifier)
-            const localUrl = toViteUrl(realPath, root)
-            const exports = getModuleExportNames(specifier, root)
-            if (exports.length > 0) {
-              const cjs = isCjsFile(realPath)
-              const subMeta: SharedModuleMeta = {
-                localUrl,
-                exports,
-                isCjs: cjs
-              }
-              if (cjs) {
-                subMeta.depUrl = `/node_modules/.vite/deps/${specifier.replace(/\//g, '_')}.js`
-              }
-              sharedModuleMeta.set(specifier, subMeta)
-            }
-          } catch {
-            /* sub-path doesn't exist for this module */
+          const subMeta = createSharedMeta(specifier, nodeRequire, root, true)
+          if (subMeta) {
+            sharedModuleMeta.set(specifier, subMeta)
           }
         }
       }
 
       // Determine which shared modules should be excluded from dep
-      // optimization.  When excluded, other pre-bundled deps (like the
-      // MFE framework bundle) create external bare-specifier imports
-      // instead of inlining the module's code.  Our resolveId hook then
-      // intercepts these bare specifiers and serves a virtual wrapper
-      // that uses the host's shared instance.
+      // optimization.  All non-CJS shared modules are excluded so Vite
+      // emits bare-specifier imports that our URL interception middleware
+      // can replace with shared wrappers.
       //
-      // Rules:
-      // - CJS modules (react, react-dom, react-redux, zustand) MUST
-      //   stay pre-bundled — browsers can't load raw CJS.  Their
-      //   `t` factory export is patched by the .vite/deps/ middleware.
-      // - ESM modules with CJS sub-dependencies (react-router → cookie;
-      //   @reduxjs/toolkit → redux/immer) should also stay pre-bundled
-      //   to avoid cascading CJS failures.
-      // - Only exclude ESM modules that are self-contained bundles with
-      //   no relative imports — their bare-specifier deps are all shared
-      //   or pre-bundled by the dep optimizer.
-      const safeToExclude = new Set<string>()
+      // CJS modules (react, react-dom, react-redux, zustand) MUST stay
+      // pre-bundled — browsers can't load raw CJS.  Their `t` factory
+      // export is patched by the .vite/deps/ middleware instead.
       for (const name of sharedList) {
         const meta = sharedModuleMeta.get(name)
         if (!meta || meta.isCjs) continue
 
-        // All non-CJS shared modules should be excluded from dep
-        // optimization so the MFE bundle has bare-specifier imports
-        // that our middleware can intercept.
-        //
+        // Exclude this non-CJS module from dep optimization.
         // For modules with relative imports to internal chunks (e.g.
         // react-router → ./chunk-XXX.mjs), the chunks may import CJS
         // packages (cookie, set-cookie-parser).  We force-include those
         // CJS deps via optimizeDeps.include so Vite pre-bundles them
         // before the browser needs them.
-        safeToExclude.add(name)
+        excludedShared.add(name)
 
         // Scan for CJS sub-deps that need force-inclusion
         try {
@@ -377,9 +378,7 @@ export const get = async (module) => {
                 ...chunkSrc.matchAll(/from\s+['"]([^'"./][^'"]*)['"]/g)
               ].map((m) => m[1])
               for (const dep of bareDeps) {
-                const pkg = dep.startsWith('@')
-                  ? dep.split('/').slice(0, 2).join('/')
-                  : dep.split('/')[0]
+                const pkg = getBasePackageName(dep)
                 if (sharedList.includes(pkg)) continue
                 // Any non-shared bare import from an excluded module's
                 // internal chunk must be force-included for pre-bundling.
@@ -396,27 +395,11 @@ export const get = async (module) => {
         }
       }
 
-      for (const name of safeToExclude) {
-        excludedShared.add(name)
-      }
-
-      console.log('[federation] CJS shared modules (stay pre-bundled):', [
-        ...cjsShared
-      ])
-      console.log(
-        '[federation] Excluded from dep optimization (virtual wrappers):',
-        [...safeToExclude]
-      )
-      if (cjsSubDeps.size > 0) {
-        console.log('[federation] CJS sub-deps force-included:', [
-          ...cjsSubDeps
-        ])
-      }
-      if (safeToExclude.size > 0) {
+      if (excludedShared.size > 0) {
         config.optimizeDeps ??= {}
         config.optimizeDeps.exclude = [
           ...(config.optimizeDeps.exclude ?? []),
-          ...safeToExclude
+          ...excludedShared
         ]
         // Force-include CJS sub-deps of excluded modules so they're
         // pre-bundled before the browser encounters them.
@@ -429,42 +412,6 @@ export const get = async (module) => {
       }
     },
 
-    transform(_code: string, _id: string) {
-      // Shared module patching is handled entirely by the middleware
-      // (response interception), which preserves Vite's import rewriting.
-      return null
-    },
-
-    resolveId(id: string) {
-      if (!excludedShared.size) return null
-
-      // Only intercept modules actually excluded from dep optimization.
-      // CJS modules (react, react-dom, react-redux, zustand) stay
-      // pre-bundled and are handled by the .vite/deps/ middleware.
-      // ESM modules with relative internal chunks (react-router) also
-      // stay pre-bundled to avoid cascading CJS failures.
-      if (!excludedShared.has(id)) return null
-
-      console.log(`[federation] resolveId intercepted: ${id}`)
-      return RESOLVED_SHARED_PREFIX + id
-    },
-
-    load(id: string) {
-      if (!id.startsWith(RESOLVED_SHARED_PREFIX)) {
-        return null
-      }
-
-      const specifier = id.slice(RESOLVED_SHARED_PREFIX.length)
-      const meta = sharedModuleMeta.get(specifier)
-      if (!meta) {
-        return null
-      }
-
-      return {
-        code: buildSharedWrapperCode(specifier, meta),
-        moduleType: 'js' as const
-      }
-    },
     configureServer(server) {
       // Intercept requests for pre-bundled shared modules in .vite/deps/.
       // CJS shared modules (react, react-dom, react-redux, zustand) are
@@ -476,9 +423,6 @@ export const get = async (module) => {
       // This ensures other pre-bundled deps importing `{ t }` from react.js
       // also get the host's shared instance.
       if (sharedModuleMeta.size > 0) {
-        console.log('[federation] .vite/deps/ middleware registered for:', [
-          ...sharedModuleMeta.keys()
-        ])
         server.middlewares.use(async (req, res, next) => {
           const url = req.url
           if (!url || !url.includes('.vite/deps/')) {
@@ -486,7 +430,7 @@ export const get = async (module) => {
             return
           }
 
-          const urlPath = url.split('?')[0]
+          const urlPath = stripQuery(url)
           const depsMatch = urlPath.match(
             /\/node_modules\/\.vite\/deps\/(.+)\.js$/
           )
@@ -513,10 +457,7 @@ export const get = async (module) => {
             return
           }
 
-          const matchedBase = matchedName
-            .split('/')
-            .slice(0, matchedName.startsWith('@') ? 2 : 1)
-            .join('/')
+          const matchedBase = getBasePackageName(matchedName)
 
           // Intercept the response: let Vite serve the file normally
           // (with proper import rewriting), then patch the output.
@@ -537,7 +478,7 @@ export const get = async (module) => {
               (e) =>
                 e !== 'default' &&
                 e !== 'module.exports' &&
-                /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e)
+                VALID_JS_IDENTIFIER.test(e)
             )
             const isTopLevel = matchedName === matchedBase
             const hasDefault = /export default .+;/.test(fileCode)
@@ -657,14 +598,10 @@ export const get = async (module) => {
             return
           }
 
-          const urlPath = url.split('?')[0]
+          const urlPath = stripQuery(url)
           for (const dep of cjsSubDeps) {
             if (urlPath.includes(`/node_modules/${dep}/`)) {
-              const depFile = dep.replace(/\//g, '_')
-              const preBundledUrl = `/node_modules/.vite/deps/${depFile}.js`
-              console.log(
-                `[federation] Redirecting CJS sub-dep: ${dep} → ${preBundledUrl}`
-              )
+              const preBundledUrl = toPrebundledDepUrl(dep)
               res.writeHead(302, { Location: preBundledUrl })
               res.end()
               return
@@ -676,11 +613,9 @@ export const get = async (module) => {
 
       // Intercept requests for excluded shared modules served from
       // node_modules (e.g. /@fs/.../sso/build/index.es.js).
-      // Since the main plugin runs with enforce:'post', our resolveId
-      // cannot intercept bare specifiers before Vite's internal resolver.
-      // Instead, Vite resolves them to file URLs, and we intercept those
-      // URLs here — serving a shared wrapper that checks the host's
-      // globalThis.__federation_shared_modules__ first.
+      // Vite resolves bare specifiers to file URLs, and we intercept
+      // those URLs here — serving a shared wrapper that checks the
+      // host's globalThis.__federation_shared_modules__ first.
       if (excludedShared.size > 0) {
         // Build a map: URL path (without query) → shared module name
         const excludedUrlMap = new Map<string, string>()
@@ -690,11 +625,6 @@ export const get = async (module) => {
             excludedUrlMap.set(meta.localUrl, name)
           }
         }
-        console.log(
-          '[federation] Excluded shared URL interception:',
-          [...excludedUrlMap.entries()].map(([url, name]) => `${name} → ${url}`)
-        )
-
         server.middlewares.use((req, res, next) => {
           const url = req.url
           if (!url) {
@@ -709,7 +639,7 @@ export const get = async (module) => {
             return
           }
 
-          const urlPath = url.split('?')[0]
+          const urlPath = stripQuery(url)
           const matchedName = excludedUrlMap.get(urlPath)
           if (!matchedName) {
             next()
@@ -722,11 +652,7 @@ export const get = async (module) => {
             return
           }
 
-          console.log(
-            `[federation] Intercepting excluded shared: ${urlPath} → wrapper for ${matchedName}`
-          )
-          const port = server.config.server.port ?? 5173
-          const originUrl = `http://localhost:${port}`
+          const originUrl = getServerOrigin(server)
           const code = buildSharedWrapperCode(matchedName, meta, originUrl)
           res.setHeader('Content-Type', 'application/javascript')
           res.setHeader('Access-Control-Allow-Origin', '*')
@@ -790,8 +716,7 @@ export const get = async (module) => {
               next()
               return
             }
-            const port = server.config.server.port ?? 5173
-            const remoteOrigin = `http://localhost:${port}`
+            const remoteOrigin = getServerOrigin(server)
             let code = clientResult.code
             code = code.replace(
               /const base = "\/"\s*\|\|\s*"\/";/,
