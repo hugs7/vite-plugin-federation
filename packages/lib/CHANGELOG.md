@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.3](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.8.2...@hugs7/vite-plugin-federation@1.8.3) (2026-03-24)
+
+
+### Bug Fixes
+
+* filter out $-prefixed specifiers from bare dependency detection ([2b2f574](https://github.com/hugs7/vite-plugin-federation/commit/2b2f574018f90adcdef874929cf1f96781c50f52))
+* prefer static analysis for getting module named exports ([23ed838](https://github.com/hugs7/vite-plugin-federation/commit/23ed8385cb7124cdb39c5d3f3152ddc69ae19f5a))
+* remove debug logs ([6991cf7](https://github.com/hugs7/vite-plugin-federation/commit/6991cf7aba9e3bee83ea4f2df1219cbd660d7547))
+
+
+### Performance Improvements
+
+* use es-module-lexer for module static analysis ([e24af93](https://github.com/hugs7/vite-plugin-federation/commit/e24af933a51ca76ded45b8ffb0f440bfb4e9b6fa))
+
+
+
+
+
 ## [1.8.2](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.8.1...@hugs7/vite-plugin-federation@1.8.2) (2026-03-24)
 
 
