@@ -183,12 +183,17 @@ const getBasePackageName = (specifier: string): string => {
   return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
 };
 
-/** Get the origin URL for the dev server */
+/** Get the origin URL for the dev server from resolved config */
 const getServerOrigin = (server: {
-  config: { server: { port?: number } };
+  config: { server: { port?: number; https?: any; host?: string | boolean } };
 }): string => {
-  const port = server.config.server.port ?? 5173;
-  return `http://localhost:${port}`;
+  const { port = 5173, https, host } = server.config.server;
+  const protocol = https ? 'https' : 'http';
+  const hostname =
+    typeof host === 'string' && host !== '0.0.0.0' && host !== '::'
+      ? host
+      : 'localhost';
+  return `${protocol}://${hostname}:${port}`;
 };
 
 /** Strip query string from a URL */
