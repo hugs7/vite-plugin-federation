@@ -13,31 +13,31 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { resolve, parse, basename, extname, relative, dirname } from 'path'
-import {
-  getModuleMarker,
-  normalizePath,
-  parseExposeOptions,
-  removeNonRegLetter,
-  NAME_CHAR_REG
-} from '../utils'
+import { Node, walk } from 'estree-walker'
+import MagicString from 'magic-string'
+import { basename, dirname, extname, parse, relative, resolve } from 'path'
+import type { AcornNode, OutputAsset, OutputChunk } from 'rollup'
+import type { VitePluginFederationOptions } from 'types'
+import type { ResolvedConfig } from 'vite'
+import type { PluginHooks } from '../../types/pluginHooks'
 import {
   builderInfo,
   DYNAMIC_LOADING_CSS,
   DYNAMIC_LOADING_CSS_PREFIX,
-  EXPOSES_MAP,
   EXPOSES_KEY_MAP,
+  EXPOSES_MAP,
   EXTERNALS,
   parsedOptions,
   SHARED,
   viteConfigResolved
 } from '../public'
-import type { AcornNode, OutputAsset, OutputChunk } from 'rollup'
-import type { VitePluginFederationOptions } from 'types'
-import type { PluginHooks } from '../../types/pluginHooks'
-import MagicString from 'magic-string'
-import { walk } from 'estree-walker'
-import type { ResolvedConfig } from 'vite'
+import {
+  getModuleMarker,
+  NAME_CHAR_REG,
+  normalizePath,
+  parseExposeOptions,
+  removeNonRegLetter
+} from '../utils'
 
 export const prodExposePlugin = (
   options: VitePluginFederationOptions
@@ -137,17 +137,17 @@ export const prodExposePlugin = (
         currentImports[name] ??= import(name)
         return currentImports[name]
       };
-      export const get =(module) => {
+      export const get = (module) => {
         if(!moduleMap[module]) throw new Error('Can not find remote module ' + module)
         return moduleMap[module]();
       };
-      export const init =(shareScope) => {
+      export const init = (shareScope) => {
         globalThis.__federation_shared__= globalThis.__federation_shared__|| {};
         Object.entries(shareScope).forEach(([key, value]) => {
           for (const [versionKey, versionValue] of Object.entries(value)) {
             const scope = versionValue.scope || 'default'
             globalThis.__federation_shared__[scope] = globalThis.__federation_shared__[scope] || {};
-            const shared= globalThis.__federation_shared__[scope];
+            const shared = globalThis.__federation_shared__[scope];
             (shared[key] = shared[key]||{})[versionKey] = versionValue;
           }
         });
@@ -178,10 +178,11 @@ export const prodExposePlugin = (
       // replace import absolute path to chunk's fileName in remoteEntry.js
       let remoteEntryChunk
       for (const file in bundle) {
-        const chunk = bundle[file] as OutputChunk
+        const chunk = bundle[file]
         if (
+          'facadeModuleId' in chunk &&
           chunk?.facadeModuleId ===
-          `\0virtual:__remoteEntryHelper__${options.filename}`
+            `\0virtual:__remoteEntryHelper__${options.filename}`
         ) {
           remoteEntryChunk = chunk
           break
@@ -309,7 +310,7 @@ export const prodExposePlugin = (
         }
         const magicString = new MagicString(remoteEntryChunk.code)
         // let cssFunctionName: string = DYNAMIC_LOADING_CSS
-        walk(ast, {
+        walk(ast as Node, {
           enter(node: any) {
             if (
               node &&

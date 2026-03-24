@@ -42,7 +42,9 @@ export const prodSharedPlugin = (
     options(inputOptions) {
       isRemote = !!parsedOptions.prodExpose.length
       isHost =
-        (!!parsedOptions.prodRemote.length || !!parsedOptions.prodShared.length) && !parsedOptions.prodExpose.length
+        (!!parsedOptions.prodRemote.length ||
+          !!parsedOptions.prodShared.length) &&
+        !parsedOptions.prodExpose.length
 
       if (shareName2Prop.size) {
         // remove item which is both in external and shared
@@ -127,7 +129,7 @@ export const prodSharedPlugin = (
             try {
               const idResolve = await this.resolve(id)
               if (idResolve?.id) {
-                (parsedOptions.prodShared as any[]).push([
+                ;(parsedOptions.prodShared as any[]).push([
                   `${monoRepo.root[0]}/${basename(id)}`,
                   {
                     id: idResolve?.id,
@@ -156,7 +158,7 @@ export const prodSharedPlugin = (
       outputOption.hoistTransitiveImports = false
 
       const manualChunkFunc = (id: string) => {
-        //  if id is in shared dependencies, return id ,else return vite function value
+        //  if id is in shared dependencies, return id, else return vite function value
         const find = parsedOptions.prodShared.find((arr) =>
           arr[1].dependencies?.has(id)
         )

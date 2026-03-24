@@ -21,7 +21,10 @@
     "test": "npm-run-all test:unit test:e2e-serve test:e2e-dev",
     "test:unit": "vitest run --coverage",
     "test:e2e-serve": "vitest run -c vitest.config.e2e-serve.ts",
-    "test:e2e-dev": "vitest run -c vitest.config.e2e-dev.ts"
+    "test:e2e-dev": "vitest run -c vitest.config.e2e-dev.ts",
+    "docs": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

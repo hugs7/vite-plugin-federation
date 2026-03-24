@@ -45,12 +45,33 @@ module.exports = (env = {}) => ({
       },
       {
         test: /\.css$/,
-        use: [
+        oneOf: [
           {
-            loader: MiniCssExtractPlugin.loader,
-            options: {},
+            resourceQuery: /module/,
+            use: [
+              {
+                loader: MiniCssExtractPlugin.loader,
+                options: {},
+              },
+              {
+                loader: "css-loader",
+                options: {
+                  modules: {
+                    localIdentName: "[local]_[hash:base64:5]",
+                  },
+                },
+              },
+            ],
           },
-          "css-loader",
+          {
+            use: [
+              {
+                loader: MiniCssExtractPlugin.loader,
+                options: {},
+              },
+              "css-loader",
+            ],
+          },
         ],
       },
     ],
