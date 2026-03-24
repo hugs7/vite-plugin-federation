@@ -13,6 +13,11 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import { createHash } from 'crypto';
+import { readFileSync } from 'fs';
+import path, { parse, posix } from 'path';
+import type { PluginContext } from 'rollup';
+
 import type {
   ConfigTypeSet,
   Exposes,
@@ -21,11 +26,6 @@ import type {
   Shared,
   VitePluginFederationOptions
 } from '../../types';
-import { readFileSync } from 'fs';
-import { createHash } from 'crypto';
-import path, { parse, posix } from 'path';
-import type { PluginContext } from 'rollup';
-
 export * from './html';
 
 export function findDependencies(
@@ -59,7 +59,7 @@ export const parseSharedOptions = (
 ): (string | ConfigTypeSet)[] => {
   return parseOptions(
     options.shared || {},
-    (value, key) => ({
+    (_value, key) => ({
       import: true,
       shareScope: 'default',
       packagePath: key,

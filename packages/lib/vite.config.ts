@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -11,10 +11,24 @@ export default defineConfig({
     minify: false,
     sourcemap: true,
     rolldownOptions: {
-      external: ['fs', 'path', 'crypto', 'magic-string', 'url', 'module', 'child_process', 'node:fs', 'node:path', 'node:crypto', 'node:url', 'node:module', 'node:child_process'],
+      external: [
+        'fs',
+        'path',
+        'crypto',
+        'magic-string',
+        'url',
+        'module',
+        'child_process',
+        'node:fs',
+        'node:path',
+        'node:crypto',
+        'node:url',
+        'node:module',
+        'node:child_process'
+      ],
       output: {
         minifyInternalExports: false
       }
     }
   }
-})
+});

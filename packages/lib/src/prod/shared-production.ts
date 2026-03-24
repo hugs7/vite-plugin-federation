@@ -13,18 +13,20 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import { readdirSync, readFileSync, statSync } from 'fs';
+import { basename, join, resolve } from 'path';
+import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+
 import type { PluginHooks } from '../../types/pluginHooks';
+import { parsedOptions } from '../public';
 import {
   NAME_CHAR_REG,
   parseSharedOptions,
   removeNonRegLetter
 } from '../utils';
-import { parsedOptions } from '../public';
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
-import { basename, join, resolve } from 'path';
-import { readdirSync, readFileSync, statSync } from 'fs';
-const sharedFilePathReg = /__federation_shared_(.+)-.{8}\.js$/;
 import federation_fn_import from './federation_fn_import.js?raw';
+
+const sharedFilePathReg = /__federation_shared_(.+)-.{8}\.js$/;
 
 export const prodSharedPlugin = (
   options: VitePluginFederationOptions
@@ -34,8 +36,8 @@ export const prodSharedPlugin = (
   parsedOptions.prodShared.forEach((value) =>
     shareName2Prop.set(removeNonRegLetter(value[0], NAME_CHAR_REG), value[1])
   );
-  let isHost;
-  let isRemote;
+  let isHost: boolean;
+  let isRemote: boolean;
   const id2Prop = new Map<string, any>();
 
   return {
@@ -179,7 +181,7 @@ export const prodSharedPlugin = (
       // only active when manualChunks is function,array not to solve
       if (typeof outputOption.manualChunks === 'function') {
         outputOption.manualChunks = new Proxy(outputOption.manualChunks, {
-          apply(target, thisArg, argArray) {
+          apply(target, _thisArg, argArray) {
             const result = manualChunkFunc(argArray[0]);
             return result ? result : target(argArray[0], argArray[1]);
           }
@@ -194,7 +196,7 @@ export const prodSharedPlugin = (
       return outputOption;
     },
 
-    generateBundle(options, bundle) {
+    generateBundle(_options, bundle) {
       if (!isRemote) {
         return;
       }

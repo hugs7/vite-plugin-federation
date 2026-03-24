@@ -13,14 +13,22 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { UserConfig } from 'vite';
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import { Node } from 'estree';
 import { walk } from 'estree-walker';
-import MagicString from 'magic-string';
 import { readFileSync } from 'fs';
-
+import MagicString from 'magic-string';
 import type { AcornNode, TransformPluginContext } from 'rollup';
+import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import type { UserConfig } from 'vite';
 
+import type { PluginHooks } from '../../types/pluginHooks';
+import { builderInfo, devRemotes, parsedOptions } from '../public';
+import {
+  FEDERATION_METHOD_GET_REMOTE,
+  FEDERATION_METHOD_SET_REMOTE,
+  FEDERATION_METHOD_UNWRAP_DEFAULT,
+  FEDERATION_METHOD_WRAP_DEFAULT
+} from '../runtime-snippets';
 import {
   createRemotesMap,
   getFileExtname,
@@ -28,15 +36,6 @@ import {
   parseRemoteOptions,
   REMOTE_FROM_PARAMETER
 } from '../utils';
-import { builderInfo, parsedOptions, devRemotes } from '../public';
-import type { PluginHooks } from '../../types/pluginHooks';
-import { Node } from 'estree';
-import {
-  FEDERATION_METHOD_UNWRAP_DEFAULT,
-  FEDERATION_METHOD_WRAP_DEFAULT,
-  FEDERATION_METHOD_GET_REMOTE,
-  FEDERATION_METHOD_SET_REMOTE
-} from '../runtime-snippets';
 
 export const devRemotePlugin = (
   options: VitePluginFederationOptions

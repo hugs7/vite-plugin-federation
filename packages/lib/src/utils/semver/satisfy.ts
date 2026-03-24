@@ -13,20 +13,20 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { combineVersion, extractComparator, pipe } from './utils';
+import type { CompareAtom } from './compare';
+import { compare } from './compare';
 import {
-  parseHyphen,
-  parseComparatorTrim,
-  parseTildeTrim,
   parseCaretTrim,
   parseCarets,
-  parseTildes,
-  parseXRanges,
+  parseComparatorTrim,
+  parseGTE0,
+  parseHyphen,
   parseStar,
-  parseGTE0
+  parseTildeTrim,
+  parseTildes,
+  parseXRanges
 } from './parser';
-import { compare } from './compare';
-import type { CompareAtom } from './compare';
+import { combineVersion, extractComparator, pipe } from './utils';
 
 function parseComparatorString(range: string): string {
   return pipe(

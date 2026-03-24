@@ -18,11 +18,13 @@ import MagicString from 'magic-string';
 import path from 'node:path';
 import type {
   AcornNode,
-  TransformPluginContext,
   OutputAsset,
-  OutputChunk
+  OutputChunk,
+  TransformPluginContext
 } from 'rollup';
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import { ResolvedConfig } from 'vite';
+
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
@@ -31,20 +33,19 @@ import {
   prodRemotes
 } from '../public';
 import {
+  FEDERATION_METHOD_GET_REMOTE,
+  FEDERATION_METHOD_SET_REMOTE,
+  FEDERATION_METHOD_UNWRAP_DEFAULT,
+  FEDERATION_METHOD_WRAP_DEFAULT
+} from '../runtime-snippets';
+import {
   createRemotesMap,
   getModuleMarker,
+  injectToHead,
   parseRemoteOptions,
   REMOTE_FROM_PARAMETER,
-  injectToHead,
   toPreloadTag
 } from '../utils';
-import { ResolvedConfig } from 'vite';
-import {
-  FEDERATION_METHOD_UNWRAP_DEFAULT,
-  FEDERATION_METHOD_WRAP_DEFAULT,
-  FEDERATION_METHOD_GET_REMOTE,
-  FEDERATION_METHOD_SET_REMOTE
-} from '../runtime-snippets';
 
 const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
   string,
@@ -584,7 +585,7 @@ export const prodRemotePlugin = (
       }
     },
 
-    generateBundle(options, bundle) {
+    generateBundle(bundle) {
       const preloadSharedReg = parsedOptions.prodShared
         .filter((shareInfo) => shareInfo[1].modulePreload)
         .map(

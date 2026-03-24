@@ -19,18 +19,18 @@ import { createRequire } from 'module';
 import { join, resolve } from 'path';
 import type { VitePluginFederationOptions } from 'types';
 import type { UserConfig } from 'vite';
+
 import type { PluginHooks } from '../../types/pluginHooks';
 import { parsedOptions } from '../public';
+import {
+  FEDERATION_DEBUG_SNIPPET_ESM,
+  FEDERATION_IMPORT_SNIPPET
+} from '../runtime-snippets';
 import {
   NAME_CHAR_REG,
   parseExposeOptions,
   removeNonRegLetter
 } from '../utils';
-
-import {
-  FEDERATION_DEBUG_SNIPPET_ESM,
-  FEDERATION_IMPORT_SNIPPET
-} from '../runtime-snippets';
 
 /**
  * Detect whether a resolved module file is CJS (uses require/module.exports).
@@ -474,12 +474,12 @@ export const get = async (module) => {
           const origEnd = res.end.bind(res);
           const chunks: Buffer[] = [];
 
-          res.write = function (chunk: any, ...args: any[]) {
+          res.write = function (chunk: any) {
             chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
             return true;
           } as any;
 
-          res.end = function (chunk?: any, ...args: any[]) {
+          res.end = function (chunk?: any) {
             if (chunk)
               chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
             let fileCode = Buffer.concat(chunks).toString('utf-8');

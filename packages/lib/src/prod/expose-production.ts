@@ -19,6 +19,7 @@ import { basename, dirname, extname, parse, relative, resolve } from 'path';
 import type { AcornNode, OutputAsset, OutputChunk } from 'rollup';
 import type { VitePluginFederationOptions } from 'types';
 import type { ResolvedConfig } from 'vite';
+
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
@@ -31,6 +32,7 @@ import {
   SHARED,
   viteConfigResolved
 } from '../public';
+import { FEDERATION_IMPORT_SNIPPET } from '../runtime-snippets';
 import {
   getModuleMarker,
   NAME_CHAR_REG,
@@ -38,7 +40,6 @@ import {
   parseExposeOptions,
   removeNonRegLetter
 } from '../utils';
-import { FEDERATION_IMPORT_SNIPPET } from '../runtime-snippets';
 
 export const prodExposePlugin = (
   options: VitePluginFederationOptions

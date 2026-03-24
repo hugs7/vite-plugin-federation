@@ -13,10 +13,11 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import type { VitePluginFederationOptions } from 'types';
+
 import type { PluginHooks } from '../../types/pluginHooks';
 import { parseSharedOptions } from '../utils';
 import { parsedOptions } from '../public';
-import type { VitePluginFederationOptions } from 'types';
 
 export const devSharedPlugin = (
   options: VitePluginFederationOptions

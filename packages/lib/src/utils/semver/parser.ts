@@ -13,7 +13,6 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { isXVersion, parseRegex } from './utils';
 import {
   caret,
   caretTrim,
@@ -25,6 +24,7 @@ import {
   tildeTrim,
   xRange
 } from './constants';
+import { isXVersion, parseRegex } from './utils';
 
 export function parseHyphen(range: string): string {
   return range.replace(
