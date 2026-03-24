@@ -73,6 +73,18 @@ const getExportNamesStatically = (resolvedPath: string): string[] => {
 }
 
 const getModuleExportNames = (name: string, root: string): string[] => {
+  // Prefer static analysis — it only parses the file without executing it,
+  // so browser-only modules (e.g. SSO with localStorage) won't trigger
+  // Node.js warnings or side-effects.
+  try {
+    const nodeRequire = createRequire(join(root, 'package.json'))
+    const resolvedPath = nodeRequire.resolve(name)
+    const names = getExportNamesStatically(resolvedPath)
+    if (names.length > 0) return names
+  } catch {
+    /* resolution failed — try dynamic import */
+  }
+
   try {
     const result = execSync(
       `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
@@ -84,14 +96,6 @@ const getModuleExportNames = (name: string, root: string): string[] => {
       }
     )
     return JSON.parse(result.trim())
-  } catch {
-    // Dynamic import failed — fall back to static analysis
-  }
-
-  try {
-    const nodeRequire = createRequire(join(root, 'package.json'))
-    const resolvedPath = nodeRequire.resolve(name)
-    return getExportNamesStatically(resolvedPath)
   } catch {
     return []
   }
