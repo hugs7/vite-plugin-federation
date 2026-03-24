@@ -378,7 +378,9 @@ export const get = async (module) => {
               const chunkSrc = readFileSync(join(entryDir, rel), 'utf-8')
               const bareDeps = [
                 ...chunkSrc.matchAll(/from\s+['"]([^'"./][^'"]*)['"]/g)
-              ].map((m) => m[1])
+              ]
+                .map((m) => m[1])
+                .filter((d) => !d.includes('$'))
               for (const dep of bareDeps) {
                 const pkg = dep.startsWith('@')
                   ? dep.split('/').slice(0, 2).join('/')
