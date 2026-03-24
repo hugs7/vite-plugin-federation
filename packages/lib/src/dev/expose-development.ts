@@ -124,9 +124,8 @@ const buildSharedWrapperCode = (
 
   // CJS modules use the pre-bundled dep URL (browsers can't load raw CJS).
   // ESM modules use localUrl with ?__fed_raw to bypass our raw middleware.
-  const baseUrl = meta.isCjs && meta.depUrl
-    ? meta.depUrl
-    : meta.localUrl + '?__fed_raw'
+  const baseUrl =
+    meta.isCjs && meta.depUrl ? meta.depUrl : meta.localUrl + '?__fed_raw'
   // When originUrl is provided, prefix the import URL so the browser
   // fetches from this dev server, not the host page's origin.
   const importUrl = originUrl ? `${originUrl}${baseUrl}` : baseUrl
@@ -176,6 +175,8 @@ export const devExposePlugin = (
   const excludedShared = new Set<string>()
   // CJS modules that must stay pre-bundled (detected at config time)
   const cjsShared = new Set<string>()
+  // CJS sub-deps of excluded modules that need force-inclusion
+  const cjsSubDeps = new Set<string>()
   let resolvedRoot = process.cwd()
 
   let moduleMap = ''
@@ -308,7 +309,11 @@ export const get = async (module) => {
             const exports = getModuleExportNames(specifier, root)
             if (exports.length > 0) {
               const cjs = isCjsFile(realPath)
-              const subMeta: SharedModuleMeta = { localUrl, exports, isCjs: cjs }
+              const subMeta: SharedModuleMeta = {
+                localUrl,
+                exports,
+                isCjs: cjs
+              }
               if (cjs) {
                 subMeta.depUrl = `/node_modules/.vite/deps/${specifier.replace(/\//g, '_')}.js`
               }
@@ -338,7 +343,6 @@ export const get = async (module) => {
       //   no relative imports — their bare-specifier deps are all shared
       //   or pre-bundled by the dep optimizer.
       const safeToExclude = new Set<string>()
-      const cjsSubDeps = new Set<string>()
       for (const name of sharedList) {
         const meta = sharedModuleMeta.get(name)
         if (!meta || meta.isCjs) continue
@@ -360,34 +364,28 @@ export const get = async (module) => {
           const entryDir = realPath.substring(0, realPath.lastIndexOf('/'))
           const src = readFileSync(realPath, 'utf-8')
           // Find relative chunk imports
-          const relImports = [
-            ...src.matchAll(/from\s+['"](\.\/.+?)['"]/g)
-          ].map((m) => m[1])
-          // Scan each chunk for bare-specifier imports to non-shared packages
+          const relImports = [...src.matchAll(/from\s+['"](\.\/.+?)['"]/g)].map(
+            (m) => m[1]
+          )
+          // Scan each chunk for bare-specifier imports to non-shared packages.
+          // Resolve from the module's own directory (not project root) to
+          // find nested deps like react-router/node_modules/cookie/.
           for (const rel of relImports) {
             try {
-              const chunkSrc = readFileSync(
-                join(entryDir, rel),
-                'utf-8'
-              )
+              const chunkSrc = readFileSync(join(entryDir, rel), 'utf-8')
               const bareDeps = [
-                ...chunkSrc.matchAll(
-                  /from\s+['"]([^'"./][^'"]*)['"]/g
-                )
+                ...chunkSrc.matchAll(/from\s+['"]([^'"./][^'"]*)['"]/g)
               ].map((m) => m[1])
               for (const dep of bareDeps) {
                 const pkg = dep.startsWith('@')
                   ? dep.split('/').slice(0, 2).join('/')
                   : dep.split('/')[0]
                 if (sharedList.includes(pkg)) continue
-                try {
-                  const depPath = nodeRequire.resolve(dep)
-                  if (isCjsFile(depPath)) {
-                    cjsSubDeps.add(dep)
-                  }
-                } catch {
-                  /* unresolvable, skip */
-                }
+                // Any non-shared bare import from an excluded module's
+                // internal chunk must be force-included for pre-bundling.
+                // Without this, Vite serves the raw CJS file which
+                // browsers can't parse.
+                cjsSubDeps.add(pkg)
               }
             } catch {
               /* can't read chunk */
@@ -402,10 +400,17 @@ export const get = async (module) => {
         excludedShared.add(name)
       }
 
-      console.log('[federation] CJS shared modules (stay pre-bundled):', [...cjsShared])
-      console.log('[federation] Excluded from dep optimization (virtual wrappers):', [...safeToExclude])
+      console.log('[federation] CJS shared modules (stay pre-bundled):', [
+        ...cjsShared
+      ])
+      console.log(
+        '[federation] Excluded from dep optimization (virtual wrappers):',
+        [...safeToExclude]
+      )
       if (cjsSubDeps.size > 0) {
-        console.log('[federation] CJS sub-deps force-included:', [...cjsSubDeps])
+        console.log('[federation] CJS sub-deps force-included:', [
+          ...cjsSubDeps
+        ])
       }
       if (safeToExclude.size > 0) {
         config.optimizeDeps ??= {}
@@ -586,7 +591,10 @@ export const get = async (module) => {
                 // local variable is `Action`, not `NavigationType`.
                 const exportMatch = fileCode.match(/export \{([^}]+)\};/)
                 if (exportMatch) {
-                  const specifiers = exportMatch[1].split(',').map((s) => s.trim()).filter(Boolean)
+                  const specifiers = exportMatch[1]
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean)
                   // Parse each specifier: "Foo" or "Foo as Bar"
                   const mappings = specifiers.map((s) => {
                     const parts = s.split(/\s+as\s+/)
@@ -639,30 +647,30 @@ export const get = async (module) => {
       // node_modules, those chunks may import CJS packages (e.g. cookie).
       // Browsers can't parse CJS, so we redirect these imports to the
       // pre-bundled ESM versions in .vite/deps/.
+      // Match by /node_modules/<pkg>/ in the URL to handle nested deps
+      // (e.g. react-router/node_modules/cookie/).
       if (cjsSubDeps.size > 0) {
-        const cjsDepPaths = new Map<string, string>()
-        for (const dep of cjsSubDeps) {
-          try {
-            const depPath = nodeRequire.resolve(dep)
-            const depUrl = toViteUrl(depPath, root)
-            cjsDepPaths.set(depUrl, dep)
-          } catch { /* skip */ }
-        }
-
         server.middlewares.use((req, res, next) => {
           const url = req.url
-          if (!url) { next(); return }
+          if (!url || !url.includes('/node_modules/')) {
+            next()
+            return
+          }
 
           const urlPath = url.split('?')[0]
-          const matchedDep = cjsDepPaths.get(urlPath)
-          if (!matchedDep) { next(); return }
-
-          // Redirect to the pre-bundled version
-          const depFile = matchedDep.replace(/\//g, '_')
-          const preBundledUrl = `/node_modules/.vite/deps/${depFile}.js`
-          console.log(`[federation] Redirecting CJS sub-dep: ${matchedDep} → ${preBundledUrl}`)
-          res.writeHead(302, { Location: preBundledUrl })
-          res.end()
+          for (const dep of cjsSubDeps) {
+            if (urlPath.includes(`/node_modules/${dep}/`)) {
+              const depFile = dep.replace(/\//g, '_')
+              const preBundledUrl = `/node_modules/.vite/deps/${depFile}.js`
+              console.log(
+                `[federation] Redirecting CJS sub-dep: ${dep} → ${preBundledUrl}`
+              )
+              res.writeHead(302, { Location: preBundledUrl })
+              res.end()
+              return
+            }
+          }
+          next()
         })
       }
 
@@ -689,20 +697,34 @@ export const get = async (module) => {
 
         server.middlewares.use((req, res, next) => {
           const url = req.url
-          if (!url) { next(); return }
+          if (!url) {
+            next()
+            return
+          }
 
           // Skip the fallback URL — __fed_raw is the escape hatch so
           // the wrapper's fallback import loads the REAL module file.
-          if (url.includes('__fed_raw')) { next(); return }
+          if (url.includes('__fed_raw')) {
+            next()
+            return
+          }
 
           const urlPath = url.split('?')[0]
           const matchedName = excludedUrlMap.get(urlPath)
-          if (!matchedName) { next(); return }
+          if (!matchedName) {
+            next()
+            return
+          }
 
           const meta = sharedModuleMeta.get(matchedName)
-          if (!meta) { next(); return }
+          if (!meta) {
+            next()
+            return
+          }
 
-          console.log(`[federation] Intercepting excluded shared: ${urlPath} → wrapper for ${matchedName}`)
+          console.log(
+            `[federation] Intercepting excluded shared: ${urlPath} → wrapper for ${matchedName}`
+          )
           const port = server.config.server.port ?? 5173
           const originUrl = `http://localhost:${port}`
           const code = buildSharedWrapperCode(matchedName, meta, originUrl)
