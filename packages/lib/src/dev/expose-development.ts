@@ -21,7 +21,7 @@ import type { VitePluginFederationOptions } from 'types';
 import type { UserConfig } from 'vite';
 
 import type { PluginHooks } from '../../types/pluginHooks';
-import { parsedOptions, PLUGIN_NAME_PREFIX } from '../public';
+import { parsedOptions, pluginName } from '../public';
 import {
   FEDERATION_DEBUG_SNIPPET_ESM,
   FEDERATION_IMPORT_SNIPPET
@@ -245,7 +245,7 @@ export const devExposePlugin = (
   });
 
   return {
-    name: `${PLUGIN_NAME_PREFIX}:expose-development`,
+    name: pluginName('expose-development'),
     virtualFile: {
       [`__remoteEntryHelper__${options.filename}`]: `
 ${FEDERATION_DEBUG_SNIPPET_ESM}

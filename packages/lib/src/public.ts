@@ -26,6 +26,10 @@ export const DYNAMIC_LOADING_CSS = 'dynamicLoadingCss';
 export const DYNAMIC_LOADING_CSS_PREFIX = '__v__css__';
 export const DEFAULT_ENTRY_FILENAME = 'remoteEntry.js';
 export const PLUGIN_NAME_PREFIX = 'hugs7';
+
+/** Build a namespaced plugin name, e.g. pluginName('federation') → 'hugs7:federation' */
+export const pluginName = (...parts: string[]): string =>
+  [PLUGIN_NAME_PREFIX, ...parts].join(':');
 export const EXTERNALS: string[] = [];
 export const ROLLUP = 'rollup';
 export const VITE = 'vite';

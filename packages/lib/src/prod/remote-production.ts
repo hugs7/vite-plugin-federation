@@ -30,7 +30,7 @@ import {
   builderInfo,
   EXPOSES_KEY_MAP,
   parsedOptions,
-  PLUGIN_NAME_PREFIX,
+  pluginName,
   prodRemotes
 } from '../public';
 import {
@@ -123,7 +123,7 @@ export const prodRemotePlugin = (
   const hasShared = parsedOptions.prodShared.length > 0;
   const needsFederationModule = hasRemotes || hasShared;
   return {
-    name: `${PLUGIN_NAME_PREFIX}:remote-production`,
+    name: pluginName('remote-production'),
     virtualFile: needsFederationModule
       ? {
           // language=JS

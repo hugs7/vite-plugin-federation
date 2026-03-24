@@ -18,7 +18,7 @@ import { basename, join, resolve } from 'path';
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
 
 import type { PluginHooks } from '../../types/pluginHooks';
-import { parsedOptions, PLUGIN_NAME_PREFIX } from '../public';
+import { parsedOptions, pluginName } from '../public';
 import {
   NAME_CHAR_REG,
   parseSharedOptions,
@@ -41,7 +41,7 @@ export const prodSharedPlugin = (
   const id2Prop = new Map<string, any>();
 
   return {
-    name: `${PLUGIN_NAME_PREFIX}:shared-production`,
+    name: pluginName('shared-production'),
     virtualFile: {
       __federation_fn_import: federation_fn_import
     },

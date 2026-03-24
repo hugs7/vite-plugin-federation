@@ -17,7 +17,7 @@ import type { VitePluginFederationOptions } from 'types';
 
 import type { PluginHooks } from '../../types/pluginHooks';
 import { parseSharedOptions } from '../utils';
-import { parsedOptions, PLUGIN_NAME_PREFIX } from '../public';
+import { parsedOptions, pluginName } from '../public';
 
 export const devSharedPlugin = (
   options: VitePluginFederationOptions
@@ -25,6 +25,6 @@ export const devSharedPlugin = (
   parsedOptions.devShared = parseSharedOptions(options);
 
   return {
-    name: `${PLUGIN_NAME_PREFIX}:shared-development`
+    name: pluginName('shared-development')
   };
 };
