@@ -22,7 +22,7 @@ import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
 import type { UserConfig } from 'vite';
 
 import type { PluginHooks } from '../../types/pluginHooks';
-import { builderInfo, devRemotes, parsedOptions } from '../public';
+import { builderInfo, devRemotes, parsedOptions, PLUGIN_NAME_PREFIX } from '../public';
 import {
   FEDERATION_METHOD_GET_REMOTE,
   FEDERATION_METHOD_SET_REMOTE,
@@ -69,7 +69,7 @@ export const devRemotePlugin = (
   const needsFederationModule = hasRemotes || hasShared;
 
   return {
-    name: 'hugs7:remote-development',
+    name: `${PLUGIN_NAME_PREFIX}:remote-development`,
     virtualFile: needsFederationModule
       ? {
           __federation__: `

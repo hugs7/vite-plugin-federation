@@ -29,6 +29,7 @@ import {
   EXPOSES_MAP,
   EXTERNALS,
   parsedOptions,
+  PLUGIN_NAME_PREFIX,
   SHARED,
   viteConfigResolved
 } from '../public';
@@ -77,7 +78,7 @@ export const prodExposePlugin = (
   // let viteConfigResolved: ResolvedConfig
 
   return {
-    name: 'hugs7:expose-production',
+    name: `${PLUGIN_NAME_PREFIX}:expose-production`,
     virtualFile: {
       // code generated for remote
       // language=JS
