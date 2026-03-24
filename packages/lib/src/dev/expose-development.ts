@@ -400,18 +400,7 @@ export const get = async (module) => {
         excludedShared.add(name)
       }
 
-      console.log('[federation] CJS shared modules (stay pre-bundled):', [
-        ...cjsShared
-      ])
-      console.log(
-        '[federation] Excluded from dep optimization (virtual wrappers):',
-        [...safeToExclude]
-      )
-      if (cjsSubDeps.size > 0) {
-        console.log('[federation] CJS sub-deps force-included:', [
-          ...cjsSubDeps
-        ])
-      }
+      
       if (safeToExclude.size > 0) {
         config.optimizeDeps ??= {}
         config.optimizeDeps.exclude = [
@@ -445,7 +434,6 @@ export const get = async (module) => {
       // stay pre-bundled to avoid cascading CJS failures.
       if (!excludedShared.has(id)) return null
 
-      console.log(`[federation] resolveId intercepted: ${id}`)
       return RESOLVED_SHARED_PREFIX + id
     },
 
@@ -476,9 +464,6 @@ export const get = async (module) => {
       // This ensures other pre-bundled deps importing `{ t }` from react.js
       // also get the host's shared instance.
       if (sharedModuleMeta.size > 0) {
-        console.log('[federation] .vite/deps/ middleware registered for:', [
-          ...sharedModuleMeta.keys()
-        ])
         server.middlewares.use(async (req, res, next) => {
           const url = req.url
           if (!url || !url.includes('.vite/deps/')) {
@@ -662,9 +647,6 @@ export const get = async (module) => {
             if (urlPath.includes(`/node_modules/${dep}/`)) {
               const depFile = dep.replace(/\//g, '_')
               const preBundledUrl = `/node_modules/.vite/deps/${depFile}.js`
-              console.log(
-                `[federation] Redirecting CJS sub-dep: ${dep} → ${preBundledUrl}`
-              )
               res.writeHead(302, { Location: preBundledUrl })
               res.end()
               return
@@ -690,11 +672,6 @@ export const get = async (module) => {
             excludedUrlMap.set(meta.localUrl, name)
           }
         }
-        console.log(
-          '[federation] Excluded shared URL interception:',
-          [...excludedUrlMap.entries()].map(([url, name]) => `${name} → ${url}`)
-        )
-
         server.middlewares.use((req, res, next) => {
           const url = req.url
           if (!url) {
@@ -722,9 +699,6 @@ export const get = async (module) => {
             return
           }
 
-          console.log(
-            `[federation] Intercepting excluded shared: ${urlPath} → wrapper for ${matchedName}`
-          )
           const port = server.config.server.port ?? 5173
           const originUrl = `http://localhost:${port}`
           const code = buildSharedWrapperCode(matchedName, meta, originUrl)
