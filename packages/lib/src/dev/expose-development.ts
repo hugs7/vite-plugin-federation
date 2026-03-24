@@ -14,6 +14,7 @@
 // *****************************************************************************
 
 import { execSync } from 'child_process'
+import { readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join, resolve } from 'path'
 import type { VitePluginFederationOptions } from 'types'
@@ -96,29 +97,21 @@ interface SharedModuleMeta {
  */
 const buildSharedWrapperCode = (
   name: string,
-  meta: SharedModuleMeta
+  meta: SharedModuleMeta,
+  originUrl?: string
 ): string => {
   const named = meta.exports.filter((e) => e !== 'default')
   const hasDefault = meta.exports.includes('default')
 
-  // Use the base shared module name for the globalThis lookup
-  // (e.g. 'react' for both 'react' and 'react/jsx-runtime')
-  const baseName = name
-    .split('/')
-    .slice(0, name.startsWith('@') ? 2 : 1)
-    .join('/')
-  const isSubPath = name !== baseName
+  // When originUrl is provided, prefix the import URL so the browser
+  // fetches from this dev server, not the host page's origin.
+  const importUrl = originUrl
+    ? `${originUrl}${meta.localUrl}`
+    : meta.localUrl
 
   let code = ''
-
-  if (isSubPath) {
-    // For sub-path imports (e.g. react/jsx-runtime), we can't look them
-    // up in the shared modules map directly. Import from the local package.
-    code += `const __mod = await import(/* @vite-ignore */ ${JSON.stringify(meta.localUrl)});\n`
-  } else {
-    code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`
-    code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(meta.localUrl)});\n`
-  }
+  code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`
+  code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(importUrl)});\n`
 
   if (hasDefault) {
     code += `export default (__mod.default ?? __mod);\n`
@@ -268,6 +261,29 @@ export const get = async (module) => {
         sharedModuleMeta.set(name, { localUrl, exports })
       }
 
+      // Also discover sub-paths of shared modules (e.g. react/jsx-runtime)
+      // from the dep optimizer's _metadata.json and pre-compute their exports.
+      // This avoids calling execSync at request time in the middleware.
+      try {
+        const metaPath = join(root, 'node_modules', '.vite', 'deps', '_metadata.json')
+        const meta = JSON.parse(readFileSync(metaPath, 'utf-8'))
+        for (const key of Object.keys(meta.optimized || {})) {
+          if (sharedModuleMeta.has(key)) continue
+          const isSubPathOf = sharedList.some(
+            (s) => key !== s && key.startsWith(s + '/')
+          )
+          if (!isSubPathOf) continue
+          try {
+            const realPath = nodeRequire.resolve(key)
+            const localUrl = toViteUrl(realPath, root)
+            const exports = getModuleExportNames(key, root)
+            if (exports.length > 0) {
+              sharedModuleMeta.set(key, { localUrl, exports })
+            }
+          } catch { /* skip unresolvable sub-paths */ }
+        }
+      } catch { /* _metadata.json may not exist on first run */ }
+
       // Exclude react and react-dom from Vite's dep optimizer.
       // These are the core singleton modules — react holds mutable
       // state (ReactSharedInternals.H) that react-dom writes to
@@ -315,11 +331,9 @@ export const get = async (module) => {
     },
 
     transform(code: string, id: string) {
-      // Replace CJS stubs for excluded shared modules with proper
-      // ESM wrappers.  When react/react-dom are excluded from the
-      // dep optimizer, Vite creates stubs with only a default export.
-      // We replace them with the shared wrapper (for base packages)
-      // or a properly transformed version (for sub-paths).
+      // Patch pre-bundled shared module files.  Base packages get
+      // replaced with a shared wrapper; sub-paths get named
+      // re-exports appended to fix Vite 8/rolldown CJS interop.
       if (!id.includes('.vite/deps/') || sharedModuleMeta.size === 0) {
         return null
       }
@@ -329,30 +343,32 @@ export const get = async (module) => {
 
       const fileName = fileMatch[1]
       for (const [name, meta] of sharedModuleMeta) {
-        const baseName = name.replace(/\//g, '_')
-        if (fileName === baseName) {
+        if (name.replace(/\//g, '_') !== fileName) continue
+
+        const baseSegments = name.startsWith('@') ? 2 : 1
+        if (name.split('/').length <= baseSegments) {
+          // Top-level shared module → replace with shared wrapper
           return { code: buildSharedWrapperCode(name, meta) }
         }
-        if (fileName.startsWith(baseName + '_')) {
-          const subPath = fileName
-            .slice(baseName.length + 1)
-            .replace(/_/g, '/')
-          const specifier = `${name}/${subPath}`
-          try {
-            const nodeReq = createRequire(
-              join(resolvedRoot, 'package.json')
-            )
-            const resolvedPath = nodeReq.resolve(specifier)
-            const exports = getModuleExportNames(specifier, resolvedRoot)
-            const subMeta: SharedModuleMeta = {
-              localUrl: toViteUrl(resolvedPath, resolvedRoot),
-              exports
+
+        // Sub-path → patch export default with named re-exports
+        if (/export default .+;/.test(code)) {
+          const exportNames = meta.exports.filter(
+            (e) => e !== 'default' && e !== 'module.exports' && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e)
+          )
+          if (exportNames.length > 0) {
+            const reExports = exportNames
+              .map((e) => `export const ${e} = __federation_default[${JSON.stringify(e)}];`)
+              .join('\n')
+            return {
+              code: code.replace(
+                /export default (.+);/,
+                `const __federation_default = $1;\nexport default __federation_default;\n${reExports}`
+              )
             }
-            return { code: buildSharedWrapperCode(specifier, subMeta) }
-          } catch {
-            // fall through
           }
         }
+        break
       }
 
       return null
@@ -413,42 +429,58 @@ export const get = async (module) => {
             next()
             return
           }
+          const port = server.config.server.port ?? 5173
+          const originUrl = `http://localhost:${port}`
           const fileName = depsMatch[1]
+
+          // Exact match against pre-computed sharedModuleMeta entries
+          let matchedName: string | undefined
+          let matchedMeta: SharedModuleMeta | undefined
           for (const [name, meta] of sharedModuleMeta) {
-            const baseName = name.replace(/\//g, '_')
-            if (fileName === baseName) {
-              const code = buildSharedWrapperCode(name, meta)
+            if (name.replace(/\//g, '_') === fileName) {
+              matchedName = name
+              matchedMeta = meta
+              break
+            }
+          }
+
+          if (matchedName && matchedMeta) {
+            const baseSegments = matchedName.startsWith('@') ? 2 : 1
+            const isSubPath = matchedName.split('/').length > baseSegments
+
+            if (!isSubPath) {
+              // Top-level shared module → serve shared wrapper with
+              // absolute origin URL for cross-origin federation
+              const code = buildSharedWrapperCode(matchedName, matchedMeta, originUrl)
               res.setHeader('Content-Type', 'application/javascript')
               res.setHeader('Access-Control-Allow-Origin', '*')
               res.end(code)
               return
             }
-            if (fileName.startsWith(baseName + '_')) {
-              // Sub-path (e.g. react/jsx-runtime) — resolve to the
-              // actual file and use server.transformRequest to serve
-              // it with proper CJS-to-ESM conversion.  We can't use
-              // buildSharedWrapperCode here because its browser-side
-              // import() would hit Vite's server.fs.allow restriction.
-              const subPath = fileName
-                .slice(baseName.length + 1)
-                .replace(/_/g, '/')
-              const specifier = `${name}/${subPath}`
-              try {
-                const nodeReq = createRequire(
-                  join(resolvedRoot, 'package.json')
+
+            // Sub-path → read pre-bundled file, append named re-exports
+            try {
+              const depsDir = join(resolvedRoot, 'node_modules', '.vite', 'deps')
+              const filePath = join(depsDir, `${fileName}.js`)
+              const fileCode = readFileSync(filePath, 'utf-8')
+              const exportNames = matchedMeta.exports.filter(
+                (e) => e !== 'default' && e !== 'module.exports' && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e)
+              )
+              if (exportNames.length > 0 && /export default .+;/.test(fileCode)) {
+                const reExports = exportNames
+                  .map((e) => `export const ${e} = __federation_default[${JSON.stringify(e)}];`)
+                  .join('\n')
+                const patchedCode = fileCode.replace(
+                  /export default (.+);/,
+                  `const __federation_default = $1;\nexport default __federation_default;\n${reExports}`
                 )
-                const resolvedPath = nodeReq.resolve(specifier)
-                const viteUrl = toViteUrl(resolvedPath, resolvedRoot)
-                const result = await server.transformRequest(viteUrl)
-                if (result) {
-                  res.setHeader('Content-Type', 'application/javascript')
-                  res.setHeader('Access-Control-Allow-Origin', '*')
-                  res.end(result.code)
-                  return
-                }
-              } catch (err) {
-                console.error('[federation] transformRequest failed for', specifier, err)
+                res.setHeader('Content-Type', 'application/javascript')
+                res.setHeader('Access-Control-Allow-Origin', '*')
+                res.end(patchedCode)
+                return
               }
+            } catch (err) {
+              console.error('[federation] sub-path patch failed for', matchedName, err)
             }
           }
           next()
