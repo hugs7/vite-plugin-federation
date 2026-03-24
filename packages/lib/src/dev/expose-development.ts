@@ -39,6 +39,8 @@ import {
 const isCjsFile = (filePath: string): boolean => {
   if (filePath.endsWith('.mjs')) return false;
   if (filePath.endsWith('.cjs')) return true;
+
+  // Infer module type via presence of cjs syntax
   try {
     const head = readFileSync(filePath, 'utf-8').slice(0, 2000);
     return /\brequire\s*\(/.test(head) || /\bmodule\.exports\b/.test(head);
@@ -65,11 +67,13 @@ const getExportNamesStatically = (resolvedPath: string): string[] => {
       'console.log(JSON.stringify(names));',
       '});'
     ].join('');
+
     const result = execSync(`node -e "${script}" -- "${resolvedPath}"`, {
       encoding: 'utf-8',
       timeout: 10000,
       stdio: ['pipe', 'pipe', 'pipe']
     });
+
     return JSON.parse(result.trim());
   } catch {
     return [];
@@ -87,6 +91,7 @@ const getModuleExportNames = (name: string, root: string): string[] => {
         stdio: ['pipe', 'pipe', 'pipe']
       }
     );
+
     return JSON.parse(result.trim());
   } catch {
     // Dynamic import failed — fall back to static analysis
