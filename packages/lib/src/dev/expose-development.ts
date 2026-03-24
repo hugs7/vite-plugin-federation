@@ -178,10 +178,10 @@ const toPrebundledDepUrl = (specifier: string): string =>
   `/node_modules/.vite/deps/${specifier.replace(/\//g, '_')}.js`;
 
 /** Extract the base package name from a bare specifier (handles scoped packages) */
-const getBasePackageName = (specifier: string): string =>
-  specifier.startsWith('@')
-    ? specifier.split('/').slice(0, 2).join('/')
-    : specifier.split('/')[0];
+const getBasePackageName = (specifier: string): string => {
+  const parts = specifier.split('/');
+  return specifier.startsWith('@') ? parts.slice(0, 2).join('/') : parts[0];
+};
 
 /** Get the origin URL for the dev server */
 const getServerOrigin = (server: {
