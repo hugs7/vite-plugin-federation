@@ -13,7 +13,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { isXVersion, parseRegex } from './utils'
+import { isXVersion, parseRegex } from './utils';
 import {
   caret,
   caretTrim,
@@ -24,7 +24,7 @@ import {
   tilde,
   tildeTrim,
   xRange
-} from './constants'
+} from './constants';
 
 export function parseHyphen(range: string): string {
   return range.replace(
@@ -44,42 +44,42 @@ export function parseHyphen(range: string): string {
       toPreRelease
     ) => {
       if (isXVersion(fromMajor)) {
-        from = ''
+        from = '';
       } else if (isXVersion(fromMinor)) {
-        from = `>=${fromMajor}.0.0`
+        from = `>=${fromMajor}.0.0`;
       } else if (isXVersion(fromPatch)) {
-        from = `>=${fromMajor}.${fromMinor}.0`
+        from = `>=${fromMajor}.${fromMinor}.0`;
       } else {
-        from = `>=${from}`
+        from = `>=${from}`;
       }
 
       if (isXVersion(toMajor)) {
-        to = ''
+        to = '';
       } else if (isXVersion(toMinor)) {
-        to = `<${+toMajor + 1}.0.0-0`
+        to = `<${+toMajor + 1}.0.0-0`;
       } else if (isXVersion(toPatch)) {
-        to = `<${toMajor}.${+toMinor + 1}.0-0`
+        to = `<${toMajor}.${+toMinor + 1}.0-0`;
       } else if (toPreRelease) {
-        to = `<=${toMajor}.${toMinor}.${toPatch}-${toPreRelease}`
+        to = `<=${toMajor}.${toMinor}.${toPatch}-${toPreRelease}`;
       } else {
-        to = `<=${to}`
+        to = `<=${to}`;
       }
 
-      return `${from} ${to}`.trim()
+      return `${from} ${to}`.trim();
     }
-  )
+  );
 }
 
 export function parseComparatorTrim(range: string): string {
-  return range.replace(parseRegex(comparatorTrim), '$1$2$3')
+  return range.replace(parseRegex(comparatorTrim), '$1$2$3');
 }
 
 export function parseTildeTrim(range: string): string {
-  return range.replace(parseRegex(tildeTrim), '$1~')
+  return range.replace(parseRegex(tildeTrim), '$1~');
 }
 
 export function parseCaretTrim(range: string): string {
-  return range.replace(parseRegex(caretTrim), '$1^')
+  return range.replace(parseRegex(caretTrim), '$1^');
 }
 
 export function parseCarets(range: string): string {
@@ -91,50 +91,50 @@ export function parseCarets(range: string): string {
         parseRegex(caret),
         (_, major, minor, patch, preRelease) => {
           if (isXVersion(major)) {
-            return ''
+            return '';
           } else if (isXVersion(minor)) {
-            return `>=${major}.0.0 <${+major + 1}.0.0-0`
+            return `>=${major}.0.0 <${+major + 1}.0.0-0`;
           } else if (isXVersion(patch)) {
             if (major === '0') {
-              return `>=${major}.${minor}.0 <${major}.${+minor + 1}.0-0`
+              return `>=${major}.${minor}.0 <${major}.${+minor + 1}.0-0`;
             } else {
-              return `>=${major}.${minor}.0 <${+major + 1}.0.0-0`
+              return `>=${major}.${minor}.0 <${+major + 1}.0.0-0`;
             }
           } else if (preRelease) {
             if (major === '0') {
               if (minor === '0') {
                 return `>=${major}.${minor}.${patch}-${preRelease} <${major}.${minor}.${
                   +patch + 1
-                }-0`
+                }-0`;
               } else {
                 return `>=${major}.${minor}.${patch}-${preRelease} <${major}.${
                   +minor + 1
-                }.0-0`
+                }.0-0`;
               }
             } else {
               return `>=${major}.${minor}.${patch}-${preRelease} <${
                 +major + 1
-              }.0.0-0`
+              }.0.0-0`;
             }
           } else {
             if (major === '0') {
               if (minor === '0') {
                 return `>=${major}.${minor}.${patch} <${major}.${minor}.${
                   +patch + 1
-                }-0`
+                }-0`;
               } else {
                 return `>=${major}.${minor}.${patch} <${major}.${
                   +minor + 1
-                }.0-0`
+                }.0-0`;
               }
             }
 
-            return `>=${major}.${minor}.${patch} <${+major + 1}.0.0-0`
+            return `>=${major}.${minor}.${patch} <${+major + 1}.0.0-0`;
           }
         }
-      )
+      );
     })
-    .join(' ')
+    .join(' ');
 }
 
 export function parseTildes(range: string): string {
@@ -146,22 +146,22 @@ export function parseTildes(range: string): string {
         parseRegex(tilde),
         (_, major, minor, patch, preRelease) => {
           if (isXVersion(major)) {
-            return ''
+            return '';
           } else if (isXVersion(minor)) {
-            return `>=${major}.0.0 <${+major + 1}.0.0-0`
+            return `>=${major}.0.0 <${+major + 1}.0.0-0`;
           } else if (isXVersion(patch)) {
-            return `>=${major}.${minor}.0 <${major}.${+minor + 1}.0-0`
+            return `>=${major}.${minor}.0 <${major}.${+minor + 1}.0-0`;
           } else if (preRelease) {
             return `>=${major}.${minor}.${patch}-${preRelease} <${major}.${
               +minor + 1
-            }.0-0`
+            }.0-0`;
           }
 
-          return `>=${major}.${minor}.${patch} <${major}.${+minor + 1}.0-0`
+          return `>=${major}.${minor}.${patch} <${major}.${+minor + 1}.0-0`;
         }
-      )
+      );
     })
-    .join(' ')
+    .join(' ');
 }
 
 export function parseXRanges(range: string): string {
@@ -173,81 +173,81 @@ export function parseXRanges(range: string): string {
         .replace(
           parseRegex(xRange),
           (ret, gtlt, major, minor, patch, preRelease) => {
-            const isXMajor = isXVersion(major)
-            const isXMinor = isXMajor || isXVersion(minor)
-            const isXPatch = isXMinor || isXVersion(patch)
+            const isXMajor = isXVersion(major);
+            const isXMinor = isXMajor || isXVersion(minor);
+            const isXPatch = isXMinor || isXVersion(patch);
 
             if (gtlt === '=' && isXPatch) {
-              gtlt = ''
+              gtlt = '';
             }
 
-            preRelease = ''
+            preRelease = '';
 
             if (isXMajor) {
               if (gtlt === '>' || gtlt === '<') {
                 // nothing is allowed
-                return '<0.0.0-0'
+                return '<0.0.0-0';
               } else {
                 // nothing is forbidden
-                return '*'
+                return '*';
               }
             } else if (gtlt && isXPatch) {
               // replace X with 0
               if (isXMinor) {
-                minor = 0
+                minor = 0;
               }
 
-              patch = 0
+              patch = 0;
 
               if (gtlt === '>') {
                 // >1 => >=2.0.0
                 // >1.2 => >=1.3.0
-                gtlt = '>='
+                gtlt = '>=';
 
                 if (isXMinor) {
-                  major = +major + 1
-                  minor = 0
-                  patch = 0
+                  major = +major + 1;
+                  minor = 0;
+                  patch = 0;
                 } else {
-                  minor = +minor + 1
-                  patch = 0
+                  minor = +minor + 1;
+                  patch = 0;
                 }
               } else if (gtlt === '<=') {
                 // <=0.7.x is actually <0.8.0, since any 0.7.x should pass
                 // Similarly, <=7.x is actually <8.0.0, etc.
-                gtlt = '<'
+                gtlt = '<';
 
                 if (isXMinor) {
-                  major = +major + 1
+                  major = +major + 1;
                 } else {
-                  minor = +minor + 1
+                  minor = +minor + 1;
                 }
               }
 
               if (gtlt === '<') {
-                preRelease = '-0'
+                preRelease = '-0';
               }
 
-              return `${gtlt + major}.${minor}.${patch}${preRelease}`
+              return `${gtlt + major}.${minor}.${patch}${preRelease}`;
             } else if (isXMinor) {
-              return `>=${major}.0.0${preRelease} <${+major + 1}.0.0-0`
+              return `>=${major}.0.0${preRelease} <${+major + 1}.0.0-0`;
             } else if (isXPatch) {
               return `>=${major}.${minor}.0${preRelease} <${major}.${
                 +minor + 1
-              }.0-0`
+              }.0-0`;
             }
 
-            return ret
+            return ret;
           }
-        )
+        );
     })
-    .join(' ')
+    .join(' ');
 }
 
 export function parseStar(range: string): string {
-  return range.trim().replace(parseRegex(star), '')
+  return range.trim().replace(parseRegex(star), '');
 }
 
 export function parseGTE0(comparatorString: string): string {
-  return comparatorString.trim().replace(parseRegex(gte0), '')
+  return comparatorString.trim().replace(parseRegex(gte0), '');
 }

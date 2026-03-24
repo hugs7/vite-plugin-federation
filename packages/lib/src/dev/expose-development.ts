@@ -13,32 +13,39 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { execSync } from 'child_process'
-import { readFileSync } from 'fs'
-import { createRequire } from 'module'
-import { join, resolve } from 'path'
-import type { VitePluginFederationOptions } from 'types'
-import type { UserConfig } from 'vite'
-import type { PluginHooks } from '../../types/pluginHooks'
-import { parsedOptions } from '../public'
-import { NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter } from '../utils'
+import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
+import { createRequire } from 'module';
+import { join, resolve } from 'path';
+import type { VitePluginFederationOptions } from 'types';
+import type { UserConfig } from 'vite';
+import type { PluginHooks } from '../../types/pluginHooks';
+import { parsedOptions } from '../public';
+import {
+  NAME_CHAR_REG,
+  parseExposeOptions,
+  removeNonRegLetter
+} from '../utils';
 
-import { FEDERATION_DEBUG_SNIPPET_ESM, FEDERATION_IMPORT_SNIPPET } from '../runtime-snippets'
+import {
+  FEDERATION_DEBUG_SNIPPET_ESM,
+  FEDERATION_IMPORT_SNIPPET
+} from '../runtime-snippets';
 
 /**
  * Detect whether a resolved module file is CJS (uses require/module.exports).
  * CJS modules must stay pre-bundled so the dep optimizer converts them to ESM.
  */
 const isCjsFile = (filePath: string): boolean => {
-  if (filePath.endsWith('.mjs')) return false
-  if (filePath.endsWith('.cjs')) return true
+  if (filePath.endsWith('.mjs')) return false;
+  if (filePath.endsWith('.cjs')) return true;
   try {
-    const head = readFileSync(filePath, 'utf-8').slice(0, 2000)
-    return /\brequire\s*\(/.test(head) || /\bmodule\.exports\b/.test(head)
+    const head = readFileSync(filePath, 'utf-8').slice(0, 2000);
+    return /\brequire\s*\(/.test(head) || /\bmodule\.exports\b/.test(head);
   } catch {
-    return false
+    return false;
   }
-}
+};
 
 /**
  * Statically extract ESM export names from a file using es-module-lexer,
@@ -57,17 +64,17 @@ const getExportNamesStatically = (resolvedPath: string): string[] => {
       "const names=exp.map(e=>typeof e==='string'?e:e.n).filter(Boolean);",
       'console.log(JSON.stringify(names));',
       '});'
-    ].join('')
+    ].join('');
     const result = execSync(`node -e "${script}" -- "${resolvedPath}"`, {
       encoding: 'utf-8',
       timeout: 10000,
       stdio: ['pipe', 'pipe', 'pipe']
-    })
-    return JSON.parse(result.trim())
+    });
+    return JSON.parse(result.trim());
   } catch {
-    return []
+    return [];
   }
-}
+};
 
 const getModuleExportNames = (name: string, root: string): string[] => {
   try {
@@ -79,31 +86,31 @@ const getModuleExportNames = (name: string, root: string): string[] => {
         timeout: 10000,
         stdio: ['pipe', 'pipe', 'pipe']
       }
-    )
-    return JSON.parse(result.trim())
+    );
+    return JSON.parse(result.trim());
   } catch {
     // Dynamic import failed — fall back to static analysis
   }
 
   try {
-    const nodeRequire = createRequire(join(root, 'package.json'))
-    const resolvedPath = nodeRequire.resolve(name)
-    return getExportNamesStatically(resolvedPath)
+    const nodeRequire = createRequire(join(root, 'package.json'));
+    const resolvedPath = nodeRequire.resolve(name);
+    return getExportNamesStatically(resolvedPath);
   } catch {
-    return []
+    return [];
   }
-}
+};
 
 /** Metadata for a shared virtual module */
 interface SharedModuleMeta {
   /** Vite-serveable URL for the real local module (/@fs/... or root-relative) */
-  localUrl: string
+  localUrl: string;
   /** Enumerated export names */
-  exports: string[]
+  exports: string[];
   /** Whether this module's entry point is CJS */
-  isCjs?: boolean
+  isCjs?: boolean;
   /** Pre-bundled dep URL (e.g. /node_modules/.vite/deps/react.js) for CJS fallback */
-  depUrl?: string
+  depUrl?: string;
 }
 
 /**
@@ -116,69 +123,71 @@ const buildSharedWrapperCode = (
   meta: SharedModuleMeta,
   originUrl?: string
 ): string => {
-  const named = meta.exports.filter((e) => e !== 'default')
-  const hasDefault = meta.exports.includes('default')
+  const named = meta.exports.filter((e) => e !== 'default');
+  const hasDefault = meta.exports.includes('default');
 
   // CJS modules use the pre-bundled dep URL (browsers can't load raw CJS).
   // ESM modules use localUrl with ?__fed_raw to bypass our URL interception middleware.
   const baseUrl =
-    meta.isCjs && meta.depUrl ? meta.depUrl : meta.localUrl + '?__fed_raw'
+    meta.isCjs && meta.depUrl ? meta.depUrl : meta.localUrl + '?__fed_raw';
   // When originUrl is provided, prefix the import URL so the browser
   // fetches from this dev server, not the host page's origin.
-  const importUrl = originUrl ? `${originUrl}${baseUrl}` : baseUrl
+  const importUrl = originUrl ? `${originUrl}${baseUrl}` : baseUrl;
 
-  let code = ''
-  code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`
-  code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(importUrl)});\n`
+  let code = '';
+  code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`;
+  code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(importUrl)});\n`;
 
   if (hasDefault) {
-    code += `export default (__mod.default ?? __mod);\n`
+    code += `export default (__mod.default ?? __mod);\n`;
   }
   for (const e of named) {
     if (VALID_JS_IDENTIFIER.test(e)) {
-      code += `export const ${e} = __mod[${JSON.stringify(e)}];\n`
+      code += `export const ${e} = __mod[${JSON.stringify(e)}];\n`;
     }
   }
 
-  return code
-}
+  return code;
+};
 
 /** Map of shared specifier -> metadata, populated in config() */
-const sharedModuleMeta = new Map<string, SharedModuleMeta>()
+const sharedModuleMeta = new Map<string, SharedModuleMeta>();
 
 // Convert an absolute filesystem path to a URL that Vite's dev server
 // can serve.  If the path is inside the project root, return a root-
 // relative path; otherwise use /@fs/ prefix.
 const toViteUrl = (filePath: string, root: string): string => {
-  const normalized = filePath.replace(/\\/g, '/')
-  const normalizedRoot = root.replace(/\\/g, '/').replace(/\/$/, '')
+  const normalized = filePath.replace(/\\/g, '/');
+  const normalizedRoot = root.replace(/\\/g, '/').replace(/\/$/, '');
   if (normalized.startsWith(normalizedRoot + '/')) {
-    return normalized.slice(normalizedRoot.length)
+    return normalized.slice(normalizedRoot.length);
   }
-  return `/@fs${normalized}`
-}
+  return `/@fs${normalized}`;
+};
 
 /** Regex matching valid JavaScript identifiers */
-const VALID_JS_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
+const VALID_JS_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
 
 /** Convert a bare specifier to its pre-bundled dep URL under .vite/deps/ */
 const toPrebundledDepUrl = (specifier: string): string =>
-  `/node_modules/.vite/deps/${specifier.replace(/\//g, '_')}.js`
+  `/node_modules/.vite/deps/${specifier.replace(/\//g, '_')}.js`;
 
 /** Extract the base package name from a bare specifier (handles scoped packages) */
 const getBasePackageName = (specifier: string): string =>
   specifier.startsWith('@')
     ? specifier.split('/').slice(0, 2).join('/')
-    : specifier.split('/')[0]
+    : specifier.split('/')[0];
 
 /** Get the origin URL for the dev server */
-const getServerOrigin = (server: { config: { server: { port?: number } } }): string => {
-  const port = server.config.server.port ?? 5173
-  return `http://localhost:${port}`
-}
+const getServerOrigin = (server: {
+  config: { server: { port?: number } };
+}): string => {
+  const port = server.config.server.port ?? 5173;
+  return `http://localhost:${port}`;
+};
 
 /** Strip query string from a URL */
-const stripQuery = (url: string): string => url.split('?')[0]
+const stripQuery = (url: string): string => url.split('?')[0];
 
 /**
  * Resolve a shared module specifier and build its metadata.
@@ -191,39 +200,39 @@ const createSharedMeta = (
   requireExports = false
 ): SharedModuleMeta | null => {
   try {
-    const realPath = nodeRequire.resolve(specifier)
-    const localUrl = toViteUrl(realPath, root)
-    const exports = getModuleExportNames(specifier, root)
-    if (requireExports && exports.length === 0) return null
-    const cjs = isCjsFile(realPath)
-    const meta: SharedModuleMeta = { localUrl, exports, isCjs: cjs }
+    const realPath = nodeRequire.resolve(specifier);
+    const localUrl = toViteUrl(realPath, root);
+    const exports = getModuleExportNames(specifier, root);
+    if (requireExports && exports.length === 0) return null;
+    const cjs = isCjsFile(realPath);
+    const meta: SharedModuleMeta = { localUrl, exports, isCjs: cjs };
     if (cjs) {
-      meta.depUrl = toPrebundledDepUrl(specifier)
+      meta.depUrl = toPrebundledDepUrl(specifier);
     }
-    return meta
+    return meta;
   } catch {
-    return null
+    return null;
   }
-}
+};
 
 export const devExposePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
-  parsedOptions.devExpose = parseExposeOptions(options)
+  parsedOptions.devExpose = parseExposeOptions(options);
 
   // Build list of shared module names for init code generation
-  const sharedList: string[] = []
+  const sharedList: string[] = [];
   // Modules actually excluded from dep optimization (only these get
   // wrapper/patch treatment in middleware and transform)
-  const excludedShared = new Set<string>()
+  const excludedShared = new Set<string>();
   // CJS sub-deps of excluded modules that need force-inclusion
-  const cjsSubDeps = new Set<string>()
-  let resolvedRoot = process.cwd()
+  const cjsSubDeps = new Set<string>();
+  let resolvedRoot = process.cwd();
 
   const exposeEntries = parsedOptions.devExpose.map((item) => {
-    const sanitized = removeNonRegLetter(item[0], NAME_CHAR_REG)
-    return `${JSON.stringify(item[0])}: './__federation_expose_${sanitized}.js'`
-  })
+    const sanitized = removeNonRegLetter(item[0], NAME_CHAR_REG);
+    return `${JSON.stringify(item[0])}: './__federation_expose_${sanitized}.js'`;
+  });
 
   return {
     name: 'hugs7:expose-development',
@@ -305,37 +314,37 @@ export const get = async (module) => {
 };`
     },
     config(config: UserConfig) {
-      resolvedRoot = config.root ? resolve(config.root) : process.cwd()
+      resolvedRoot = config.root ? resolve(config.root) : process.cwd();
 
       // Only set up shared wrappers when this is a remote with shared modules
       if (!parsedOptions.devExpose.length || !parsedOptions.devShared.length) {
-        return
+        return;
       }
 
-      const root = resolvedRoot
-      const nodeRequire = createRequire(join(root, 'package.json'))
+      const root = resolvedRoot;
+      const nodeRequire = createRequire(join(root, 'package.json'));
 
       // Populate sharedList and discover exports for each shared module
       for (const item of parsedOptions.devShared) {
-        const name = item[0]
-        sharedList.push(name)
+        const name = item[0];
+        sharedList.push(name);
 
-        const meta = createSharedMeta(name, nodeRequire, root)
+        const meta = createSharedMeta(name, nodeRequire, root);
         if (meta) {
-          sharedModuleMeta.set(name, meta)
+          sharedModuleMeta.set(name, meta);
         }
       }
 
       // Discover sub-paths of shared modules (e.g. react/jsx-runtime).
       // These are known CJS entry points that need named re-export patching.
-      const knownSubPaths = ['/jsx-runtime', '/jsx-dev-runtime', '/client']
+      const knownSubPaths = ['/jsx-runtime', '/jsx-dev-runtime', '/client'];
       for (const baseName of sharedList) {
         for (const sub of knownSubPaths) {
-          const specifier = baseName + sub
-          if (sharedModuleMeta.has(specifier)) continue
-          const subMeta = createSharedMeta(specifier, nodeRequire, root, true)
+          const specifier = baseName + sub;
+          if (sharedModuleMeta.has(specifier)) continue;
+          const subMeta = createSharedMeta(specifier, nodeRequire, root, true);
           if (subMeta) {
-            sharedModuleMeta.set(specifier, subMeta)
+            sharedModuleMeta.set(specifier, subMeta);
           }
         }
       }
@@ -349,8 +358,8 @@ export const get = async (module) => {
       // pre-bundled — browsers can't load raw CJS.  Their `t` factory
       // export is patched by the .vite/deps/ middleware instead.
       for (const name of sharedList) {
-        const meta = sharedModuleMeta.get(name)
-        if (!meta || meta.isCjs) continue
+        const meta = sharedModuleMeta.get(name);
+        if (!meta || meta.isCjs) continue;
 
         // Exclude this non-CJS module from dep optimization.
         // For modules with relative imports to internal chunks (e.g.
@@ -358,34 +367,34 @@ export const get = async (module) => {
         // packages (cookie, set-cookie-parser).  We force-include those
         // CJS deps via optimizeDeps.include so Vite pre-bundles them
         // before the browser needs them.
-        excludedShared.add(name)
+        excludedShared.add(name);
 
         // Scan for CJS sub-deps that need force-inclusion
         try {
-          const realPath = nodeRequire.resolve(name)
-          const entryDir = realPath.substring(0, realPath.lastIndexOf('/'))
-          const src = readFileSync(realPath, 'utf-8')
+          const realPath = nodeRequire.resolve(name);
+          const entryDir = realPath.substring(0, realPath.lastIndexOf('/'));
+          const src = readFileSync(realPath, 'utf-8');
           // Find relative chunk imports
           const relImports = [...src.matchAll(/from\s+['"](\.\/.+?)['"]/g)].map(
             (m) => m[1]
-          )
+          );
           // Scan each chunk for bare-specifier imports to non-shared packages.
           // Resolve from the module's own directory (not project root) to
           // find nested deps like react-router/node_modules/cookie/.
           for (const rel of relImports) {
             try {
-              const chunkSrc = readFileSync(join(entryDir, rel), 'utf-8')
+              const chunkSrc = readFileSync(join(entryDir, rel), 'utf-8');
               const bareDeps = [
                 ...chunkSrc.matchAll(/from\s+['"]([^'"./][^'"]*)['"]/g)
-              ].map((m) => m[1])
+              ].map((m) => m[1]);
               for (const dep of bareDeps) {
-                const pkg = getBasePackageName(dep)
-                if (sharedList.includes(pkg)) continue
+                const pkg = getBasePackageName(dep);
+                if (sharedList.includes(pkg)) continue;
                 // Any non-shared bare import from an excluded module's
                 // internal chunk must be force-included for pre-bundling.
                 // Without this, Vite serves the raw CJS file which
                 // browsers can't parse.
-                cjsSubDeps.add(pkg)
+                cjsSubDeps.add(pkg);
               }
             } catch {
               /* can't read chunk */
@@ -397,18 +406,18 @@ export const get = async (module) => {
       }
 
       if (excludedShared.size > 0) {
-        config.optimizeDeps ??= {}
+        config.optimizeDeps ??= {};
         config.optimizeDeps.exclude = [
           ...(config.optimizeDeps.exclude ?? []),
           ...excludedShared
-        ]
+        ];
         // Force-include CJS sub-deps of excluded modules so they're
         // pre-bundled before the browser encounters them.
         if (cjsSubDeps.size > 0) {
           config.optimizeDeps.include = [
             ...(config.optimizeDeps.include ?? []),
             ...cjsSubDeps
-          ]
+          ];
         }
       }
     },
@@ -425,64 +434,64 @@ export const get = async (module) => {
       // also get the host's shared instance.
       if (sharedModuleMeta.size > 0) {
         server.middlewares.use(async (req, res, next) => {
-          const url = req.url
+          const url = req.url;
           if (!url || !url.includes('.vite/deps/')) {
-            next()
-            return
+            next();
+            return;
           }
 
-          const urlPath = stripQuery(url)
+          const urlPath = stripQuery(url);
           const depsMatch = urlPath.match(
             /\/node_modules\/\.vite\/deps\/(.+)\.js$/
-          )
+          );
           if (!depsMatch) {
-            next()
-            return
+            next();
+            return;
           }
-          const fileName = depsMatch[1]
+          const fileName = depsMatch[1];
 
           // Match against all shared modules (not just excluded ones).
           // Pre-bundled CJS modules need patching here.
-          let matchedName: string | undefined
-          let matchedMeta: SharedModuleMeta | undefined
+          let matchedName: string | undefined;
+          let matchedMeta: SharedModuleMeta | undefined;
           for (const [name, meta] of sharedModuleMeta) {
             if (name.replace(/\//g, '_') === fileName) {
-              matchedName = name
-              matchedMeta = meta
-              break
+              matchedName = name;
+              matchedMeta = meta;
+              break;
             }
           }
 
           if (!matchedName || !matchedMeta) {
-            next()
-            return
+            next();
+            return;
           }
 
-          const matchedBase = getBasePackageName(matchedName)
+          const matchedBase = getBasePackageName(matchedName);
 
           // Intercept the response: let Vite serve the file normally
           // (with proper import rewriting), then patch the output.
-          const origEnd = res.end.bind(res)
-          const chunks: Buffer[] = []
+          const origEnd = res.end.bind(res);
+          const chunks: Buffer[] = [];
 
           res.write = function (chunk: any, ...args: any[]) {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-            return true
-          } as any
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            return true;
+          } as any;
 
           res.end = function (chunk?: any, ...args: any[]) {
             if (chunk)
-              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-            let fileCode = Buffer.concat(chunks).toString('utf-8')
+              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            let fileCode = Buffer.concat(chunks).toString('utf-8');
 
             const exportNames = matchedMeta!.exports.filter(
               (e) =>
                 e !== 'default' &&
                 e !== 'module.exports' &&
                 VALID_JS_IDENTIFIER.test(e)
-            )
-            const isTopLevel = matchedName === matchedBase
-            const hasDefault = /export default .+;/.test(fileCode)
+            );
+            const isTopLevel = matchedName === matchedBase;
+            const hasDefault = /export default .+;/.test(fileCode);
 
             if (isTopLevel) {
               // For top-level shared module facades, replace the ENTIRE
@@ -497,8 +506,8 @@ export const get = async (module) => {
               // For CJS modules with a `t` factory, we also patch the factory
               // so other pre-bundled deps that import `{ t }` from this module
               // also get the shared instance.
-              const sharedName = JSON.stringify(matchedName!)
-              const hasFactory = /export \{ .+ as t \};/.test(fileCode)
+              const sharedName = JSON.stringify(matchedName!);
+              const hasFactory = /export \{ .+ as t \};/.test(fileCode);
 
               if (hasDefault) {
                 // CJS pattern: export default require_xxx(); export { require_xxx as t };
@@ -511,13 +520,13 @@ export const get = async (module) => {
                           `export const ${e} = __federation_default[${JSON.stringify(e)}];`
                       )
                       .join('\n')
-                )
+                );
 
                 if (hasFactory) {
                   fileCode = fileCode.replace(
                     /export \{ .+ as t \};/,
                     `const __federation_t = () => __federation_default;\nexport { __federation_t as t };`
-                  )
+                  );
                 }
               } else if (exportNames.length > 0) {
                 // ESM pattern: only named re-exports from chunk (e.g. react-router).
@@ -531,33 +540,33 @@ export const get = async (module) => {
                 // Parse the export statement to extract local→exported mappings,
                 // because renamed exports like `Action as NavigationType` mean the
                 // local variable is `Action`, not `NavigationType`.
-                const exportMatch = fileCode.match(/export \{([^}]+)\};/)
+                const exportMatch = fileCode.match(/export \{([^}]+)\};/);
                 if (exportMatch) {
                   const specifiers = exportMatch[1]
                     .split(',')
                     .map((s) => s.trim())
-                    .filter(Boolean)
+                    .filter(Boolean);
                   // Parse each specifier: "Foo" or "Foo as Bar"
                   const mappings = specifiers.map((s) => {
-                    const parts = s.split(/\s+as\s+/)
-                    const local = parts[0].trim()
-                    const exported = (parts[1] || parts[0]).trim()
-                    return { local, exported }
-                  })
+                    const parts = s.split(/\s+as\s+/);
+                    const local = parts[0].trim();
+                    const exported = (parts[1] || parts[0]).trim();
+                    return { local, exported };
+                  });
 
                   // Remove original export block
-                  fileCode = fileCode.replace(/export \{[^}]+\};/, '')
+                  fileCode = fileCode.replace(/export \{[^}]+\};/, '');
 
                   // Append shared-aware re-exports
                   fileCode +=
                     `\nconst __federation_shared = globalThis.__federation_shared_modules__?.[${sharedName}];\n` +
                     mappings
                       .map(({ local, exported }) => {
-                        const safeId = `__fed_${exported.replace(/[^a-zA-Z0-9_$]/g, '_')}`
-                        return `const ${safeId} = __federation_shared ? __federation_shared[${JSON.stringify(exported)}] : ${local};\nexport { ${safeId} as ${exported} };`
+                        const safeId = `__fed_${exported.replace(/[^a-zA-Z0-9_$]/g, '_')}`;
+                        return `const ${safeId} = __federation_shared ? __federation_shared[${JSON.stringify(exported)}] : ${local};\nexport { ${safeId} as ${exported} };`;
                       })
                       .join('\n') +
-                    '\n'
+                    '\n';
                 }
               }
             } else if (exportNames.length > 0 && hasDefault) {
@@ -567,21 +576,21 @@ export const get = async (module) => {
                   (e) =>
                     `export const ${e} = __federation_default[${JSON.stringify(e)}];`
                 )
-                .join('\n')
+                .join('\n');
               fileCode = fileCode.replace(
                 /export default (.+);/,
                 `const __federation_default = $1;\nexport default __federation_default;\n${reExports}`
-              )
+              );
             }
 
             // Remove content-length since we changed the body
-            res.removeHeader('content-length')
-            res.setHeader('Access-Control-Allow-Origin', '*')
-            origEnd(fileCode)
-          } as any
+            res.removeHeader('content-length');
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            origEnd(fileCode);
+          } as any;
 
-          next()
-        })
+          next();
+        });
       }
 
       // Intercept CJS sub-deps of excluded shared modules.
@@ -593,23 +602,23 @@ export const get = async (module) => {
       // (e.g. react-router/node_modules/cookie/).
       if (cjsSubDeps.size > 0) {
         server.middlewares.use((req, res, next) => {
-          const url = req.url
+          const url = req.url;
           if (!url || !url.includes('/node_modules/')) {
-            next()
-            return
+            next();
+            return;
           }
 
-          const urlPath = stripQuery(url)
+          const urlPath = stripQuery(url);
           for (const dep of cjsSubDeps) {
             if (urlPath.includes(`/node_modules/${dep}/`)) {
-              const preBundledUrl = toPrebundledDepUrl(dep)
-              res.writeHead(302, { Location: preBundledUrl })
-              res.end()
-              return
+              const preBundledUrl = toPrebundledDepUrl(dep);
+              res.writeHead(302, { Location: preBundledUrl });
+              res.end();
+              return;
             }
           }
-          next()
-        })
+          next();
+        });
       }
 
       // Intercept requests for excluded shared modules served from
@@ -619,83 +628,83 @@ export const get = async (module) => {
       // host's globalThis.__federation_shared_modules__ first.
       if (excludedShared.size > 0) {
         // Build a map: URL path (without query) → shared module name
-        const excludedUrlMap = new Map<string, string>()
+        const excludedUrlMap = new Map<string, string>();
         for (const name of excludedShared) {
-          const meta = sharedModuleMeta.get(name)
+          const meta = sharedModuleMeta.get(name);
           if (meta) {
-            excludedUrlMap.set(meta.localUrl, name)
+            excludedUrlMap.set(meta.localUrl, name);
           }
         }
         server.middlewares.use((req, res, next) => {
-          const url = req.url
+          const url = req.url;
           if (!url) {
-            next()
-            return
+            next();
+            return;
           }
 
           // Skip the fallback URL — __fed_raw is the escape hatch so
           // the wrapper's fallback import loads the REAL module file.
           if (url.includes('__fed_raw')) {
-            next()
-            return
+            next();
+            return;
           }
 
-          const urlPath = stripQuery(url)
-          const matchedName = excludedUrlMap.get(urlPath)
+          const urlPath = stripQuery(url);
+          const matchedName = excludedUrlMap.get(urlPath);
           if (!matchedName) {
-            next()
-            return
+            next();
+            return;
           }
 
-          const meta = sharedModuleMeta.get(matchedName)
+          const meta = sharedModuleMeta.get(matchedName);
           if (!meta) {
-            next()
-            return
+            next();
+            return;
           }
 
-          const originUrl = getServerOrigin(server)
-          const code = buildSharedWrapperCode(matchedName, meta, originUrl)
-          res.setHeader('Content-Type', 'application/javascript')
-          res.setHeader('Access-Control-Allow-Origin', '*')
-          res.end(code)
-        })
+          const originUrl = getServerOrigin(server);
+          const code = buildSharedWrapperCode(matchedName, meta, originUrl);
+          res.setHeader('Content-Type', 'application/javascript');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.end(code);
+        });
       }
 
       // Add CORS headers to ALL responses so the HOST browser can load
       // source files, @vite/client, dep-optimized chunks, etc. from
       // this remote dev server.
       server.middlewares.use((req, res, next) => {
-        res.setHeader('Access-Control-Allow-Origin', '*')
-        res.setHeader('Access-Control-Allow-Methods', '*')
-        res.setHeader('Access-Control-Allow-Headers', '*')
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', '*');
+        res.setHeader('Access-Control-Allow-Headers', '*');
         if (req.method === 'OPTIONS') {
-          res.statusCode = 204
-          res.end()
-          return
+          res.statusCode = 204;
+          res.end();
+          return;
         }
-        next()
-      })
+        next();
+      });
 
       server.middlewares.use(async (req, res, next) => {
-        const url = req.url
+        const url = req.url;
 
         // Serve remoteEntry.js
         if (url === `/${options.filename}`) {
           try {
-            const moduleId = `__remoteEntryHelper__${options.filename}`
-            const result = await server.transformRequest(moduleId)
+            const moduleId = `__remoteEntryHelper__${options.filename}`;
+            const result = await server.transformRequest(moduleId);
             if (result) {
-              res.setHeader('Content-Type', 'application/javascript')
-              res.end(result.code)
+              res.setHeader('Content-Type', 'application/javascript');
+              res.end(result.code);
             } else {
-              res.statusCode = 404
-              res.end('Module not found')
+              res.statusCode = 404;
+              res.end('Module not found');
             }
           } catch (error) {
-            res.statusCode = 500
-            res.end('Internal server error')
+            res.statusCode = 500;
+            res.end('Internal server error');
           }
-          return
+          return;
         }
 
         // Patch @vite/client so HMR module re-imports use the
@@ -712,27 +721,27 @@ export const get = async (module) => {
         // reload — the patched base ensures the reload check works.
         if (url === '/@vite/client' || url?.startsWith('/@vite/client?')) {
           try {
-            const clientResult = await server.transformRequest('/@vite/client')
+            const clientResult = await server.transformRequest('/@vite/client');
             if (!clientResult) {
-              next()
-              return
+              next();
+              return;
             }
-            const remoteOrigin = getServerOrigin(server)
-            let code = clientResult.code
+            const remoteOrigin = getServerOrigin(server);
+            let code = clientResult.code;
             code = code.replace(
               /const base = "\/"\s*\|\|\s*"\/";/,
               `const base = "${remoteOrigin}/";`
-            )
+            );
             code = code.replace(
               /const base\$1 = "\/"\s*\|\|\s*"\/";/,
               `const base$1 = "${remoteOrigin}/";`
-            )
-            res.setHeader('Content-Type', 'application/javascript')
-            res.end(code)
+            );
+            res.setHeader('Content-Type', 'application/javascript');
+            res.end(code);
           } catch (error) {
-            next()
+            next();
           }
-          return
+          return;
         }
 
         // Patch /@react-refresh so the MFE re-uses the HOST's
@@ -771,10 +780,10 @@ export var validateRefreshBoundaryAndEnqueueUpdate = _rt.validateRefreshBoundary
 export var registerExportsForReactRefresh = _rt.registerExportsForReactRefresh;
 export var __hmr_import = _rt.__hmr_import;
 export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
-`
-          res.setHeader('Content-Type', 'application/javascript')
-          res.end(code)
-          return
+`;
+          res.setHeader('Content-Type', 'application/javascript');
+          res.end(code);
+          return;
         }
 
         // Serve the real react-refresh runtime under an alternate
@@ -784,17 +793,17 @@ export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
           url?.startsWith('/@react-refresh-runtime?')
         ) {
           try {
-            const result = await server.transformRequest('/@react-refresh')
+            const result = await server.transformRequest('/@react-refresh');
             if (result) {
-              res.setHeader('Content-Type', 'application/javascript')
-              res.end(result.code)
-              return
+              res.setHeader('Content-Type', 'application/javascript');
+              res.end(result.code);
+              return;
             }
           } catch {
             /* fall through */
           }
-          next()
-          return
+          next();
+          return;
         }
 
         // Serve exposed modules as re-export stubs that redirect the
@@ -802,40 +811,40 @@ export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
         // the real file in its module graph and sends HMR updates for it.
         if (url?.includes('__federation_expose_')) {
           try {
-            const match = url.match(/__federation_expose_(.+?)\.js/)
+            const match = url.match(/__federation_expose_(.+?)\.js/);
             if (match) {
-              const exposeName = match[1]
+              const exposeName = match[1];
               const exposeItem = parsedOptions.devExpose.find((item) => {
-                const itemName = removeNonRegLetter(item[0], NAME_CHAR_REG)
-                return itemName === exposeName
-              })
+                const itemName = removeNonRegLetter(item[0], NAME_CHAR_REG);
+                return itemName === exposeName;
+              });
               if (exposeItem && exposeItem[1] && exposeItem[1].import) {
-                const modulePath = exposeItem[1].import
+                const modulePath = exposeItem[1].import;
                 // Serve a thin re-export stub.  The browser follows
                 // the import to the real source file, which Vite serves
                 // with HMR metadata.
-                const viteUrl = toViteUrl(modulePath, resolvedRoot)
-                const code = `export { default } from '${viteUrl}';\nexport * from '${viteUrl}';`
-                res.setHeader('Content-Type', 'application/javascript')
-                res.end(code)
+                const viteUrl = toViteUrl(modulePath, resolvedRoot);
+                const code = `export { default } from '${viteUrl}';\nexport * from '${viteUrl}';`;
+                res.setHeader('Content-Type', 'application/javascript');
+                res.end(code);
               } else {
-                res.statusCode = 404
-                res.end(`Expose module not found: ${exposeName}`)
+                res.statusCode = 404;
+                res.end(`Expose module not found: ${exposeName}`);
               }
             } else {
-              res.statusCode = 400
-              res.end('Invalid expose module URL')
+              res.statusCode = 400;
+              res.end('Invalid expose module URL');
             }
           } catch (error) {
-            console.error('Error loading expose module:', error)
-            res.statusCode = 500
-            res.end('Internal server error')
+            console.error('Error loading expose module:', error);
+            res.statusCode = 500;
+            res.end('Internal server error');
           }
-          return
+          return;
         }
 
-        next()
-      })
+        next();
+      });
     }
-  }
-}
+  };
+};

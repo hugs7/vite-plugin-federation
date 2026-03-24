@@ -13,19 +13,19 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { ConfigTypeSet, RemotesConfig } from 'types'
-import type { ResolvedConfig } from 'vite'
-import { Remote } from './utils'
+import type { ConfigTypeSet, RemotesConfig } from 'types';
+import type { ResolvedConfig } from 'vite';
+import { Remote } from './utils';
 // for generateBundle Hook replace
-export const EXPOSES_MAP = new Map()
-export const EXPOSES_KEY_MAP = new Map()
-export const SHARED = 'shared'
-export const DYNAMIC_LOADING_CSS = 'dynamicLoadingCss'
-export const DYNAMIC_LOADING_CSS_PREFIX = '__v__css__'
-export const DEFAULT_ENTRY_FILENAME = 'remoteEntry.js'
-export const EXTERNALS: string[] = []
-export const ROLLUP = 'rollup'
-export const VITE = 'vite'
+export const EXPOSES_MAP = new Map();
+export const EXPOSES_KEY_MAP = new Map();
+export const SHARED = 'shared';
+export const DYNAMIC_LOADING_CSS = 'dynamicLoadingCss';
+export const DYNAMIC_LOADING_CSS_PREFIX = '__v__css__';
+export const DEFAULT_ENTRY_FILENAME = 'remoteEntry.js';
+export const EXTERNALS: string[] = [];
+export const ROLLUP = 'rollup';
+export const VITE = 'vite';
 export const builderInfo = {
   builder: 'rollup',
   version: '',
@@ -33,7 +33,7 @@ export const builderInfo = {
   isHost: false,
   isRemote: false,
   isShared: false
-}
+};
 export const parsedOptions = {
   prodExpose: [] as (string | ConfigTypeSet)[],
   prodRemote: [] as (string | ConfigTypeSet)[],
@@ -41,13 +41,13 @@ export const parsedOptions = {
   devShared: [] as (string | ConfigTypeSet)[],
   devExpose: [] as (string | ConfigTypeSet)[],
   devRemote: [] as (string | ConfigTypeSet)[]
-}
+};
 export const devRemotes: {
-  id: string
-  regexp: RegExp
-  config: RemotesConfig
-}[] = []
-export const prodRemotes: Remote[] = []
+  id: string;
+  regexp: RegExp;
+  config: RemotesConfig;
+}[] = [];
+export const prodRemotes: Remote[] = [];
 export const viteConfigResolved: { config: ResolvedConfig | undefined } = {
   config: undefined
-}
+};

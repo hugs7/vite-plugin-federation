@@ -14,7 +14,7 @@
 // enable in the browser with `localStorage.debug = 'federation:*'`)
 // ---------------------------------------------------------------------------
 
-const DEBUG_COLOR = '#d97706'
+const DEBUG_COLOR = '#d97706';
 
 /** ESM snippet for virtual modules (runs in the browser via Vite dev server) */
 export const FEDERATION_DEBUG_SNIPPET_ESM = `\
@@ -28,7 +28,7 @@ const __fed_debug = (() => {
     return (...args) => console.debug('%c' + ns, 'color: ${DEBUG_COLOR}', ...args);
   };
 })();
-`
+`;
 
 // ---------------------------------------------------------------------------
 // Module import helper
@@ -38,65 +38,65 @@ const __fed_debug = (() => {
 // The `currentImports` variable is declared in the snippet output,
 // not captured from outer scope.
 const _federationImport = async (name: string) => {
-  currentImports[name] ??= import(/* @vite-ignore */ name)
-  return currentImports[name]
-}
+  currentImports[name] ??= import(/* @vite-ignore */ name);
+  return currentImports[name];
+};
 
 /** Cached dynamic import helper (declares currentImports + the function) */
 export const FEDERATION_IMPORT_SNIPPET = `\
 const currentImports = {};
 
 const __federation_import = ${_federationImport.toString().replace(/: string/g, '')};
-`
+`;
 
 // ---------------------------------------------------------------------------
 // Federation method helpers (shared between dev and prod remote entries)
 // ---------------------------------------------------------------------------
 
 const _unwrapDefault = (module: any) =>
-  (module?.__esModule || module?.[Symbol.toStringTag] === 'Module')
+  module?.__esModule || module?.[Symbol.toStringTag] === 'Module'
     ? module.default
-    : module
+    : module;
 
 export const FEDERATION_METHOD_UNWRAP_DEFAULT = `\
 const __federation_method_unwrapDefault = ${_unwrapDefault.toString().replace(/: any/g, '')};
-`
+`;
 
 const _wrapDefault = (module: any, need: boolean) => {
   if (!module?.default && need) {
-    const obj = Object.create(null)
-    obj.default = module
-    obj.__esModule = true
-    return obj
+    const obj = Object.create(null);
+    obj.default = module;
+    obj.__esModule = true;
+    return obj;
   }
-  return module
-}
+  return module;
+};
 
 export const FEDERATION_METHOD_WRAP_DEFAULT = `\
 const __federation_method_wrapDefault = ${_wrapDefault.toString().replace(/: any|: boolean/g, '')};
-`
+`;
 
 const _getRemote = (remoteName: string, componentName: string) =>
   __federation_method_ensure(remoteName).then((remote: any) =>
     remote.get(componentName).then((factory: any) => factory())
-  )
+  );
 
 export const FEDERATION_METHOD_GET_REMOTE = `\
 const __federation_method_getRemote = ${_getRemote.toString().replace(/: string|: any/g, '')};
-`
+`;
 
 const _setRemote = (remoteName: string, remoteConfig: any) => {
-  remotesMap[remoteName] = remoteConfig
-}
+  remotesMap[remoteName] = remoteConfig;
+};
 
 export const FEDERATION_METHOD_SET_REMOTE = `\
 const __federation_method_setRemote = ${_setRemote.toString().replace(/: string|: any/g, '')};
-`
+`;
 
 // ---------------------------------------------------------------------------
 // Ambient declarations so TypeScript doesn't complain about references
 // in the function bodies above.  These are never executed.
 // ---------------------------------------------------------------------------
-declare const currentImports: Record<string, Promise<any>>
-declare const remotesMap: Record<string, any>
-declare function __federation_method_ensure(id: string): Promise<any>
+declare const currentImports: Record<string, Promise<any>>;
+declare const remotesMap: Record<string, any>;
+declare function __federation_method_ensure(id: string): Promise<any>;

@@ -13,23 +13,23 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { walk } from 'estree-walker'
-import MagicString from 'magic-string'
-import path from 'node:path'
+import { walk } from 'estree-walker';
+import MagicString from 'magic-string';
+import path from 'node:path';
 import type {
   AcornNode,
   TransformPluginContext,
   OutputAsset,
   OutputChunk
-} from 'rollup'
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
-import type { PluginHooks } from '../../types/pluginHooks'
+} from 'rollup';
+import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
   EXPOSES_KEY_MAP,
   parsedOptions,
   prodRemotes
-} from '../public'
+} from '../public';
 import {
   createRemotesMap,
   getModuleMarker,
@@ -37,32 +37,32 @@ import {
   REMOTE_FROM_PARAMETER,
   injectToHead,
   toPreloadTag
-} from '../utils'
-import { ResolvedConfig } from 'vite'
+} from '../utils';
+import { ResolvedConfig } from 'vite';
 import {
   FEDERATION_METHOD_UNWRAP_DEFAULT,
   FEDERATION_METHOD_WRAP_DEFAULT,
   FEDERATION_METHOD_GET_REMOTE,
   FEDERATION_METHOD_SET_REMOTE
-} from '../runtime-snippets'
+} from '../runtime-snippets';
 
 const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
   string,
   ConfigTypeSet
->()
+>();
 
 const joinUrlSegments = (a: string, b: string): string => {
   if (!a || !b) {
-    return a || b || ''
+    return a || b || '';
   }
   if (a[a.length - 1] === '/') {
-    a = a.substring(0, a.length - 1)
+    a = a.substring(0, a.length - 1);
   }
   if (b[0] !== '/') {
-    b = '/' + b
+    b = '/' + b;
   }
-  return a + b
-}
+  return a + b;
+};
 
 const toOutputFilePathWithoutRuntime = (
   filename: string,
@@ -72,54 +72,54 @@ const toOutputFilePathWithoutRuntime = (
   config: ResolvedConfig,
   toRelative: (filename: string, hostId: string) => string
 ): string => {
-  const { renderBuiltUrl } = config.experimental
-  let relative = config.base === '' || config.base === './'
+  const { renderBuiltUrl } = config.experimental;
+  let relative = config.base === '' || config.base === './';
   if (renderBuiltUrl) {
     const result = renderBuiltUrl(filename, {
       hostId,
       hostType,
       type,
       ssr: !!config.build.ssr
-    })
+    });
     if (typeof result === 'object') {
       if (result.runtime) {
         throw new Error(
           `{ runtime: "${result.runtime}" } is not supported for assets in ${hostType} files: ${filename}`
-        )
+        );
       }
       if (typeof result.relative === 'boolean') {
-        relative = result.relative
+        relative = result.relative;
       }
     } else if (result) {
-      return result
+      return result;
     }
   }
   if (relative && !config.build.ssr) {
-    return toRelative(filename, hostId)
+    return toRelative(filename, hostId);
   } else {
-    return joinUrlSegments(config.base, filename)
+    return joinUrlSegments(config.base, filename);
   }
-}
+};
 
 export const prodRemotePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
-  parsedOptions.prodRemote = parseRemoteOptions(options)
+  parsedOptions.prodRemote = parseRemoteOptions(options);
   // const remotes: Remote[] = []
   for (const item of parsedOptions.prodRemote) {
     prodRemotes.push({
       id: item[0],
       regexp: new RegExp(`^${item[0]}/.+?`),
       config: item[1]
-    })
+    });
   }
 
-  const shareScope = options.shareScope || 'default'
-  let resolvedConfig: ResolvedConfig
-  let federationRuntimeEmitted = false
-  const hasRemotes = !!options.remotes
-  const hasShared = parsedOptions.prodShared.length > 0
-  const needsFederationModule = hasRemotes || hasShared
+  const shareScope = options.shareScope || 'default';
+  let resolvedConfig: ResolvedConfig;
+  let federationRuntimeEmitted = false;
+  const hasRemotes = !!options.remotes;
+  const hasShared = parsedOptions.prodShared.length > 0;
+  const needsFederationModule = hasRemotes || hasShared;
   return {
     name: 'hugs7:remote-production',
     virtualFile: needsFederationModule
@@ -225,7 +225,7 @@ export const prodRemotePlugin = (
         }
       : { __federation__: '' },
     configResolved(config) {
-      resolvedConfig = config
+      resolvedConfig = config;
     },
 
     async transform(this: TransformPluginContext, code: string, id: string) {
@@ -237,7 +237,7 @@ export const prodRemotePlugin = (
               id: sharedInfo[1].id ?? sharedInfo[1].packagePath,
               preserveSignature: 'strict',
               name: `__federation_shared_${sharedInfo[0]}`
-            })
+            });
           }
         }
 
@@ -256,11 +256,11 @@ export const prodRemotePlugin = (
                     : ''
                 }}`
             )
-            .join(',')
+            .join(',');
           return code.replace(
             getModuleMarker('moduleMap', 'var'),
             `{${moduleMapCode}}`
-          )
+          );
         }
       }
 
@@ -272,7 +272,7 @@ export const prodRemotePlugin = (
               id: expose[1].id ?? expose[1].import,
               name: EXPOSES_KEY_MAP.get(expose[0]),
               preserveSignature: 'allow-extension'
-            })
+            });
           }
         }
       }
@@ -282,35 +282,39 @@ export const prodRemotePlugin = (
       // (e.g. in vendor-framework) would import federation functions from the
       // entry chunk, creating circular static imports that deadlock when
       // combined with TLA from await importShared().
-      if (builderInfo.isHost && needsFederationModule && !federationRuntimeEmitted) {
-        federationRuntimeEmitted = true
+      if (
+        builderInfo.isHost &&
+        needsFederationModule &&
+        !federationRuntimeEmitted
+      ) {
+        federationRuntimeEmitted = true;
         this.emitFile({
           type: 'chunk',
           id: '__federation__',
           name: '__federation_runtime__',
           preserveSignature: 'strict'
-        })
+        });
       }
 
       if (builderInfo.isHost) {
         if (id === '\0virtual:__federation__') {
-          const res: string[] = []
+          const res: string[] = [];
           parsedOptions.prodShared.forEach((arr) => {
-            const obj = arr[1]
-            let str = ''
+            const obj = arr[1];
+            let str = '';
             if (typeof obj === 'object') {
-              const fileUrl = `import.meta.ROLLUP_FILE_URL_${obj.emitFile}`
-              str += `get:() => get(${fileUrl}, ${REMOTE_FROM_PARAMETER}), loaded:1`
-              res.push(`'${arr[0]}':{'${obj.version}':{${str}}}`)
+              const fileUrl = `import.meta.ROLLUP_FILE_URL_${obj.emitFile}`;
+              str += `get:() => get(${fileUrl}, ${REMOTE_FROM_PARAMETER}), loaded:1`;
+              res.push(`'${arr[0]}':{'${obj.version}':{${str}}}`);
             }
-          })
-          return code.replace(getModuleMarker('shareScope'), res.join(','))
+          });
+          return code.replace(getModuleMarker('shareScope'), res.join(','));
         }
       }
 
       if (builderInfo.isHost || builderInfo.isShared) {
         const isNodeModules =
-          id.includes('/node_modules/') || id.includes('\\node_modules\\')
+          id.includes('/node_modules/') || id.includes('\\node_modules\\');
 
         if (isNodeModules) {
           if (!builderInfo.isRemote) {
@@ -318,7 +322,7 @@ export const prodRemotePlugin = (
             // them to await importShared() creates TLA in vendor chunks
             // that often contain the shared modules themselves, causing
             // self-referential deadlocks during module evaluation.
-            return null
+            return null;
           }
 
           // Remote builds: allow the transform for third-party libraries
@@ -327,53 +331,53 @@ export const prodRemotePlugin = (
           // runtime.  However, skip files that belong to a shared module's
           // own package to avoid self-referential deadlocks (e.g.
           // react/index.js importing itself via importShared('react')).
-          const normalizedId = id.replace(/\\/g, '/')
+          const normalizedId = id.replace(/\\/g, '/');
           const isSharedModuleSource = parsedOptions.prodShared.some(
             (sharedInfo) => {
-              const sharedName = sharedInfo[0]
+              const sharedName = sharedInfo[0];
               // Match node_modules/<sharedName>/ or node_modules/@scope/pkg/
-              const pattern = `/node_modules/${sharedName}/`
-              return normalizedId.includes(pattern)
+              const pattern = `/node_modules/${sharedName}/`;
+              return normalizedId.includes(pattern);
             }
-          )
+          );
           if (isSharedModuleSource) {
-            return null
+            return null;
           }
         }
 
-        let ast: AcornNode | null = null
+        let ast: AcornNode | null = null;
         try {
-          ast = this.parse(code)
+          ast = this.parse(code);
         } catch (err) {
-          console.error(err)
+          console.error(err);
         }
         if (!ast) {
-          return null
+          return null;
         }
 
-        const magicString = new MagicString(code)
-        const hasStaticImported = new Map<string, string>()
-        let requiresRuntime = false
-        let hasImportShared = false
-        let modify = false
-        let manualRequired: any = null // set static import if exists
+        const magicString = new MagicString(code);
+        const hasStaticImported = new Map<string, string>();
+        let requiresRuntime = false;
+        let hasImportShared = false;
+        let modify = false;
+        let manualRequired: any = null; // set static import if exists
 
         walk(ast, {
           enter(node: any) {
             // handle share, eg. replace import {a} from b  -> const a = importShared('b')
             if (node.type === 'ImportDeclaration') {
-              const moduleName = node.source.value
+              const moduleName = node.source.value;
               if (
                 parsedOptions.prodShared.some(
                   (sharedInfo) => sharedInfo[0] === moduleName
                 )
               ) {
-                const namedImportDeclaration: (string | never)[] = []
-                let defaultImportDeclaration: string | null = null
+                const namedImportDeclaration: (string | never)[] = [];
+                let defaultImportDeclaration: string | null = null;
                 if (!node.specifiers?.length) {
                   // invalid import , like import './__federation_shared_lib.js' , and remove it
-                  magicString.remove(node.start, node.end)
-                  modify = true
+                  magicString.remove(node.start, node.end);
+                  modify = true;
                 } else {
                   node.specifiers.forEach((specify) => {
                     if (specify.imported?.name) {
@@ -383,27 +387,27 @@ export const prodRemotePlugin = (
                             ? specify.imported.name
                             : `${specify.imported.name}:${specify.local.name}`
                         }`
-                      )
+                      );
                     } else {
-                      defaultImportDeclaration = specify.local.name
+                      defaultImportDeclaration = specify.local.name;
                     }
-                  })
+                  });
 
-                  hasImportShared = true
+                  hasImportShared = true;
 
                   if (
                     defaultImportDeclaration &&
                     namedImportDeclaration.length
                   ) {
-                    const imports = namedImportDeclaration.join(',')
-                    const line = `const ${defaultImportDeclaration} = await importShared('${moduleName}');\nconst {${imports}} = ${defaultImportDeclaration};\n`
-                    magicString.overwrite(node.start, node.end, line)
+                    const imports = namedImportDeclaration.join(',');
+                    const line = `const ${defaultImportDeclaration} = await importShared('${moduleName}');\nconst {${imports}} = ${defaultImportDeclaration};\n`;
+                    magicString.overwrite(node.start, node.end, line);
                   } else if (defaultImportDeclaration) {
                     magicString.overwrite(
                       node.start,
                       node.end,
                       `const ${defaultImportDeclaration} = await importShared('${moduleName}');\n`
-                    )
+                    );
                   } else if (namedImportDeclaration.length) {
                     magicString.overwrite(
                       node.start,
@@ -411,7 +415,7 @@ export const prodRemotePlugin = (
                       `const {${namedImportDeclaration.join(
                         ','
                       )}} = await importShared('${moduleName}');\n`
-                    )
+                    );
                   }
                 }
               }
@@ -421,7 +425,7 @@ export const prodRemotePlugin = (
               node.type === 'ImportDeclaration' &&
               node.source?.value === 'virtual:__federation__'
             ) {
-              manualRequired = node
+              manualRequired = node;
             }
 
             // handle remote import , eg replace import {a} from 'remote/b' to dynamic import
@@ -431,12 +435,12 @@ export const prodRemotePlugin = (
                 node.type === 'ExportNamedDeclaration') &&
               node.source?.value?.indexOf('/') > -1
             ) {
-              const moduleId = node.source.value
-              const remote = prodRemotes.find((r) => r.regexp.test(moduleId))
-              const needWrap = remote?.config.from === 'vite'
+              const moduleId = node.source.value;
+              const remote = prodRemotes.find((r) => r.regexp.test(moduleId));
+              const needWrap = remote?.config.from === 'vite';
               if (remote) {
-                requiresRuntime = true
-                const modName = `.${moduleId.slice(remote.id.length)}`
+                requiresRuntime = true;
+                const modName = `.${moduleId.slice(remote.id.length)}`;
                 switch (node.type) {
                   case 'ImportExpression': {
                     magicString.overwrite(
@@ -447,50 +451,50 @@ export const prodRemotePlugin = (
                       )} , ${JSON.stringify(
                         modName
                       )}).then(module=>__federation_method_wrapDefault(module, ${needWrap}))`
-                    )
-                    break
+                    );
+                    break;
                   }
                   case 'ImportDeclaration': {
                     if (node.specifiers?.length) {
                       const afterImportName = `__federation_var_${moduleId.replace(
                         /[@/\\.-]/g,
                         ''
-                      )}`
+                      )}`;
                       if (!hasStaticImported.has(moduleId)) {
-                        hasStaticImported.set(moduleId, afterImportName)
+                        hasStaticImported.set(moduleId, afterImportName);
                         magicString.overwrite(
                           node.start,
                           node.end,
                           `const ${afterImportName} = await __federation_method_getRemote(${JSON.stringify(
                             remote.id
                           )} , ${JSON.stringify(modName)});`
-                        )
+                        );
                       }
-                      let deconstructStr = ''
+                      let deconstructStr = '';
                       node.specifiers.forEach((spec) => {
                         // default import , like import a from 'lib'
                         if (spec.type === 'ImportDefaultSpecifier') {
                           magicString.appendRight(
                             node.end,
                             `\n let ${spec.local.name} = __federation_method_unwrapDefault(${afterImportName}) `
-                          )
+                          );
                         } else if (spec.type === 'ImportSpecifier') {
                           //  like import {a as b} from 'lib'
-                          const importedName = spec.imported.name
-                          const localName = spec.local.name
+                          const importedName = spec.imported.name;
+                          const localName = spec.local.name;
                           deconstructStr += `${
                             importedName === localName
                               ? localName
                               : `${importedName} : ${localName}`
-                          },`
+                          },`;
                         } else if (spec.type === 'ImportNamespaceSpecifier') {
                           //  like import * as a from 'lib'
                           magicString.appendRight(
                             node.end,
                             `let {${spec.local.name}} = ${afterImportName}`
-                          )
+                          );
                         }
-                      })
+                      });
                       if (deconstructStr.length > 0) {
                         magicString.appendRight(
                           node.end,
@@ -498,84 +502,84 @@ export const prodRemotePlugin = (
                             0,
                             -1
                           )}} = ${afterImportName}`
-                        )
+                        );
                       }
                     }
-                    break
+                    break;
                   }
                   case 'ExportNamedDeclaration': {
                     // handle export like export {a} from 'remotes/lib'
                     const afterImportName = `__federation_var_${moduleId.replace(
                       /[@/\\.-]/g,
                       ''
-                    )}`
+                    )}`;
                     if (!hasStaticImported.has(moduleId)) {
-                      hasStaticImported.set(moduleId, afterImportName)
+                      hasStaticImported.set(moduleId, afterImportName);
                       magicString.overwrite(
                         node.start,
                         node.end,
                         `const ${afterImportName} = await __federation_method_getRemote(${JSON.stringify(
                           remote.id
                         )} , ${JSON.stringify(modName)});`
-                      )
+                      );
                     }
                     if (node.specifiers.length > 0) {
-                      const specifiers = node.specifiers
-                      let exportContent = ''
-                      let deconstructContent = ''
+                      const specifiers = node.specifiers;
+                      let exportContent = '';
+                      let deconstructContent = '';
                       specifiers.forEach((spec) => {
-                        const localName = spec.local.name
-                        const exportName = spec.exported.name
-                        const variableName = `${afterImportName}_${localName}`
+                        const localName = spec.local.name;
+                        const exportName = spec.exported.name;
+                        const variableName = `${afterImportName}_${localName}`;
                         deconstructContent = deconstructContent.concat(
                           `${localName}:${variableName},`
-                        )
+                        );
                         exportContent = exportContent.concat(
                           `${variableName} as ${exportName},`
-                        )
-                      })
+                        );
+                      });
                       magicString.append(
                         `\n const {${deconstructContent.slice(
                           0,
                           deconstructContent.length - 1
                         )}} = ${afterImportName}; \n`
-                      )
+                      );
                       magicString.append(
                         `\n export {${exportContent.slice(
                           0,
                           exportContent.length - 1
                         )}}; `
-                      )
+                      );
                     }
-                    break
+                    break;
                   }
                 }
               }
             }
           }
-        })
+        });
 
         if (requiresRuntime) {
-          let requiresCode = `import {__federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`
+          let requiresCode = `import {__federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`;
           // clear static required
           if (manualRequired) {
-            requiresCode = `import {__federation_method_setRemote, __federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`
-            magicString.overwrite(manualRequired.start, manualRequired.end, ``)
+            requiresCode = `import {__federation_method_setRemote, __federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`;
+            magicString.overwrite(manualRequired.start, manualRequired.end, ``);
           }
-          magicString.prepend(requiresCode)
+          magicString.prepend(requiresCode);
         }
 
         if (hasImportShared) {
           magicString.prepend(
             `import {importShared} from '\0virtual:__federation_fn_import';\n`
-          )
+          );
         }
 
         if (requiresRuntime || hasImportShared || modify) {
           return {
             code: magicString.toString(),
             map: magicString.generateMap({ hires: true })
-          }
+          };
         }
       }
     },
@@ -585,48 +589,48 @@ export const prodRemotePlugin = (
         .filter((shareInfo) => shareInfo[1].modulePreload)
         .map(
           (item) => new RegExp(`__federation_shared_${item[0]}-.{8}.js`, 'g')
-        )
+        );
       const getImportedChunks = (
         chunk: OutputChunk,
         satisfy: (chunk: OutputChunk) => boolean,
         seen: Set<string> = new Set()
       ): OutputChunk[] => {
-        const chunks: OutputChunk[] = []
+        const chunks: OutputChunk[] = [];
         chunk.imports.forEach((file) => {
-          const importee = bundle[file]
+          const importee = bundle[file];
           if (importee) {
             if (importee.type === 'chunk' && !seen.has(file)) {
               if (satisfy(importee)) {
-                seen.add(file)
-                chunks.push(...getImportedChunks(importee, satisfy, seen))
-                chunks.push(importee)
+                seen.add(file);
+                chunks.push(...getImportedChunks(importee, satisfy, seen));
+                chunks.push(importee);
               }
             }
           }
-        })
-        return chunks
-      }
+        });
+        return chunks;
+      };
 
-      const sharedFiles: string[] = []
-      const entryChunk: Record<string, OutputAsset> = {}
+      const sharedFiles: string[] = [];
+      const entryChunk: Record<string, OutputAsset> = {};
       for (const fileName in bundle) {
-        const file = bundle[fileName]
+        const file = bundle[fileName];
         if (file.type === 'asset') {
           if (fileName.endsWith('.html')) {
-            entryChunk[fileName] = file
+            entryChunk[fileName] = file;
           }
         } else {
           if (preloadSharedReg.some((item) => item.test(fileName))) {
-            sharedFiles.push(fileName)
+            sharedFiles.push(fileName);
           }
         }
       }
 
-      if (!sharedFiles.length) return
+      if (!sharedFiles.length) return;
 
       Object.keys(entryChunk).forEach((fileName) => {
-        let html = entryChunk[fileName].source as string
-        const htmlPath = entryChunk[fileName].fileName
+        let html = entryChunk[fileName].source as string;
+        const htmlPath = entryChunk[fileName].fileName;
         const basePath =
           resolvedConfig.base === './' || resolvedConfig.base === ''
             ? path.posix.join(
@@ -635,7 +639,7 @@ export const prodRemotePlugin = (
                   .slice(0, -2),
                 './'
               )
-            : resolvedConfig.base
+            : resolvedConfig.base;
 
         const toOutputFilePath = (filename: string) =>
           toOutputFilePathWithoutRuntime(
@@ -645,33 +649,33 @@ export const prodRemotePlugin = (
             'html',
             resolvedConfig,
             (filename) => basePath + filename
-          )
+          );
 
         const importFiles = sharedFiles
           .filter((item) => {
-            return !html.includes(toOutputFilePath(item))
+            return !html.includes(toOutputFilePath(item));
           })
           .flatMap((item) => {
-            const filepath = item
+            const filepath = item;
             const importFiles = getImportedChunks(
               bundle[item] as OutputChunk,
               (chunk) => !html.includes(toOutputFilePath(chunk.fileName))
-            ).map((item) => item.fileName)
+            ).map((item) => item.fileName);
 
             return [filepath, ...importFiles].map((item) =>
               toOutputFilePath(item)
-            )
-          })
+            );
+          });
 
         html = injectToHead(
           html,
           [...new Set(importFiles)].map((item) => toPreloadTag(item))
-        )
+        );
 
-        entryChunk[fileName].source = html
-      })
+        entryChunk[fileName].source = html;
+      });
     }
-  }
-}
+  };
+};
 
-export { sharedFileName2Prop }
+export { sharedFileName2Prop };

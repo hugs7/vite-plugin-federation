@@ -13,13 +13,13 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { UserConfig } from 'vite'
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
-import { walk } from 'estree-walker'
-import MagicString from 'magic-string'
-import { readFileSync } from 'fs'
+import type { UserConfig } from 'vite';
+import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import { walk } from 'estree-walker';
+import MagicString from 'magic-string';
+import { readFileSync } from 'fs';
 
-import type { AcornNode, TransformPluginContext } from 'rollup'
+import type { AcornNode, TransformPluginContext } from 'rollup';
 
 import {
   createRemotesMap,
@@ -27,28 +27,28 @@ import {
   getModuleMarker,
   parseRemoteOptions,
   REMOTE_FROM_PARAMETER
-} from '../utils'
-import { builderInfo, parsedOptions, devRemotes } from '../public'
-import type { PluginHooks } from '../../types/pluginHooks'
-import { Node } from 'estree'
+} from '../utils';
+import { builderInfo, parsedOptions, devRemotes } from '../public';
+import type { PluginHooks } from '../../types/pluginHooks';
+import { Node } from 'estree';
 import {
   FEDERATION_METHOD_UNWRAP_DEFAULT,
   FEDERATION_METHOD_WRAP_DEFAULT,
   FEDERATION_METHOD_GET_REMOTE,
   FEDERATION_METHOD_SET_REMOTE
-} from '../runtime-snippets'
+} from '../runtime-snippets';
 
 export const devRemotePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
-  parsedOptions.devRemote = parseRemoteOptions(options)
+  parsedOptions.devRemote = parseRemoteOptions(options);
   // const remotes: { id: string; regexp: RegExp; config: RemotesConfig }[] = []
   for (const item of parsedOptions.devRemote) {
     devRemotes.push({
       id: item[0],
       regexp: new RegExp(`^${item[0]}/.+?`),
       config: item[1]
-    })
+    });
   }
 
   const needHandleFileType = [
@@ -60,14 +60,14 @@ export const devRemotePlugin = (
     '.cjs',
     '.vue',
     '.svelte'
-  ]
+  ];
   options.transformFileTypes = (options.transformFileTypes ?? [])
     .concat(needHandleFileType)
-    .map((item) => item.toLowerCase())
-  const transformFileTypeSet = new Set(options.transformFileTypes)
-  const hasRemotes = !!options.remotes
-  const hasShared = parsedOptions.devShared.length > 0
-  const needsFederationModule = hasRemotes || hasShared
+    .map((item) => item.toLowerCase());
+  const transformFileTypeSet = new Set(options.transformFileTypes);
+  const hasRemotes = !!options.remotes;
+  const hasShared = parsedOptions.devShared.length > 0;
+  const needsFederationModule = hasRemotes || hasShared;
 
   return {
     name: 'hugs7:remote-development',
@@ -146,16 +146,16 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
     config(config: UserConfig) {
       // need to include remotes in the optimizeDeps.exclude
       if (parsedOptions.devRemote.length) {
-        const excludeRemotes: string[] = []
-        parsedOptions.devRemote.forEach((item) => excludeRemotes.push(item[0]))
-        let optimizeDeps = config.optimizeDeps
+        const excludeRemotes: string[] = [];
+        parsedOptions.devRemote.forEach((item) => excludeRemotes.push(item[0]));
+        let optimizeDeps = config.optimizeDeps;
         if (!optimizeDeps) {
-          optimizeDeps = config.optimizeDeps = {}
+          optimizeDeps = config.optimizeDeps = {};
         }
         if (!optimizeDeps.exclude) {
-          optimizeDeps.exclude = []
+          optimizeDeps.exclude = [];
         }
-        optimizeDeps.exclude = optimizeDeps.exclude.concat(excludeRemotes)
+        optimizeDeps.exclude = optimizeDeps.exclude.concat(excludeRemotes);
       }
     },
 
@@ -167,13 +167,13 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
       // roots are tracked in one place for React Fast Refresh.
       if (parsedOptions.devRemote.length) {
         server.middlewares.use(async (req, res, next) => {
-          const url = req.url
+          const url = req.url;
           if (
             url === '/@react-refresh' ||
             url?.startsWith('/@react-refresh?')
           ) {
             try {
-              const result = await server.transformRequest('/@react-refresh')
+              const result = await server.transformRequest('/@react-refresh');
               if (result) {
                 // Append a line that stores the module on the window
                 const code =
@@ -185,17 +185,17 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
                   `setSignature,collectCustomHooksForSignature,` +
                   `validateRefreshBoundaryAndEnqueueUpdate,` +
                   `registerExportsForReactRefresh,__hmr_import` +
-                  `};};\n`
-                res.setHeader('Content-Type', 'application/javascript')
-                res.end(code)
-                return
+                  `};};\n`;
+                res.setHeader('Content-Type', 'application/javascript');
+                res.end(code);
+                return;
               }
             } catch {
               /* fall through */
             }
           }
-          next()
-        })
+          next();
+        });
       }
     },
     async transform(this: TransformPluginContext, code: string, id: string) {
@@ -207,16 +207,16 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
           if (!arr[1].version && !arr[1].manuallyPackagePathSetting) {
             const packageJsonPath = (
               await this.resolve(`${arr[0]}/package.json`)
-            )?.id
+            )?.id;
             if (!packageJsonPath) {
               this.error(
                 `No description file or no version in description file (usually package.json) of ${arr[0]}(${packageJsonPath}). Add version to description file, or manually specify version in shared config.`
-              )
+              );
             } else {
               const json = JSON.parse(
                 readFileSync(packageJsonPath, { encoding: 'utf-8' })
-              )
-              arr[1].version = json.version
+              );
+              arr[1].version = json.version;
             }
           }
         }
@@ -226,38 +226,38 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
         const scopeCode = await devSharedScopeCode.call(
           this,
           parsedOptions.devShared
-        )
-        return code.replace(getModuleMarker('shareScope'), scopeCode.join(','))
+        );
+        return code.replace(getModuleMarker('shareScope'), scopeCode.join(','));
       }
 
       // ignore some not need to handle file types
-      const fileExtname = getFileExtname(id)
+      const fileExtname = getFileExtname(id);
       if (!transformFileTypeSet.has((fileExtname ?? '').toLowerCase())) {
-        return
+        return;
       }
 
-      let ast: AcornNode | null = null
+      let ast: AcornNode | null = null;
       try {
-        ast = this.parse(code)
+        ast = this.parse(code);
       } catch (err) {
-        console.error(err)
+        console.error(err);
       }
       if (!ast) {
-        return null
+        return null;
       }
 
-      const magicString = new MagicString(code)
-      const hasStaticImported = new Map<string, string>()
+      const magicString = new MagicString(code);
+      const hasStaticImported = new Map<string, string>();
 
-      let requiresRuntime = false
-      let manualRequired: any = null // set static import if exists
+      let requiresRuntime = false;
+      let manualRequired: any = null; // set static import if exists
       walk(ast as Node, {
         enter(node: any) {
           if (
             node.type === 'ImportDeclaration' &&
             node.source?.value === 'virtual:__federation__'
           ) {
-            manualRequired = node
+            manualRequired = node;
           }
 
           if (
@@ -266,12 +266,12 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
               node.type === 'ExportNamedDeclaration') &&
             node.source?.value?.indexOf('/') > -1
           ) {
-            const moduleId = node.source.value
-            const remote = devRemotes.find((r) => r.regexp.test(moduleId))
-            const needWrap = remote?.config.from === 'vite'
+            const moduleId = node.source.value;
+            const remote = devRemotes.find((r) => r.regexp.test(moduleId));
+            const needWrap = remote?.config.from === 'vite';
             if (remote) {
-              requiresRuntime = true
-              const modName = `.${moduleId.slice(remote.id.length)}`
+              requiresRuntime = true;
+              const modName = `.${moduleId.slice(remote.id.length)}`;
               switch (node.type) {
                 case 'ImportExpression': {
                   magicString.overwrite(
@@ -282,15 +282,15 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
                     )} , ${JSON.stringify(
                       modName
                     )}).then(module=>__federation_method_wrapDefault(module, ${needWrap}))`
-                  )
-                  break
+                  );
+                  break;
                 }
                 case 'ImportDeclaration': {
                   if (node.specifiers?.length) {
                     const afterImportName = `__federation_var_${moduleId.replace(
                       /[@/\\.-]/g,
                       ''
-                    )}`
+                    )}`;
                     if (!hasStaticImported.has(moduleId)) {
                       magicString.overwrite(
                         node.start,
@@ -298,34 +298,34 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
                         `const ${afterImportName} = await __federation_method_getRemote(${JSON.stringify(
                           remote.id
                         )} , ${JSON.stringify(modName)});`
-                      )
-                      hasStaticImported.set(moduleId, afterImportName)
+                      );
+                      hasStaticImported.set(moduleId, afterImportName);
                     }
-                    let deconstructStr = ''
+                    let deconstructStr = '';
                     node.specifiers.forEach((spec) => {
                       // default import , like import a from 'lib'
                       if (spec.type === 'ImportDefaultSpecifier') {
                         magicString.appendRight(
                           node.end,
                           `\n let ${spec.local.name} = __federation_method_unwrapDefault(${afterImportName}) `
-                        )
+                        );
                       } else if (spec.type === 'ImportSpecifier') {
                         //  like import {a as b} from 'lib'
-                        const importedName = spec.imported.name
-                        const localName = spec.local.name
+                        const importedName = spec.imported.name;
+                        const localName = spec.local.name;
                         deconstructStr += `${
                           importedName === localName
                             ? localName
                             : `${importedName} : ${localName}`
-                        },`
+                        },`;
                       } else if (spec.type === 'ImportNamespaceSpecifier') {
                         //  like import * as a from 'lib'
                         magicString.appendRight(
                           node.end,
                           `let {${spec.local.name}} = ${afterImportName}`
-                        )
+                        );
                       }
-                    })
+                    });
                     if (deconstructStr.length > 0) {
                       magicString.appendRight(
                         node.end,
@@ -333,85 +333,85 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
                           0,
                           -1
                         )}} = ${afterImportName}`
-                      )
+                      );
                     }
                   }
-                  break
+                  break;
                 }
                 case 'ExportNamedDeclaration': {
                   // handle export like export {a} from 'remotes/lib'
                   const afterImportName = `__federation_var_${moduleId.replace(
                     /[@/\\.-]/g,
                     ''
-                  )}`
+                  )}`;
                   if (!hasStaticImported.has(moduleId)) {
-                    hasStaticImported.set(moduleId, afterImportName)
+                    hasStaticImported.set(moduleId, afterImportName);
                     magicString.overwrite(
                       node.start,
                       node.end,
                       `const ${afterImportName} = await __federation_method_getRemote(${JSON.stringify(
                         remote.id
                       )} , ${JSON.stringify(modName)});`
-                    )
+                    );
                   }
                   if (node.specifiers.length > 0) {
-                    const specifiers = node.specifiers
-                    let exportContent = ''
-                    let deconstructContent = ''
+                    const specifiers = node.specifiers;
+                    let exportContent = '';
+                    let deconstructContent = '';
                     specifiers.forEach((spec) => {
-                      const localName = spec.local.name
-                      const exportName = spec.exported.name
-                      const variableName = `${afterImportName}_${localName}`
+                      const localName = spec.local.name;
+                      const exportName = spec.exported.name;
+                      const variableName = `${afterImportName}_${localName}`;
                       deconstructContent = deconstructContent.concat(
                         `${localName}:${variableName},`
-                      )
+                      );
                       exportContent = exportContent.concat(
                         `${variableName} as ${exportName},`
-                      )
-                    })
+                      );
+                    });
                     magicString.append(
                       `\n const {${deconstructContent.slice(
                         0,
                         deconstructContent.length - 1
                       )}} = ${afterImportName}; \n`
-                    )
+                    );
                     magicString.append(
                       `\n export {${exportContent.slice(
                         0,
                         exportContent.length - 1
                       )}}; `
-                    )
+                    );
                   }
-                  break
+                  break;
                 }
               }
             }
           }
         }
-      })
+      });
 
       if (requiresRuntime) {
-        let requiresCode = `import {__federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`
+        let requiresCode = `import {__federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`;
         // clear static required
         if (manualRequired) {
-          requiresCode = `import {__federation_method_setRemote, __federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`
-          magicString.overwrite(manualRequired.start, manualRequired.end, ``)
+          requiresCode = `import {__federation_method_setRemote, __federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`;
+          magicString.overwrite(manualRequired.start, manualRequired.end, ``);
         }
-        magicString.prepend(requiresCode)
+        magicString.prepend(requiresCode);
       }
-      return magicString.toString()
+      return magicString.toString();
     }
-  }
+  };
 
   async function devSharedScopeCode(
     this: TransformPluginContext,
     shared: (string | ConfigTypeSet)[]
   ): Promise<string[]> {
-    const res: string[] = []
+    const res: string[] = [];
     if (shared.length) {
       for (const item of shared) {
-        const sharedName = item[0]
-        const obj = item[1]
+        const sharedName = item[0];
+        const obj = item[1];
         if (typeof obj === 'object') {
           // Use dynamic import() by bare specifier so the shared module
           // resolves through Vite's dep optimizer — same module instance
@@ -426,11 +426,11 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
             const keys = Object.keys(m);
             const hasNamed = keys.some(k => k !== 'default' && k !== '__esModule');
             return () => hasNamed ? m : (m.default ?? m);
-          })`
-          res.push(`'${sharedName}':{'${obj.version}':{${str}}}`)
+          })`;
+          res.push(`'${sharedName}':{'${obj.version}':{${str}}}`);
         }
       }
     }
-    return res
+    return res;
   }
-}
+};

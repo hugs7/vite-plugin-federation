@@ -20,13 +20,13 @@ import type {
   RemotesConfig,
   Shared,
   VitePluginFederationOptions
-} from '../../types'
-import { readFileSync } from 'fs'
-import { createHash } from 'crypto'
-import path, { parse, posix } from 'path'
-import type { PluginContext } from 'rollup'
+} from '../../types';
+import { readFileSync } from 'fs';
+import { createHash } from 'crypto';
+import path, { parse, posix } from 'path';
+import type { PluginContext } from 'rollup';
 
-export * from './html'
+export * from './html';
 
 export function findDependencies(
   this: PluginContext,
@@ -36,8 +36,8 @@ export function findDependencies(
   usedSharedModuleIds: Set<string>
 ): void {
   if (!sets.has(id)) {
-    sets.add(id)
-    const moduleInfo = this.getModuleInfo(id)
+    sets.add(id);
+    const moduleInfo = this.getModuleInfo(id);
     if (moduleInfo?.importedIds) {
       moduleInfo.importedIds.forEach((id) => {
         findDependencies.apply(this, [
@@ -45,11 +45,11 @@ export function findDependencies(
           sets,
           sharedModuleIds,
           usedSharedModuleIds
-        ])
-      })
+        ]);
+      });
     }
     if (sharedModuleIds.has(id)) {
-      usedSharedModuleIds.add(sharedModuleIds.get(id) as string)
+      usedSharedModuleIds.add(sharedModuleIds.get(id) as string);
     }
   }
 }
@@ -69,16 +69,16 @@ export const parseSharedOptions = (
       modulePreload: false
     }),
     (value, key) => {
-      value.import = value.import ?? true
-      value.shareScope = value.shareScope || 'default'
-      value.packagePath = value.packagePath || key
-      value.manuallyPackagePathSetting = value.packagePath !== key
-      value.generate = value.generate ?? true
-      value.modulePreload = value.modulePreload ?? false
-      return value
+      value.import = value.import ?? true;
+      value.shareScope = value.shareScope || 'default';
+      value.packagePath = value.packagePath || key;
+      value.manuallyPackagePathSetting = value.packagePath !== key;
+      value.generate = value.generate ?? true;
+      value.modulePreload = value.modulePreload ?? false;
+      return value;
     }
-  )
-}
+  );
+};
 
 export const parseExposeOptions = (
   options: VitePluginFederationOptions
@@ -90,20 +90,20 @@ export const parseExposeOptions = (
         import: item,
         name: undefined,
         dontAppendStylesToHead: false
-      }
+      };
     },
     (item) => ({
       import: item.import,
       name: item.name || undefined,
       dontAppendStylesToHead: item.dontAppendStylesToHead || false
     })
-  )
-}
+  );
+};
 
 export const createContentHash = (path: string): string => {
-  const content = readFileSync(path, { encoding: 'utf-8' })
-  return createHash('md5').update(content).digest('hex').toString().slice(0, 8)
-}
+  const content = readFileSync(path, { encoding: 'utf-8' });
+  return createHash('md5').update(content).digest('hex').toString().slice(0, 8);
+};
 
 export const parseRemoteOptions = (
   options: VitePluginFederationOptions
@@ -124,8 +124,8 @@ export const parseRemoteOptions = (
       from: item.from ?? 'vite',
       externalType: item.externalType || 'url'
     })
-  )
-}
+  );
+};
 
 export const parseOptions = (
   options: Exposes | Remotes | Shared | undefined,
@@ -133,101 +133,101 @@ export const parseOptions = (
   normalizeOptions: (value: any, key: any) => ConfigTypeSet
 ): (string | ConfigTypeSet)[] => {
   if (!options) {
-    return []
+    return [];
   }
   const list: {
-    [index: number]: string | ConfigTypeSet
-  }[] = []
+    [index: number]: string | ConfigTypeSet;
+  }[] = [];
   const array = (items: (string | ConfigTypeSet)[]) => {
     for (const item of items) {
       if (typeof item === 'string') {
-        list.push([item, normalizeSimple(item, item)])
+        list.push([item, normalizeSimple(item, item)]);
       } else if (item && typeof item === 'object') {
-        object(item)
+        object(item);
       } else {
-        throw new Error('Unexpected options format')
+        throw new Error('Unexpected options format');
       }
     }
-  }
+  };
   const object = (obj) => {
     for (const [key, value] of Object.entries(obj)) {
       if (typeof value === 'string' || Array.isArray(value)) {
-        list.push([key, normalizeSimple(value, key)])
+        list.push([key, normalizeSimple(value, key)]);
       } else {
-        list.push([key, normalizeOptions(value, key)])
+        list.push([key, normalizeOptions(value, key)]);
       }
     }
-  }
+  };
   if (Array.isArray(options)) {
-    array(options)
+    array(options);
   } else if (typeof options === 'object') {
-    object(options)
+    object(options);
   } else {
-    throw new Error('Unexpected options format')
+    throw new Error('Unexpected options format');
   }
-  return list
-}
+  return list;
+};
 
-const letterReg = new RegExp('[0-9a-zA-Z]+')
+const letterReg = new RegExp('[0-9a-zA-Z]+');
 
 export const removeNonRegLetter = (str: string, reg = letterReg): string => {
-  let needUpperCase = false
-  let ret = ''
+  let needUpperCase = false;
+  let ret = '';
   for (const c of str) {
     if (reg.test(c)) {
-      ret += needUpperCase ? c.toUpperCase() : c
-      needUpperCase = false
+      ret += needUpperCase ? c.toUpperCase() : c;
+      needUpperCase = false;
     } else {
-      needUpperCase = true
+      needUpperCase = true;
     }
   }
-  return ret
-}
+  return ret;
+};
 
 export const getModuleMarker = (value: string, type?: string): string => {
-  return type ? `__rf_${type}__${value}` : `__rf_placeholder__${value}`
-}
+  return type ? `__rf_${type}__${value}` : `__rf_placeholder__${value}`;
+};
 
 export const normalizePath = (id: string): string => {
-  return posix.normalize(id.replace(/\\/g, '/'))
-}
+  return posix.normalize(id.replace(/\\/g, '/'));
+};
 
 export const uniqueArr = <T>(arr: T[]): T[] => {
-  return Array.from(new Set(arr))
-}
+  return Array.from(new Set(arr));
+};
 
 export const isSameFilepath = (src: string, dest: string): boolean => {
   if (!src || !dest) {
-    return false
+    return false;
   }
-  src = normalizePath(src)
-  dest = normalizePath(dest)
-  const srcExt = parse(src).ext
-  const destExt = parse(dest).ext
+  src = normalizePath(src);
+  dest = normalizePath(dest);
+  const srcExt = parse(src).ext;
+  const destExt = parse(dest).ext;
   if (srcExt && destExt && srcExt !== destExt) {
-    return false
+    return false;
   }
   if (srcExt) {
-    src = src.slice(0, -srcExt.length)
+    src = src.slice(0, -srcExt.length);
   }
   if (destExt) {
-    dest = dest.slice(0, -destExt.length)
+    dest = dest.slice(0, -destExt.length);
   }
-  return src === dest
-}
+  return src === dest;
+};
 
-export type Remote = { id: string; regexp: RegExp; config: RemotesConfig }
+export type Remote = { id: string; regexp: RegExp; config: RemotesConfig };
 
 export const createRemotesMap = (remotes: Remote[]): string => {
   const createUrl = (remote: Remote) => {
-    const external = remote.config.external[0]
-    const externalType = remote.config.externalType
+    const external = remote.config.external[0];
+    const externalType = remote.config.externalType;
     if (externalType === 'promise') {
-      return `()=>${external}`
+      return `()=>${external}`;
     } else {
-      return `'${external}'`
+      return `'${external}'`;
     }
-  }
+  };
   return `const remotesMap = {
 ${remotes
   .map(
@@ -237,19 +237,19 @@ ${remotes
       }',from:'${remote.config.from}'}`
   )
   .join(',\n  ')}
-};`
-}
+};`;
+};
 
 /**
  * get file extname from url
  * @param url
  */
 export const getFileExtname = (url: string): string => {
-  const fileNameAndParamArr = normalizePath(url).split('/')
-  const fileNameAndParam = fileNameAndParamArr[fileNameAndParamArr.length - 1]
-  const fileName = fileNameAndParam.split('?')[0]
-  return path.extname(fileName)
-}
+  const fileNameAndParamArr = normalizePath(url).split('/');
+  const fileNameAndParam = fileNameAndParamArr[fileNameAndParamArr.length - 1];
+  const fileName = fileNameAndParam.split('?')[0];
+  return path.extname(fileName);
+};
 
-export const REMOTE_FROM_PARAMETER = 'remoteFrom'
-export const NAME_CHAR_REG = new RegExp('[0-9a-zA-Z@_-]+')
+export const REMOTE_FROM_PARAMETER = 'remoteFrom';
+export const NAME_CHAR_REG = new RegExp('[0-9a-zA-Z@_-]+');

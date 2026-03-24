@@ -25,7 +25,9 @@ const moduleMap = __rf_var__moduleMap;
 const moduleCache = Object.create(null);
 
 function importShared(name, shareScope = 'default') {
-  return moduleCache[name] ?? (moduleCache[name] = loadShared(name, shareScope));
+  return (
+    moduleCache[name] ?? (moduleCache[name] = loadShared(name, shareScope))
+  );
 }
 
 async function loadShared(name, shareScope) {

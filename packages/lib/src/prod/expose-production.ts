@@ -13,13 +13,13 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { Node, walk } from 'estree-walker'
-import MagicString from 'magic-string'
-import { basename, dirname, extname, parse, relative, resolve } from 'path'
-import type { AcornNode, OutputAsset, OutputChunk } from 'rollup'
-import type { VitePluginFederationOptions } from 'types'
-import type { ResolvedConfig } from 'vite'
-import type { PluginHooks } from '../../types/pluginHooks'
+import { Node, walk } from 'estree-walker';
+import MagicString from 'magic-string';
+import { basename, dirname, extname, parse, relative, resolve } from 'path';
+import type { AcornNode, OutputAsset, OutputChunk } from 'rollup';
+import type { VitePluginFederationOptions } from 'types';
+import type { ResolvedConfig } from 'vite';
+import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
   DYNAMIC_LOADING_CSS,
@@ -30,47 +30,47 @@ import {
   parsedOptions,
   SHARED,
   viteConfigResolved
-} from '../public'
+} from '../public';
 import {
   getModuleMarker,
   NAME_CHAR_REG,
   normalizePath,
   parseExposeOptions,
   removeNonRegLetter
-} from '../utils'
-import { FEDERATION_IMPORT_SNIPPET } from '../runtime-snippets'
+} from '../utils';
+import { FEDERATION_IMPORT_SNIPPET } from '../runtime-snippets';
 
 export const prodExposePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
-  const exposeEntries: string[] = []
+  const exposeEntries: string[] = [];
   const hasOptions = parsedOptions.prodExpose.some((expose) => {
-    return expose[0] === parseExposeOptions(options)[0]?.[0]
-  })
+    return expose[0] === parseExposeOptions(options)[0]?.[0];
+  });
   if (!hasOptions) {
     parsedOptions.prodExpose = Array.prototype.concat(
       parsedOptions.prodExpose,
       parseExposeOptions(options)
-    )
+    );
   }
   // exposes module
   for (const item of parseExposeOptions(options)) {
-    const moduleName = getModuleMarker(`\${${item[0]}}`, SHARED)
-    EXTERNALS.push(moduleName)
-    const exposeFilepath = normalizePath(resolve(item[1].import))
-    EXPOSES_MAP.set(item[0], exposeFilepath)
+    const moduleName = getModuleMarker(`\${${item[0]}}`, SHARED);
+    EXTERNALS.push(moduleName);
+    const exposeFilepath = normalizePath(resolve(item[1].import));
+    EXPOSES_MAP.set(item[0], exposeFilepath);
     EXPOSES_KEY_MAP.set(
       item[0],
       `__federation_expose_${removeNonRegLetter(item[0], NAME_CHAR_REG)}`
-    )
+    );
     exposeEntries.push(
       `${JSON.stringify(item[0])}: {` +
         `url: '\${__federation_expose_${item[0]}}',` +
         `css: '${DYNAMIC_LOADING_CSS_PREFIX}${exposeFilepath}',` +
         `noStyles: ${item[1].dontAppendStylesToHead},` +
         `name: ${JSON.stringify(item[0])}` +
-      `}`
-    )
+        `}`
+    );
   }
 
   // let viteConfigResolved: ResolvedConfig
@@ -167,7 +167,7 @@ export const prodExposePlugin = (
 
     configResolved(config: ResolvedConfig) {
       if (config) {
-        viteConfigResolved.config = config
+        viteConfigResolved.config = config;
       }
     },
 
@@ -181,22 +181,22 @@ export const prodExposePlugin = (
           type: 'chunk',
           id: `__remoteEntryHelper__${options.filename}`,
           preserveSignature: 'strict'
-        })
+        });
       }
     },
 
     generateBundle(_options, bundle) {
       // replace import absolute path to chunk's fileName in remoteEntry.js
-      let remoteEntryChunk
+      let remoteEntryChunk;
       for (const file in bundle) {
-        const chunk = bundle[file]
+        const chunk = bundle[file];
         if (
           'facadeModuleId' in chunk &&
           chunk?.facadeModuleId ===
             `\0virtual:__remoteEntryHelper__${options.filename}`
         ) {
-          remoteEntryChunk = chunk
-          break
+          remoteEntryChunk = chunk;
+          break;
         }
       }
       // placeholder replace
@@ -210,18 +210,18 @@ export const prodExposePlugin = (
           .replace(
             '__VITE_ASSETS_DIR_PLACEHOLDER__',
             `'${viteConfigResolved.config?.build?.assetsDir || ''}'`
-          )
+          );
 
-        const filepathMap = new Map()
-        const getFilename = (name) => parse(parse(name).name).name
+        const filepathMap = new Map();
+        const getFilename = (name) => parse(parse(name).name).name;
         const cssBundlesMap: Map<string, OutputAsset | OutputChunk> =
           Object.keys(bundle)
             .filter((name) => extname(name) === '.css')
             .reduce((res, name) => {
-              const filename = getFilename(name)
-              res.set(filename, bundle[name])
-              return res
-            }, new Map())
+              const filename = getFilename(name);
+              res.set(filename, bundle[name]);
+              return res;
+            }, new Map());
         remoteEntryChunk.code = remoteEntryChunk.code.replace(
           new RegExp(`(["'\`])${DYNAMIC_LOADING_CSS_PREFIX}.*?\\1`, 'g'),
           (str) => {
@@ -235,62 +235,62 @@ export const prodExposePlugin = (
                   .map((cssBundle) =>
                     JSON.stringify(basename(cssBundle.fileName))
                   )
-                  .join(',')}]`
+                  .join(',')}]`;
               } else {
-                return '[]'
+                return '[]';
               }
             }
             const filepath = str.slice(
               (`'` + DYNAMIC_LOADING_CSS_PREFIX).length,
               -1
-            )
-            if (!filepath || !filepath.length) return str
-            let fileBundle = filepathMap.get(filepath)
+            );
+            if (!filepath || !filepath.length) return str;
+            let fileBundle = filepathMap.get(filepath);
             if (!fileBundle) {
               fileBundle = Object.values(bundle).find(
                 (b) => 'facadeModuleId' in b && b.facadeModuleId === filepath
-              )
-              if (fileBundle) filepathMap.set(filepath, fileBundle)
-              else return str
+              );
+              if (fileBundle) filepathMap.set(filepath, fileBundle);
+              else return str;
             }
-            const depCssFiles: Set<string> = new Set()
+            const depCssFiles: Set<string> = new Set();
             const addDepCss = (bundleName) => {
-              const theBundle = bundle[bundleName] as any
+              const theBundle = bundle[bundleName] as any;
               if (theBundle && theBundle.viteMetadata) {
                 for (const cssFileName of theBundle.viteMetadata.importedCss.values()) {
-                  const cssBundle = cssBundlesMap.get(getFilename(cssFileName))
+                  const cssBundle = cssBundlesMap.get(getFilename(cssFileName));
                   if (cssBundle) {
-                    depCssFiles.add(cssBundle.fileName)
+                    depCssFiles.add(cssBundle.fileName);
                   }
                 }
               }
               if (theBundle && theBundle.imports && theBundle.imports.length) {
-                theBundle.imports.forEach((name) => addDepCss(name))
+                theBundle.imports.forEach((name) => addDepCss(name));
               }
-            }
+            };
 
-            ;[fileBundle.fileName, ...fileBundle.imports].forEach(addDepCss)
+            [fileBundle.fileName, ...fileBundle.imports].forEach(addDepCss);
 
             return `[${[...depCssFiles]
               .map((d) => JSON.stringify(basename(d)))
-              .join(',')}]`
+              .join(',')}]`;
           }
-        )
+        );
 
         // replace the export file placeholder path to final chunk path
         for (const expose of parseExposeOptions(options)) {
           const module = Object.keys(bundle).find((module) => {
-            const chunk = bundle[module]
-            return chunk.name === EXPOSES_KEY_MAP.get(expose[0])
-          })
+            const chunk = bundle[module];
+            return chunk.name === EXPOSES_KEY_MAP.get(expose[0]);
+          });
 
           if (module) {
-            const chunk = bundle[module]
+            const chunk = bundle[module];
             const fileRelativePath = relative(
               dirname(remoteEntryChunk.fileName),
               chunk.fileName
-            )
-            const slashPath = fileRelativePath.replace(/\\/g, '/')
+            );
+            const slashPath = fileRelativePath.replace(/\\/g, '/');
             remoteEntryChunk.code = remoteEntryChunk.code.replace(
               `\${__federation_expose_${expose[0]}}`,
               viteConfigResolved.config?.base?.replace(/\/+$/, '')
@@ -305,21 +305,21 @@ export const prodExposePlugin = (
                     .filter(Boolean)
                     .join('/')
                 : `./${slashPath}`
-            )
+            );
           }
         }
 
         // remove all __f__dynamic_loading_css__ after replace
-        let ast: AcornNode | null = null
+        let ast: AcornNode | null = null;
         try {
-          ast = this.parse(remoteEntryChunk.code)
+          ast = this.parse(remoteEntryChunk.code);
         } catch (err) {
-          console.error(err)
+          console.error(err);
         }
         if (!ast) {
-          return
+          return;
         }
-        const magicString = new MagicString(remoteEntryChunk.code)
+        const magicString = new MagicString(remoteEntryChunk.code);
         // let cssFunctionName: string = DYNAMIC_LOADING_CSS
         walk(ast as Node, {
           enter(node: any) {
@@ -331,12 +331,12 @@ export const prodExposePlugin = (
                 `${DYNAMIC_LOADING_CSS_PREFIX}`
               ) > -1
             ) {
-              magicString.remove(node.start, node.end + 1)
+              magicString.remove(node.start, node.end + 1);
             }
           }
-        })
-        remoteEntryChunk.code = magicString.toString()
+        });
+        remoteEntryChunk.code = magicString.toString();
       }
     }
-  }
-}
+  };
+};
