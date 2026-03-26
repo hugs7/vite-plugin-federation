@@ -443,6 +443,11 @@ export const get = async (module) => {
         excludedShared.add(name)
       }
 
+      console.log('[federation:config] Shared modules:', [...sharedModuleMeta.keys()])
+      console.log('[federation:config] CJS (stay pre-bundled):', [...cjsShared])
+      console.log('[federation:config] Excluded from dep optimization:', [...safeToExclude])
+      console.log('[federation:config] CJS sub-deps force-included:', [...cjsSubDeps])
+
       if (safeToExclude.size > 0) {
         config.optimizeDeps ??= {}
         config.optimizeDeps.exclude = [
