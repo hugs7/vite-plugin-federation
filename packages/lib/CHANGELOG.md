@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.4](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.8.3...@hugs7/vite-plugin-federation@1.8.4) (2026-03-26)
+
+
+### Bug Fixes
+
+* remove console log ([a8a33ce](https://github.com/hugs7/vite-plugin-federation/commit/a8a33ce51e94f4984e753e341776bcd21017fb90))
+* resolve shared module context duplication in dev mode (react-router, SSO, etc.) ([851494f](https://github.com/hugs7/vite-plugin-federation/commit/851494ff19ffb529ec721ff996139f1f9dff58be))
+
+
+
+
+
 ## [1.8.3](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.8.2...@hugs7/vite-plugin-federation@1.8.3) (2026-03-24)
 
 
