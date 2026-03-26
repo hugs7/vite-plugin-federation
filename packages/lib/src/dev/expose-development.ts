@@ -735,6 +735,15 @@ export const get = async (module) => {
 
           const urlPath = url.split('?')[0]
           const matchedName = excludedUrlMap.get(urlPath)
+          if (!matchedName && urlPath.includes('node_modules')) {
+            // Debug: log unmatched node_modules URLs to help diagnose
+            // excluded shared module interception failures
+            for (const [mapUrl, mapName] of excludedUrlMap) {
+              if (urlPath.includes(mapName.replace(/\//g, '/')) || mapUrl.includes(urlPath.split('/').slice(-1)[0])) {
+                console.log('[federation:excluded-middleware] NEAR MISS:', urlPath, '≠', mapUrl, `(${mapName})`)
+              }
+            }
+          }
           if (!matchedName) {
             next()
             return
