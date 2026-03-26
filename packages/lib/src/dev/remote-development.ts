@@ -210,10 +210,7 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
       }
     },
     async transform(this: TransformPluginContext, code: string, id: string) {
-      if (
-        (builderInfo.isHost || builderInfo.isShared) &&
-        !builderInfo.isRemote
-      ) {
+      if (builderInfo.isHost || builderInfo.isShared) {
         for (const arr of parsedOptions.devShared) {
           if (!arr[1].version && !arr[1].manuallyPackagePathSetting) {
             const packageJsonPath = (
