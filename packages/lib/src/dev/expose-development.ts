@@ -60,9 +60,7 @@ const getExportNamesStatically = async (
     await lexerReady
     const code = readFileSync(resolvedPath, 'utf-8')
     const [, exports] = parse(code)
-    return exports
-      .map((e) => (typeof e === 'string' ? e : e.n))
-      .filter(Boolean)
+    return exports.map((e) => (typeof e === 'string' ? e : e.n)).filter(Boolean)
   } catch {
     return []
   }
@@ -445,7 +443,6 @@ export const get = async (module) => {
         excludedShared.add(name)
       }
 
-      
       if (safeToExclude.size > 0) {
         config.optimizeDeps ??= {}
         config.optimizeDeps.exclude = [
@@ -542,8 +539,6 @@ export const get = async (module) => {
             next()
             return
           }
-
-          console.log('[federation:deps-middleware] Patching:', matchedName, 'url:', url)
 
           const matchedBase = matchedName
             .split('/')
