@@ -350,29 +350,72 @@ export const get = async (module) => {
         const meta = sharedModuleMeta.get(name)
         if (!meta || meta.isCjs) continue
 
-        // All non-CJS shared modules should be excluded from dep
-        // optimization so the MFE bundle has bare-specifier imports
-        // that our middleware can intercept.
+        // Non-CJS shared modules should be excluded from dep
+        // optimization so the virtual wrapper intercepts ALL imports
+        // (including from other pre-bundled deps).  When a shared
+        // module stays pre-bundled, other pre-bundled deps import its
+        // internal chunks directly, bypassing the shared wrapper.
         //
-        // For modules with relative imports to internal chunks (e.g.
-        // react-router → ./chunk-XXX.mjs), the chunks may import CJS
-        // packages (cookie, set-cookie-parser).  We force-include those
-        // CJS deps via optimizeDeps.include so Vite pre-bundles them
-        // before the browser needs them.
+        // EXCEPTION: modules whose entry uses `export * from "pkg"`
+        // where pkg is a non-shared CJS module CANNOT be excluded.
+        // `export *` requires the target to have static named exports,
+        // but CJS modules pre-bundled by Vite only have a default
+        // export.  These modules must stay pre-bundled (the dep
+        // optimizer flattens the `export *` during bundling).
+        //
+        // Any non-shared bare-specifier deps are force-included so
+        // the browser can load them from .vite/deps/.
+        let hasExportStarFromNonShared = false
+
+        try {
+          const realPath = nodeRequire.resolve(name)
+          const src = readFileSync(realPath, 'utf-8')
+
+          // Check for `export * from "non-shared-pkg"` in entry
+          const exportStarDeps = [
+            ...src.matchAll(/export\s+\*\s+from\s+['"]([^'"./][^'"]*)['"]/g)
+          ].map((m) => m[1])
+          for (const dep of exportStarDeps) {
+            const pkg = dep.startsWith('@')
+              ? dep.split('/').slice(0, 2).join('/')
+              : dep.split('/')[0]
+            if (!sharedList.includes(pkg)) {
+              hasExportStarFromNonShared = true
+              break
+            }
+          }
+        } catch {
+          /* can't read module */
+        }
+
+        if (hasExportStarFromNonShared) continue
+
         safeToExclude.add(name)
 
-        // Scan for CJS sub-deps that need force-inclusion
         try {
           const realPath = nodeRequire.resolve(name)
           const entryDir = realPath.substring(0, realPath.lastIndexOf('/'))
           const src = readFileSync(realPath, 'utf-8')
-          // Find relative chunk imports
+
+          // Collect non-shared bare deps from the ENTRY file
+          const entryBareDeps = [
+            ...src.matchAll(/from\s+['"]([^'"./][^'"]*)['"]/g)
+          ]
+            .map((m) => m[1])
+            .filter((d) => !d.includes('$'))
+          for (const dep of entryBareDeps) {
+            const pkg = dep.startsWith('@')
+              ? dep.split('/').slice(0, 2).join('/')
+              : dep.split('/')[0]
+            if (!sharedList.includes(pkg)) {
+              cjsSubDeps.add(pkg)
+            }
+          }
+
+          // Scan internal chunks for non-shared bare deps too
           const relImports = [...src.matchAll(/from\s+['"](\.\/.+?)['"]/g)].map(
             (m) => m[1]
           )
-          // Scan each chunk for bare-specifier imports to non-shared packages.
-          // Resolve from the module's own directory (not project root) to
-          // find nested deps like react-router/node_modules/cookie/.
           for (const rel of relImports) {
             try {
               const chunkSrc = readFileSync(join(entryDir, rel), 'utf-8')
@@ -385,12 +428,9 @@ export const get = async (module) => {
                 const pkg = dep.startsWith('@')
                   ? dep.split('/').slice(0, 2).join('/')
                   : dep.split('/')[0]
-                if (sharedList.includes(pkg)) continue
-                // Any non-shared bare import from an excluded module's
-                // internal chunk must be force-included for pre-bundling.
-                // Without this, Vite serves the raw CJS file which
-                // browsers can't parse.
-                cjsSubDeps.add(pkg)
+                if (!sharedList.includes(pkg)) {
+                  cjsSubDeps.add(pkg)
+                }
               }
             } catch {
               /* can't read chunk */
@@ -502,6 +542,8 @@ export const get = async (module) => {
             next()
             return
           }
+
+          console.log('[federation:deps-middleware] Patching:', matchedName, 'url:', url)
 
           const matchedBase = matchedName
             .split('/')

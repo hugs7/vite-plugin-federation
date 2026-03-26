@@ -106,12 +106,12 @@ const federation = (options: VitePluginFederationOptions): Plugin => {
       }
       return _options
     },
-    config(config: UserConfig, env: ConfigEnv) {
+    async config(config: UserConfig, env: ConfigEnv) {
       options.mode = options.mode ?? env.mode
       registerPlugins(options.mode, env.command)
       registerCount++
       for (const pluginHook of pluginList) {
-        pluginHook.config?.call(this, config, env)
+        await pluginHook.config?.call(this, config, env)
       }
 
       // only run when builder is vite since rollup doesn't have hook named `config`
