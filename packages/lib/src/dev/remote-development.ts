@@ -68,6 +68,76 @@ export const devRemotePlugin = (
   const hasShared = parsedOptions.devShared.length > 0
   const needsFederationModule = hasRemotes || hasShared
 
+  const excludeRemotesFromOptimizeDeps = (config: UserConfig) => {
+    if (parsedOptions.devRemote.length) {
+      const excludeRemotes: string[] = []
+      parsedOptions.devRemote.forEach((item) => excludeRemotes.push(item[0]))
+      config.optimizeDeps ??= {}
+      config.optimizeDeps.exclude ??= []
+      config.optimizeDeps.exclude = config.optimizeDeps.exclude.concat(excludeRemotes)
+    }
+  }
+
+  const handleHostReactRefresh = (server: ViteDevServer) => {
+    // Patch /@react-refresh on the HOST so it stores itself as a
+    // global singleton.  When a federated remote loads its own
+    // /@react-refresh from a different origin, it can re-export
+    // this singleton — ensuring all component families and mounted
+    // roots are tracked in one place for React Fast Refresh.
+    if (parsedOptions.devRemote.length) {
+      server.middlewares.use(async (req, res, next) => {
+        const url = req.url
+        if (
+          url === '/@react-refresh' ||
+          url?.startsWith('/@react-refresh?')
+        ) {
+          try {
+            const result = await server.transformRequest('/@react-refresh')
+            if (result) {
+              const code =
+                result.code +
+                `\nif(typeof window!=='undefined'){` +
+                `window.__vite_react_refresh_runtime__={` +
+                `injectIntoGlobalHook,register,createSignatureFunctionForTransform,` +
+                `isLikelyComponentType,getFamilyByType,performReactRefresh,` +
+                `setSignature,collectCustomHooksForSignature,` +
+                `validateRefreshBoundaryAndEnqueueUpdate,` +
+                `registerExportsForReactRefresh,__hmr_import` +
+                `};};\n`
+              res.setHeader('Content-Type', 'application/javascript')
+              res.end(code)
+              return
+            }
+          } catch {
+            /* fall through */
+          }
+        }
+        next()
+      })
+    }
+  }
+
+  const devSharedScopeCode = async (
+    shared: (string | ConfigTypeSet)[]
+  ): Promise<string[]> => {
+    const res: string[] = []
+    if (shared.length) {
+      for (const item of shared) {
+        const sharedName = item[0]
+        const obj = item[1]
+        if (typeof obj === 'object') {
+          const str = `get:() => import('${sharedName}').then(m => {
+            const keys = Object.keys(m);
+            const hasNamed = keys.some(k => k !== 'default' && k !== '__esModule');
+            return () => hasNamed ? m : (m.default ?? m);
+          })`
+          res.push(`'${sharedName}':{'${obj.version}':{${str}}}`)
+        }
+      }
+    }
+    return res
+  }
+
   return {
     name: [PLUGIN_PREFIX, 'remote-development'].join(':'),
     virtualFile: needsFederationModule
@@ -151,90 +221,5 @@ export const devRemotePlugin = (
       }
       return magicString.toString()
     }
-  }
-
-  const excludeRemotesFromOptimizeDeps = (config: UserConfig) => {
-    if (parsedOptions.devRemote.length) {
-      const excludeRemotes: string[] = []
-      parsedOptions.devRemote.forEach((item) => excludeRemotes.push(item[0]))
-      let optimizeDeps = config.optimizeDeps
-      if (!optimizeDeps) {
-        optimizeDeps = config.optimizeDeps = {}
-      }
-      if (!optimizeDeps.exclude) {
-        optimizeDeps.exclude = []
-      }
-      optimizeDeps.exclude = optimizeDeps.exclude.concat(excludeRemotes)
-    }
-  }
-
-  const handleHostReactRefresh = (server: ViteDevServer) => {
-    // Patch /@react-refresh on the HOST so it stores itself as a
-    // global singleton.  When a federated remote loads its own
-    // /@react-refresh from a different origin, it can re-export
-    // this singleton — ensuring all component families and mounted
-    // roots are tracked in one place for React Fast Refresh.
-    if (parsedOptions.devRemote.length) {
-      server.middlewares.use(async (req, res, next) => {
-        const url = req.url
-        if (
-          url === '/@react-refresh' ||
-          url?.startsWith('/@react-refresh?')
-        ) {
-          try {
-            const result = await server.transformRequest('/@react-refresh')
-            if (result) {
-              // Append a line that stores the module on the window
-              const code =
-                result.code +
-                `\nif(typeof window!=='undefined'){` +
-                `window.__vite_react_refresh_runtime__={` +
-                `injectIntoGlobalHook,register,createSignatureFunctionForTransform,` +
-                `isLikelyComponentType,getFamilyByType,performReactRefresh,` +
-                `setSignature,collectCustomHooksForSignature,` +
-                `validateRefreshBoundaryAndEnqueueUpdate,` +
-                `registerExportsForReactRefresh,__hmr_import` +
-                `};};\n`
-              res.setHeader('Content-Type', 'application/javascript')
-              res.end(code)
-              return
-            }
-          } catch {
-            /* fall through */
-          }
-        }
-        next()
-      })
-    }
-  }
-
-  const devSharedScopeCode = async (
-    shared: (string | ConfigTypeSet)[]
-  ): Promise<string[]> => {
-    const res: string[] = []
-    if (shared.length) {
-      for (const item of shared) {
-        const sharedName = item[0]
-        const obj = item[1]
-        if (typeof obj === 'object') {
-          // Use dynamic import() by bare specifier so the shared module
-          // resolves through Vite's dep optimizer — same module instance
-          // as the host app uses.  Dynamic import avoids the "export not
-          // defined" errors that static import * triggers on packages
-          // with stripped TypeScript type re-exports.
-          // Unwrap CJS-only deps whose dep-optimized entry has ONLY a
-          // default export (e.g. react.js: `export default require_react()`).
-          // If the module also has named exports (zustand, react-redux),
-          // return the full namespace to preserve them.
-          const str = `get:() => import('${sharedName}').then(m => {
-            const keys = Object.keys(m);
-            const hasNamed = keys.some(k => k !== 'default' && k !== '__esModule');
-            return () => hasNamed ? m : (m.default ?? m);
-          })`
-          res.push(`'${sharedName}':{'${obj.version}':{${str}}}`)
-        }
-      }
-    }
-    return res
   }
 }
