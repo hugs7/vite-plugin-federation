@@ -15,12 +15,12 @@
 
 import virtual from '@rollup/plugin-virtual'
 import { dirname } from 'path'
-import type { ModuleInfo } from 'vite'
 import { fileURLToPath } from 'url'
 import type {
   ConfigEnv,
   Plugin,
   ResolvedConfig,
+  Rolldown,
   UserConfig,
   ViteDevServer
 } from 'vite'
@@ -196,7 +196,7 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
       }
       return code
     },
-    moduleParsed(moduleInfo: ModuleInfo): void {
+    moduleParsed(moduleInfo: Rolldown.ModuleInfo): void {
       for (const pluginHook of pluginList) {
         pluginHook.moduleParsed?.call(this, moduleInfo)
       }

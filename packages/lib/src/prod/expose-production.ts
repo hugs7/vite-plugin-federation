@@ -18,9 +18,7 @@ import MagicString from 'magic-string'
 import { basename, dirname, extname, parse, relative, resolve } from 'path'
 import type { Program } from 'estree'
 import type { VitePluginFederationOptions } from 'types'
-import type { OutputBundle, OutputChunk, ResolvedConfig } from 'vite'
-
-type OutputAsset = Exclude<OutputBundle[string], OutputChunk>
+import type { ResolvedConfig, Rolldown } from 'vite'
 import type { PluginHooks } from '../../types/pluginHooks'
 import {
   builderInfo,
@@ -206,7 +204,7 @@ export const prodExposePlugin = (
 
         const filepathMap = new Map()
         const getFilename = (name) => parse(parse(name).name).name
-        const cssBundlesMap: Map<string, OutputAsset | OutputChunk> =
+        const cssBundlesMap: Map<string, Rolldown.OutputAsset | Rolldown.OutputChunk> =
           Object.keys(bundle)
             .filter((name) => extname(name) === '.css')
             .reduce((res, name) => {

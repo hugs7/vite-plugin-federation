@@ -34,14 +34,7 @@ import {
   injectToHead,
   toPreloadTag
 } from '../utils'
-import type {
-  OutputBundle,
-  OutputChunk,
-  ResolvedConfig,
-  TransformPluginContext
-} from 'vite'
-
-type OutputAsset = Exclude<OutputBundle[string], OutputChunk>
+import type { ResolvedConfig, Rolldown } from 'vite'
 
 const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
   string,
@@ -242,7 +235,7 @@ export const prodRemotePlugin = (
       resolvedConfig = config
     },
 
-    async transform(this: TransformPluginContext, code: string, id: string) {
+    async transform(this: Rolldown.TransformPluginContext, code: string, id: string) {
       if (builderInfo.isShared) {
         for (const sharedInfo of parsedOptions.prodShared) {
           if (!sharedInfo[1].emitFile) {
@@ -601,11 +594,11 @@ export const prodRemotePlugin = (
           (item) => new RegExp(`__federation_shared_${item[0]}-.{8}.js`, 'g')
         )
       const getImportedChunks = (
-        chunk: OutputChunk,
-        satisfy: (chunk: OutputChunk) => boolean,
+        chunk: Rolldown.OutputChunk,
+        satisfy: (chunk: Rolldown.OutputChunk) => boolean,
         seen: Set<string> = new Set()
-      ): OutputChunk[] => {
-        const chunks: OutputChunk[] = []
+      ): Rolldown.OutputChunk[] => {
+        const chunks: Rolldown.OutputChunk[] = []
         chunk.imports.forEach((file) => {
           const importee = bundle[file]
           if (importee) {
@@ -622,7 +615,7 @@ export const prodRemotePlugin = (
       }
 
       const sharedFiles: string[] = []
-      const entryChunk: Record<string, OutputAsset> = {}
+      const entryChunk: Record<string, Rolldown.OutputAsset> = {}
       for (const fileName in bundle) {
         const file = bundle[fileName]
         if (file.type === 'asset') {
@@ -668,7 +661,7 @@ export const prodRemotePlugin = (
           .flatMap((item) => {
             const filepath = item
             const importFiles = getImportedChunks(
-              bundle[item] as OutputChunk,
+              bundle[item] as Rolldown.OutputChunk,
               (chunk) => !html.includes(toOutputFilePath(chunk.fileName))
             ).map((item) => item.fileName)
 

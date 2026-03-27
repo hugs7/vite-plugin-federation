@@ -24,12 +24,12 @@ import type {
 import { readFileSync } from 'fs'
 import { createHash } from 'crypto'
 import path, { parse, posix } from 'path'
-import type { PluginContext } from 'vite'
+import type { Rolldown } from 'vite'
 
 export * from './html'
 
 export function findDependencies(
-  this: PluginContext,
+  this: Rolldown.PluginContext,
   id: string,
   sets: Set<string>,
   sharedModuleIds: Map<string, string>,
