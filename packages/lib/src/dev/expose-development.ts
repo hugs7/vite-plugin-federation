@@ -92,9 +92,16 @@ const getPreBundleExports = async (
       .map((e) => (typeof e === 'string' ? e : e.n))
       .filter(Boolean)
 
-    // ESM module with named exports — use them directly
-    if (names.length > 1 || (names.length === 1 && names[0] !== 'default')) {
-      return names
+    // ESM module with real named exports — use them directly.
+    // Filter out Rolldown's internal `t` factory export (used for CJS
+    // interop: `export { require_xxx as t }`) which is not a real
+    // consumer-facing export.
+    const realNames = names.filter((n) => n !== 't')
+    if (
+      realNames.length > 1 ||
+      (realNames.length === 1 && realNames[0] !== 'default')
+    ) {
+      return realNames
     }
 
     // CJS module — scan pre-bundle entry + chunks for exports.XXX patterns
