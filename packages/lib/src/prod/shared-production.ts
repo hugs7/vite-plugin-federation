@@ -30,8 +30,8 @@ export const prodSharedPlugin = (
   parsedOptions.prodShared.forEach((value) =>
     shareName2Prop.set(removeNonRegLetter(value[0], NAME_CHAR_REG), value[1])
   )
-  let isHost
-  let isRemote
+  let isHost: boolean
+  let isRemote: boolean
   const id2Prop = new Map<string, any>()
 
   return {
