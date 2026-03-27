@@ -71,12 +71,18 @@ const scanCjsExports = (
 /**
  * Discover export names from a federation pre-bundled file.
  *
- * Uses es-module-lexer for fast static analysis.  For CJS modules, Rolldown
- * produces only `export default require_xxx()` — in that case, we scan
- * for `exports.XXX = ...` patterns in the entry and its chunk imports.
- * This is fast (pure string parsing, no subprocess).
+ * Strategy (fastest to slowest, stops when exports found):
+ * 1. es-module-lexer on the entry file (works for ESM modules)
+ * 2. Scan entry + chunk files for `exports.XXX = ...` (works for CJS)
+ * 3. Scan the ORIGINAL package source for `exports.XXX = ...` (fallback
+ *    when code splitting moves CJS bodies into shared chunks that the
+ *    entry doesn't directly import)
  */
-const getPreBundleExports = async (filePath: string): Promise<string[]> => {
+const getPreBundleExports = async (
+  filePath: string,
+  moduleName: string,
+  root: string
+): Promise<string[]> => {
   try {
     const { init, parse } = await import('es-module-lexer')
     await init
@@ -86,17 +92,64 @@ const getPreBundleExports = async (filePath: string): Promise<string[]> => {
       .map((e) => (typeof e === 'string' ? e : e.n))
       .filter(Boolean)
 
-    // If the only ESM export is `default`, this is a CJS module wrapped by
-    // Rolldown.  Extract named exports from `exports.XXX = ...` patterns
-    // in the entry file and its chunk imports.
-    if (names.length <= 1 && names[0] === 'default') {
-      const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
-      return [...scanCjsExports(code, fileDir)]
+    // ESM module with named exports — use them directly
+    if (names.length > 1 || (names.length === 1 && names[0] !== 'default')) {
+      return names
     }
 
-    return names
+    // CJS module — scan pre-bundle entry + chunks for exports.XXX patterns
+    const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+    const cjsExports = scanCjsExports(code, fileDir)
+    if (cjsExports.size > 1) {
+      return [...cjsExports]
+    }
+
+    // Fallback: scan the ORIGINAL package source.  With code splitting,
+    // CJS bodies can end up in shared chunks that the entry file doesn't
+    // directly import (e.g. react/jsx-runtime shares a chunk with react).
+    try {
+      const nodeRequire = createRequire(join(root, 'package.json'))
+      const origPath = nodeRequire.resolve(moduleName)
+      const origCode = readFileSync(origPath, 'utf-8')
+      const origExports = new Set<string>(['default'])
+
+      // Scan the entry file
+      for (const m of origCode.matchAll(
+        /exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
+      )) {
+        origExports.add(m[1])
+      }
+
+      // Follow require('./...') to find CJS sub-files
+      if (origExports.size <= 1) {
+        const origDir = origPath.substring(0, origPath.lastIndexOf('/'))
+        for (const req of origCode.matchAll(
+          /require\s*\(\s*['"](\.[^'"]+)['"]\s*\)/g
+        )) {
+          try {
+            const subPath = nodeRequire.resolve(join(origDir, req[1]))
+            const subCode = readFileSync(subPath, 'utf-8')
+            for (const m of subCode.matchAll(
+              /exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
+            )) {
+              origExports.add(m[1])
+            }
+          } catch {
+            /* sub-file not found */
+          }
+        }
+      }
+
+      if (origExports.size > 1) {
+        return [...origExports]
+      }
+    } catch {
+      /* original source fallback failed */
+    }
+
+    return names.length ? names : ['default']
   } catch {
-    return []
+    return ['default']
   }
 }
 
@@ -425,7 +478,7 @@ export const get = async (module) => {
             )
             continue
           }
-          const exports = await getPreBundleExports(filePath)
+          const exports = await getPreBundleExports(filePath, name, root)
           const preBundleUrl = `/node_modules/${FEDERATION_DEPS_DIR}/${fileName}`
 
           sharedModuleMeta.set(name, { preBundleUrl, exports })
