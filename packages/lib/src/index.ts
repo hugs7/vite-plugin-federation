@@ -27,7 +27,7 @@ import type {
 
 import type { VitePluginFederationOptions } from '../types'
 import type { PluginHooks } from '../types/pluginHooks'
-import { devExposePlugin } from './dev/expose-development'
+import { devExposePlugin, devSharedResolverPlugin } from './dev/expose-development'
 import { devRemotePlugin } from './dev/remote-development'
 import { devSharedPlugin } from './dev/shared-development'
 import { prodExposePlugin } from './prod/expose-production'
@@ -35,7 +35,7 @@ import { prodRemotePlugin } from './prod/remote-production'
 import { prodSharedPlugin } from './prod/shared-production'
 import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions } from './public'
 
-const federation = (options: VitePluginFederationOptions): Plugin => {
+const federation = (options: VitePluginFederationOptions): Plugin[] => {
   if (!options.filename) {
     options.filename = DEFAULT_ENTRY_FILENAME
   }
@@ -82,7 +82,7 @@ const federation = (options: VitePluginFederationOptions): Plugin => {
     virtualMod = virtual(virtualFiles)
   }
 
-  return {
+  const mainPlugin: Plugin = {
     name: 'hugs7:federation',
     // for scenario vite.config.js build.cssCodeSplit: false
     // vite:css-post plugin will summarize all the styles in the style.xxxxxx.css file
@@ -118,9 +118,9 @@ const federation = (options: VitePluginFederationOptions): Plugin => {
       builderInfo.builder = 'vite'
       builderInfo.assetsDir = config?.build?.assetsDir ?? 'assets'
     },
-    configureServer(server: ViteDevServer) {
+    async configureServer(server: ViteDevServer) {
       for (const pluginHook of pluginList) {
-        pluginHook.configureServer?.call(this, server)
+        await pluginHook.configureServer?.call(this, server)
       }
     },
     configResolved(config: ResolvedConfig) {
@@ -230,6 +230,13 @@ const federation = (options: VitePluginFederationOptions): Plugin => {
       }
     }
   }
+
+  // Return the main plugin + the enforce:'pre' shared resolver.
+  // Vite flattens plugin arrays, so this works transparently.
+  // devSharedResolverPlugin runs before Vite's internal resolver to
+  // intercept shared module imports.  It's a no-op in production or
+  // when no shared modules are configured.
+  return [mainPlugin, devSharedResolverPlugin]
 }
 
 export default federation

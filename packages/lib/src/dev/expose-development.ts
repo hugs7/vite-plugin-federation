@@ -30,19 +30,35 @@ const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
 const FEDERATION_DEPS_DIR = '.federation-deps'
 
 /**
- * Read the export names from a federation pre-bundled file.
- * The pre-bundle output is clean ESM — es-module-lexer can parse it reliably
- * because Rolldown already resolved all CJS/ESM/export* into flat exports.
+ * Discover export names from a federation pre-bundled file.
+ *
+ * Uses es-module-lexer for fast static analysis.  For CJS modules, Rolldown
+ * produces only `export default require_xxx()` — in that case, we also scan
+ * the CJS body for `exports.XXX = ...` assignments to discover named exports.
+ * This is fast (pure string parsing, no subprocess).
  */
-const readPreBundledExports = async (
-  filePath: string
-): Promise<string[]> => {
+const getPreBundleExports = async (filePath: string): Promise<string[]> => {
   try {
     const { init, parse } = await import('es-module-lexer')
     await init
     const code = readFileSync(filePath, 'utf-8')
     const [, exports] = parse(code)
-    return exports.map((e) => (typeof e === 'string' ? e : e.n)).filter(Boolean)
+    const names = exports
+      .map((e) => (typeof e === 'string' ? e : e.n))
+      .filter(Boolean)
+
+    // If the only ESM export is `default`, this is a CJS module wrapped by
+    // Rolldown.  Extract named exports from `exports.XXX = ...` patterns
+    // in the CJS body.
+    if (names.length <= 1 && names[0] === 'default') {
+      const cjsExports = new Set<string>(['default'])
+      for (const match of code.matchAll(/exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g)) {
+        cjsExports.add(match[1])
+      }
+      return [...cjsExports]
+    }
+
+    return names
   } catch {
     return []
   }
@@ -74,24 +90,31 @@ const buildSharedWrapperCode = (
     ? `${originUrl}${meta.preBundleUrl}`
     : meta.preBundleUrl
 
+  // For CJS modules (react, react-dom), the pre-bundle output only has
+  // `export default require_xxx()`.  The actual exports (Fragment, useState,
+  // etc.) are properties of the default export object.  We need to unwrap:
+  //   __ns = __mod.default ?? __mod
+  // Then re-export properties from __ns rather than __mod directly.
+  // For ESM modules, __mod already has top-level named exports AND a default,
+  // so __ns still works (we just read properties from __mod.default which is
+  // the same namespace object).
+
   let code = ''
   code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`
   code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(importUrl)});\n`
+  code += `const __ns = __mod.default ?? __mod;\n`
 
   if (hasDefault) {
-    code += `export default (__mod.default ?? __mod);\n`
+    code += `export default __ns;\n`
   }
   for (const e of named) {
     if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e)) {
-      code += `export const ${e} = __mod[${JSON.stringify(e)}];\n`
+      code += `export const ${e} = __ns[${JSON.stringify(e)}];\n`
     }
   }
 
   return code
 }
-
-/** Map of shared specifier -> metadata, populated in configureServer() */
-const sharedModuleMeta = new Map<string, SharedModuleMeta>()
 
 // Convert an absolute filesystem path to a URL that Vite's dev server
 // can serve.  If the path is inside the project root, return a root-
@@ -105,13 +128,62 @@ const toViteUrl = (filePath: string, root: string): string => {
   return `/@fs${normalized}`
 }
 
+// Shared state between the main plugin and the enforce:'pre' resolver plugin.
+// Both reference these module-level variables.  They're populated when
+// devExposePlugin() runs (called from config() hook) and used by the
+// resolver plugin at request time.
+const sharedSet = new Set<string>()
+let sharedModuleMeta = new Map<string, SharedModuleMeta>()
+
+/**
+ * Separate enforce:'pre' plugin for shared module resolution.
+ * Must run before Vite's internal resolver so that bare specifier imports
+ * of shared modules (from both app source AND pre-bundled deps) are
+ * intercepted before Vite resolves them to raw /@fs/ paths.
+ *
+ * Always registered — becomes a no-op when sharedSet is empty (production
+ * builds, host-only configs, etc.).
+ */
+export const devSharedResolverPlugin: import('vite').Plugin = {
+  name: 'hugs7:federation-shared-resolve',
+  enforce: 'pre',
+
+  resolveId(id: string) {
+    if (sharedSet.has(id)) {
+      return RESOLVED_SHARED_PREFIX + id
+    }
+    return null
+  },
+
+  load(id: string) {
+    if (!id.startsWith(RESOLVED_SHARED_PREFIX)) {
+      return null
+    }
+
+    const specifier = id.slice(RESOLVED_SHARED_PREFIX.length)
+    const meta = sharedModuleMeta.get(specifier)
+    if (!meta) {
+      return null
+    }
+
+    return {
+      code: buildSharedWrapperCode(specifier, meta),
+      moduleType: 'js' as const
+    }
+  }
+}
+
 export const devExposePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
   parsedOptions.devExpose = parseExposeOptions(options)
 
-  // The set of ALL shared module specifiers (populated in config())
-  const sharedSet = new Set<string>()
+  // Reset shared state for this plugin instance.
+  // The module-level sharedSet/sharedModuleMeta are shared with
+  // devSharedResolverPlugin (enforce:'pre').
+  sharedSet.clear()
+  sharedModuleMeta = new Map<string, SharedModuleMeta>()
+
   let resolvedRoot = process.cwd()
 
   let moduleMap = ''
@@ -232,69 +304,28 @@ export const get = async (module) => {
         [...sharedSet]
       )
 
-      // Inject a Rolldown plugin into the dep optimizer that marks ALL
-      // shared modules as external.  This means when Rolldown pre-bundles
-      // dependencies (e.g. react-dom, some-ui-lib), any import of a shared
-      // module is left as a bare specifier in the .vite/deps/ output.
-      // Our Vite-level resolveId then intercepts these bare specifiers
-      // from the browser and serves the shared wrapper.
+      // Exclude ALL shared modules from Vite's dep optimizer.
+      // When excluded, bare specifier imports of these modules in other
+      // pre-bundled deps (e.g. react-dom importing react) are resolved
+      // through the normal Vite plugin pipeline — which hits our resolveId
+      // hook and serves the virtual shared wrapper.
       //
-      // This replaces ALL heuristic classification (CJS/ESM detection,
-      // export* scanning, sub-dep discovery) with a single declarative rule.
+      // The old code couldn't exclude CJS modules because the fallback
+      // served raw CJS (browsers can't load it). Now our fallback imports
+      // from the federation pre-bundle (clean ESM built by Rolldown), so
+      // CJS/ESM distinction is no longer needed.
       config.optimizeDeps ??= {}
-      config.optimizeDeps.rolldownOptions ??= {}
-
-      const sharedNames = [...sharedSet]
-      const federationOptimizerPlugin = {
-        name: 'federation-shared-external',
-        resolveId(id: string) {
-          // Mark shared modules as external in the dep optimizer.
-          // This causes Rolldown to leave `import "react"` as-is in
-          // pre-bundled output instead of inlining/chunking the module.
-          if (sharedNames.includes(id)) {
-            return { id, external: true }
-          }
-          return null
-        }
-      }
-
-      const existingPlugins = config.optimizeDeps.rolldownOptions.plugins
-      if (Array.isArray(existingPlugins)) {
-        existingPlugins.push(federationOptimizerPlugin)
-      } else {
-        config.optimizeDeps.rolldownOptions.plugins = [
-          federationOptimizerPlugin
-        ]
-      }
+      config.optimizeDeps.exclude = [
+        ...(config.optimizeDeps.exclude ?? []),
+        ...sharedSet
+      ]
     },
 
-    resolveId(id: string) {
-      // Intercept ALL shared module imports.  Because shared modules are
-      // externalized in the dep optimizer, bare specifiers for them appear
-      // in .vite/deps/ output and in application source code.  We redirect
-      // them all to our virtual shared wrapper.
-      if (sharedSet.has(id)) {
-        return RESOLVED_SHARED_PREFIX + id
-      }
-      return null
-    },
-
-    load(id: string) {
-      if (!id.startsWith(RESOLVED_SHARED_PREFIX)) {
-        return null
-      }
-
-      const specifier = id.slice(RESOLVED_SHARED_PREFIX.length)
-      const meta = sharedModuleMeta.get(specifier)
-      if (!meta) {
-        return null
-      }
-
-      return {
-        code: buildSharedWrapperCode(specifier, meta),
-        moduleType: 'js' as const
-      }
-    },
+    // Shared module resolution is handled by devSharedResolverPlugin
+    // (enforce:'pre'), registered as a separate Vite plugin so it runs
+    // BEFORE Vite's internal resolver.  The main federation plugin is
+    // enforce:'post', which is too late to intercept bare specifiers
+    // from pre-bundled deps.
 
     async configureServer(server) {
       // Build the federation pre-bundle: use Rolldown to bundle each shared
@@ -352,7 +383,11 @@ export const get = async (module) => {
           })
         )
 
-        // Populate sharedModuleMeta from the pre-bundled output
+        // Populate sharedModuleMeta from the pre-bundled output.
+        // Export names are discovered via dynamic import in a subprocess
+        // (not from the pre-bundle output) because CJS modules only have
+        // a default export in the Rolldown output — Node's import()
+        // correctly exposes CJS named properties as ESM named exports.
         for (const name of sharedNames) {
           const fileName = name.replace(/\//g, '_') + '.js'
           const filePath = join(outDir, fileName)
@@ -362,9 +397,7 @@ export const get = async (module) => {
             )
             continue
           }
-          const exports = await readPreBundledExports(filePath)
-          // Use a simple root-relative path — the pre-bundle is always
-          // inside node_modules/ within the project root, so no /@fs/ needed.
+          const exports = await getPreBundleExports(filePath)
           const preBundleUrl = `/node_modules/${FEDERATION_DEPS_DIR}/${fileName}`
 
           sharedModuleMeta.set(name, { preBundleUrl, exports })
