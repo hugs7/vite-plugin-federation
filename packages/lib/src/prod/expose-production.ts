@@ -22,6 +22,7 @@ import type { ResolvedConfig, Rolldown } from 'vite';
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
+  DYNAMIC_LOADING_CSS,
   DYNAMIC_LOADING_CSS_PREFIX,
   EXPOSES_KEY_MAP,
   EXPOSES_MAP,

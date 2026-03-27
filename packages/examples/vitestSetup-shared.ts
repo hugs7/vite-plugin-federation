@@ -7,7 +7,7 @@ import type { Browser, Page } from 'playwright-chromium';
 import type { RunnerTestFile } from 'vitest';
 import { beforeAll, afterAll } from 'vitest';
 
-export const workspaceRoot = resolve(__dirname, '../');
+export const workspaceRoot = resolve(__dirname, '../../');
 
 export const slash = (p: string): string => p.replace(/\\/g, '/');
 

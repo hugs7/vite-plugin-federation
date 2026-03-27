@@ -27,11 +27,11 @@ export const setup = async (): Promise<void> => {
     await new Promise((r) => setTimeout(r, 2000));
   }
 
-  const tempDir = path.resolve(__dirname, '../temp');
+  const tempDir = path.resolve(__dirname, '../../temp');
   await fs.rm(tempDir, { recursive: true, force: true });
   await fs.mkdir(tempDir, { recursive: true });
   await fs
-    .cp(path.resolve(__dirname, '../examples'), tempDir, {
+    .cp(path.resolve(__dirname), tempDir, {
       recursive: true,
       filter: (file) => {
         const normalized = file.replace(/\\/g, '/');
@@ -59,7 +59,7 @@ export const teardown = async (): Promise<void> => {
       await new Promise((r) => setTimeout(r, 2000));
     }
     try {
-      await fs.rm(path.resolve(__dirname, '../temp'), {
+      await fs.rm(path.resolve(__dirname, '../../temp'), {
         recursive: true,
         force: true
       });

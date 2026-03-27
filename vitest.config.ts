@@ -6,7 +6,7 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       './packages/examples/**/*.*',
-      './packages/temp/**/*.*'
+      './temp/**/*.*'
     ],
     testTimeout: 20000
   },
