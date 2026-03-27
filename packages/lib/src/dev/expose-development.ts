@@ -186,26 +186,25 @@ const buildSharedWrapperCode = (
     ? `${originUrl}${meta.preBundleUrl}`
     : meta.preBundleUrl
 
-  // For CJS modules (react, react-dom), the pre-bundle output only has
-  // `export default require_xxx()`.  The actual exports (Fragment, useState,
-  // etc.) are properties of the default export object.  We need to unwrap:
-  //   __ns = __mod.default ?? __mod
-  // Then re-export properties from __ns rather than __mod directly.
-  // For ESM modules, __mod already has top-level named exports AND a default,
-  // so __ns still works (we just read properties from __mod.default which is
-  // the same namespace object).
+  // Named exports live in different places depending on module format:
+  //   ESM pre-bundle: named exports are on __mod (the namespace object)
+  //                   __mod.default is the default export VALUE (e.g. a function)
+  //   CJS pre-bundle: only has `export default require_xxx()`, so named
+  //                   exports are properties of __mod.default (the module.exports)
+  //
+  // For named exports, try __mod[name] first (ESM), fall back to
+  // (__mod.default ?? __mod)[name] (CJS).
 
   let code = ''
   code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`
   code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(importUrl)});\n`
-  code += `const __ns = __mod.default ?? __mod;\n`
 
   if (hasDefault) {
-    code += `export default __ns;\n`
+    code += `export default (__mod.default ?? __mod);\n`
   }
   for (const e of named) {
     if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e)) {
-      code += `export const ${e} = __ns[${JSON.stringify(e)}];\n`
+      code += `export const ${e} = __mod[${JSON.stringify(e)}] ?? (__mod.default ?? __mod)[${JSON.stringify(e)}];\n`
     }
   }
 
