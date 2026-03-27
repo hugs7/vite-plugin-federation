@@ -27,7 +27,7 @@ const loadJS = async (url, fn) => {
 }
 ${opts.getFunctionCode}
 ${opts.shareScopeWrapperCode}
-async function __federation_method_ensure(remoteId) {
+const __federation_method_ensure = async (remoteId) => {
   const remote = remotesMap[remoteId];
   if (!remote.inited) {
     if ('var' === remote.format) {
@@ -63,11 +63,10 @@ async function __federation_method_ensure(remoteId) {
   }
 }
 
-function __federation_method_unwrapDefault(module) {
-  return (module?.__esModule || module?.[Symbol.toStringTag] === 'Module')?module.default:module
-}
+const __federation_method_unwrapDefault = (module) =>
+  (module?.__esModule || module?.[Symbol.toStringTag] === 'Module') ? module.default : module
 
-function __federation_method_wrapDefault(module, need){
+const __federation_method_wrapDefault = (module, need) => {
   if (!module?.default && need) {
     let obj = Object.create(null);
     obj.default = module;
@@ -77,11 +76,10 @@ function __federation_method_wrapDefault(module, need){
   return module;
 }
 
-function __federation_method_getRemote(remoteName, componentName) {
-  return __federation_method_ensure(remoteName).then((remote) => remote.get(componentName).then(factory => factory()));
-}
+const __federation_method_getRemote = (remoteName, componentName) =>
+  __federation_method_ensure(remoteName).then((remote) => remote.get(componentName).then(factory => factory()))
 
-function __federation_method_setRemote(remoteName, remoteConfig) {
+const __federation_method_setRemote = (remoteName, remoteConfig) => {
   remotesMap[remoteName] = remoteConfig;
 }
 export {__federation_method_ensure, __federation_method_getRemote , __federation_method_setRemote , __federation_method_unwrapDefault , __federation_method_wrapDefault}
