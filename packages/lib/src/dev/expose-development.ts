@@ -13,7 +13,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { existsSync, mkdirSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join, resolve } from 'path'
 import type { VitePluginFederationOptions } from 'types'
@@ -356,20 +356,24 @@ export const devExposePlugin = (
         sharedSet.add(item[0])
       }
 
-      // Also add known sub-paths that are commonly imported.
-      // Snapshot the base names first to avoid mutating the set while iterating.
-      const knownSubPaths = ['/jsx-runtime', '/jsx-dev-runtime', '/client']
+      // Discover sub-path exports from each shared package's exports map
+      // (e.g. react/jsx-runtime, zustand/middleware) so they are also
+      // intercepted by the shared resolver.
       const nodeRequire = createRequire(join(resolvedRoot, 'package.json'))
       const baseNames = [...sharedSet]
       for (const baseName of baseNames) {
-        for (const sub of knownSubPaths) {
-          const specifier = baseName + sub
-          try {
-            nodeRequire.resolve(specifier)
-            sharedSet.add(specifier)
-          } catch {
-            /* sub-path doesn't exist */
+        try {
+          const pkgJsonPath = nodeRequire.resolve(`${baseName}/package.json`)
+          const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
+          if (pkgJson.exports && typeof pkgJson.exports === 'object') {
+            for (const subPath of Object.keys(pkgJson.exports)) {
+              if (subPath !== '.' && subPath.startsWith('./')) {
+                sharedSet.add(baseName + subPath.slice(1))
+              }
+            }
           }
+        } catch {
+          /* package.json not found or not readable */
         }
       }
 
