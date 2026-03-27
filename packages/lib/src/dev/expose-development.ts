@@ -13,6 +13,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import { init as initLexer, parse as parseLexer } from 'es-module-lexer'
 import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join, resolve } from 'path'
@@ -84,10 +85,9 @@ const getPreBundleExports = async (
   root: string
 ): Promise<string[]> => {
   try {
-    const { init, parse } = await import('es-module-lexer')
-    await init
+    await initLexer
     const code = readFileSync(filePath, 'utf-8')
-    const [, exports] = parse(code)
+    const [, exports] = parseLexer(code)
     const names = exports
       .map((e) => (typeof e === 'string' ? e : e.n))
       .filter(Boolean)
