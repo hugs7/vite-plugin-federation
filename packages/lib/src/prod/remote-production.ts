@@ -34,6 +34,8 @@ import {
   injectToHead,
   toPreloadTag
 } from '../utils'
+import { buildFederationRuntimeCode } from '../runtime/federation-runtime'
+import { rewriteRemoteImports, buildFederationImportPreamble } from '../transform/rewrite-remote-imports'
 import type { ResolvedConfig, Rolldown } from 'vite'
 
 const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
@@ -114,121 +116,37 @@ export const prodRemotePlugin = (
     name: [PLUGIN_PREFIX, 'remote-production'].join(':'),
     virtualFile: needsFederationModule
       ? {
-          // language=JS
-          __federation__: `
-                ${hasRemotes ? createRemotesMap(prodRemotes) : 'const remotesMap = {};'}
-                const currentImports = {}
-                const loadJS = async (url, fn) => {
-                    const resolvedUrl = typeof url === 'function' ? await url() : url;
-                    const script = document.createElement('script')
-                    script.type = 'text/javascript';
-                    script.onload = fn;
-                    script.src = resolvedUrl;
-                    document.getElementsByTagName('head')[0].appendChild(script);
-                }
-
-                function get(name, ${REMOTE_FROM_PARAMETER}) {
-                    return __federation_import(name).then(module => () => {
-                        if ((globalThis.__federation_shared_remote_from__ ?? ${REMOTE_FROM_PARAMETER}) === 'webpack') {
-                            return Object.prototype.toString.call(module).indexOf('Module') > -1 && module.default ? module.default : module
-                        }
-                        return module
-                    })
-                }
-                
-                function merge(obj1, obj2) {
-                  const mergedObj = Object.assign(obj1, obj2);
-                  for (const key of Object.keys(mergedObj)) {
-                    if (typeof mergedObj[key] === 'object' && typeof obj2[key] === 'object') {
-                      mergedObj[key] = merge(mergedObj[key], obj2[key]);
-                    }
-                  }
-                  return mergedObj;
-                }
-
-                const wrapShareModule = ${REMOTE_FROM_PARAMETER} => {
-                  globalThis.__federation_shared_remote_from__ = ${REMOTE_FROM_PARAMETER};
-                  return merge({
-                    ${getModuleMarker('shareScope')}
-                  }, (globalThis.__federation_shared__ || {})['${shareScope}'] || {});
-                }
-                
-                async function __federation_import(name) {
-                    currentImports[name] ??= import(name)
-                    return currentImports[name]
-                }
-
-                const initMap = Object.create(null);
-
-                async function __federation_method_ensure(remoteId) {
-                    const remote = remotesMap[remoteId];
-                    if (!remote.inited) {
-                        if ('var' === remote.format) {
-                            // loading js with script tag
-                            return new Promise(resolve => {
-                                const callback = () => {
-                                    if (!remote.inited) {
-                                        remote.lib = window[remoteId];
-                                        remote.lib.init(wrapShareModule(remote.from));
-                                        remote.inited = true;
-                                    }
-                                    resolve(remote.lib);
-                                }
-                                return loadJS(remote.url, callback);
-                            });
-                        } else if (['esm', 'systemjs'].includes(remote.format)) {
-                            // loading js with import(...)
-                            return new Promise((resolve, reject) => {
-                                const getUrl = typeof remote.url === 'function' ? remote.url : () => Promise.resolve(remote.url);
-                                getUrl().then(url => {
-                                    import(/* @vite-ignore */ url).then(lib => {
-                                        if (!remote.inited) {
-                                            const shareScope = wrapShareModule(remote.from);
-                                            lib.init(shareScope);
-                                            remote.lib = lib;
-                                            remote.lib.init(shareScope);
-                                            remote.inited = true;
-                                        }
-                                        resolve(remote.lib);
-                                    }).catch(reject)
-                                })
-                            })
-                        }
-                    } else {
-                        return remote.lib;
-                    }
-                }
-
-                function __federation_method_unwrapDefault(module) {
-                    return (module?.__esModule || module?.[Symbol.toStringTag] === 'Module') ? module.default : module
-                }
-
-                function __federation_method_wrapDefault(module, need) {
-                    if (!module?.default && need) {
-                        let obj = Object.create(null);
-                        obj.default = module;
-                        obj.__esModule = true;
-                        return obj;
-                    }
-                    return module;
-                }
-
-                function __federation_method_getRemote(remoteName, componentName) {
-                    return __federation_method_ensure(remoteName).then((remote) => remote.get(componentName).then(factory => factory()));
-                }
-
-                function __federation_method_setRemote(remoteName, remoteConfig) {
-                  remotesMap[remoteName] = remoteConfig;
-                }
-
-                export {
-                    __federation_method_ensure,
-                    __federation_method_getRemote,
-                    __federation_method_setRemote,
-                    __federation_method_unwrapDefault,
-                    __federation_method_wrapDefault
-                }
-            `
+          __federation__: buildFederationRuntimeCode({
+            remotesMapCode: hasRemotes ? createRemotesMap(prodRemotes) : 'const remotesMap = {};',
+            extraPreludeCode: `const currentImports = {}
+function merge(obj1, obj2) {
+  const mergedObj = Object.assign(obj1, obj2);
+  for (const key of Object.keys(mergedObj)) {
+    if (typeof mergedObj[key] === 'object' && typeof obj2[key] === 'object') {
+      mergedObj[key] = merge(mergedObj[key], obj2[key]);
+    }
+  }
+  return mergedObj;
+}
+async function __federation_import(name) {
+    currentImports[name] ??= import(name)
+    return currentImports[name]
+}`,
+            getFunctionCode: `function get(name, ${REMOTE_FROM_PARAMETER}) {
+    return __federation_import(name).then(module => () => {
+        if ((globalThis.__federation_shared_remote_from__ ?? ${REMOTE_FROM_PARAMETER}) === 'webpack') {
+            return Object.prototype.toString.call(module).indexOf('Module') > -1 && module.default ? module.default : module
+        }
+        return module
+    })
+}`,
+            shareScopeWrapperCode: `const wrapShareScope = ${REMOTE_FROM_PARAMETER} => {
+  globalThis.__federation_shared_remote_from__ = ${REMOTE_FROM_PARAMETER};
+  return merge({
+    ${getModuleMarker('shareScope')}
+  }, (globalThis.__federation_shared__ || {})['${shareScope}'] || {});
+}`
+          })
         }
       : { __federation__: '' },
     configResolved(config) {
@@ -359,11 +277,8 @@ export const prodRemotePlugin = (
         }
 
         const magicString = new MagicString(code)
-        const hasStaticImported = new Map<string, string>()
-        let requiresRuntime = false
         let hasImportShared = false
         let modify = false
-        let manualRequired: any = null // set static import if exists
 
         walk(ast, {
           enter(node: any) {
@@ -423,150 +338,14 @@ export const prodRemotePlugin = (
                 }
               }
             }
-
-            if (
-              node.type === 'ImportDeclaration' &&
-              node.source?.value === 'virtual:__federation__'
-            ) {
-              manualRequired = node
-            }
-
-            // handle remote import , eg replace import {a} from 'remote/b' to dynamic import
-            if (
-              (node.type === 'ImportExpression' ||
-                node.type === 'ImportDeclaration' ||
-                node.type === 'ExportNamedDeclaration') &&
-              node.source?.value?.indexOf('/') > -1
-            ) {
-              const moduleId = node.source.value
-              const remote = prodRemotes.find((r) => r.regexp.test(moduleId))
-              const needWrap = remote?.config.from === 'vite'
-              if (remote) {
-                requiresRuntime = true
-                const modName = `.${moduleId.slice(remote.id.length)}`
-                switch (node.type) {
-                  case 'ImportExpression': {
-                    magicString.overwrite(
-                      node.start,
-                      node.end,
-                      `__federation_method_getRemote(${JSON.stringify(
-                        remote.id
-                      )} , ${JSON.stringify(
-                        modName
-                      )}).then(module=>__federation_method_wrapDefault(module, ${needWrap}))`
-                    )
-                    break
-                  }
-                  case 'ImportDeclaration': {
-                    if (node.specifiers?.length) {
-                      const afterImportName = `__federation_var_${moduleId.replace(
-                        /[@/\\.-]/g,
-                        ''
-                      )}`
-                      if (!hasStaticImported.has(moduleId)) {
-                        hasStaticImported.set(moduleId, afterImportName)
-                        magicString.overwrite(
-                          node.start,
-                          node.end,
-                          `const ${afterImportName} = await __federation_method_getRemote(${JSON.stringify(
-                            remote.id
-                          )} , ${JSON.stringify(modName)});`
-                        )
-                      }
-                      let deconstructStr = ''
-                      node.specifiers.forEach((spec) => {
-                        // default import , like import a from 'lib'
-                        if (spec.type === 'ImportDefaultSpecifier') {
-                          magicString.appendRight(
-                            node.end,
-                            `\n let ${spec.local.name} = __federation_method_unwrapDefault(${afterImportName}) `
-                          )
-                        } else if (spec.type === 'ImportSpecifier') {
-                          //  like import {a as b} from 'lib'
-                          const importedName = spec.imported.name
-                          const localName = spec.local.name
-                          deconstructStr += `${
-                            importedName === localName
-                              ? localName
-                              : `${importedName} : ${localName}`
-                          },`
-                        } else if (spec.type === 'ImportNamespaceSpecifier') {
-                          //  like import * as a from 'lib'
-                          magicString.appendRight(
-                            node.end,
-                            `let {${spec.local.name}} = ${afterImportName}`
-                          )
-                        }
-                      })
-                      if (deconstructStr.length > 0) {
-                        magicString.appendRight(
-                          node.end,
-                          `\n let {${deconstructStr.slice(
-                            0,
-                            -1
-                          )}} = ${afterImportName}`
-                        )
-                      }
-                    }
-                    break
-                  }
-                  case 'ExportNamedDeclaration': {
-                    // handle export like export {a} from 'remotes/lib'
-                    const afterImportName = `__federation_var_${moduleId.replace(
-                      /[@/\\.-]/g,
-                      ''
-                    )}`
-                    if (!hasStaticImported.has(moduleId)) {
-                      hasStaticImported.set(moduleId, afterImportName)
-                      magicString.overwrite(
-                        node.start,
-                        node.end,
-                        `const ${afterImportName} = await __federation_method_getRemote(${JSON.stringify(
-                          remote.id
-                        )} , ${JSON.stringify(modName)});`
-                      )
-                    }
-                    if (node.specifiers.length > 0) {
-                      const specifiers = node.specifiers
-                      let exportContent = ''
-                      let deconstructContent = ''
-                      specifiers.forEach((spec) => {
-                        const localName = spec.local.name
-                        const exportName = spec.exported.name
-                        const variableName = `${afterImportName}_${localName}`
-                        deconstructContent = deconstructContent.concat(
-                          `${localName}:${variableName},`
-                        )
-                        exportContent = exportContent.concat(
-                          `${variableName} as ${exportName},`
-                        )
-                      })
-                      magicString.append(
-                        `\n const {${deconstructContent.slice(
-                          0,
-                          deconstructContent.length - 1
-                        )}} = ${afterImportName}; \n`
-                      )
-                      magicString.append(
-                        `\n export {${exportContent.slice(
-                          0,
-                          exportContent.length - 1
-                        )}}; `
-                      )
-                    }
-                    break
-                  }
-                }
-              }
-            }
           }
         })
 
+        const { requiresRuntime, manualRequired } = rewriteRemoteImports(ast, magicString, prodRemotes)
+
         if (requiresRuntime) {
-          let requiresCode = `import {__federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`
-          // clear static required
+          const requiresCode = buildFederationImportPreamble(manualRequired)
           if (manualRequired) {
-            requiresCode = `import {__federation_method_setRemote, __federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`
             magicString.overwrite(manualRequired.start, manualRequired.end, ``)
           }
           magicString.prepend(requiresCode)

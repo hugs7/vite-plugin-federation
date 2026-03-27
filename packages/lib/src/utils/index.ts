@@ -28,24 +28,19 @@ import type { Rolldown } from 'vite'
 
 export * from './html'
 
-export function findDependencies(
-  this: Rolldown.PluginContext,
+export const findDependencies = (
+  ctx: Rolldown.PluginContext,
   id: string,
   sets: Set<string>,
   sharedModuleIds: Map<string, string>,
   usedSharedModuleIds: Set<string>
-): void {
+): void => {
   if (!sets.has(id)) {
     sets.add(id)
-    const moduleInfo = this.getModuleInfo(id)
+    const moduleInfo = ctx.getModuleInfo(id)
     if (moduleInfo?.importedIds) {
       moduleInfo.importedIds.forEach((id) => {
-        findDependencies.apply(this, [
-          id,
-          sets,
-          sharedModuleIds,
-          usedSharedModuleIds
-        ])
+        findDependencies(ctx, id, sets, sharedModuleIds, usedSharedModuleIds)
       })
     }
     if (sharedModuleIds.has(id)) {

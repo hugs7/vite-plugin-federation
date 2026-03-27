@@ -153,7 +153,7 @@ export const prodSharedPlugin = (
       }
     },
 
-    outputOptions: function (outputOption) {
+    outputOptions(outputOption) {
       // remove rollup generated empty imports,like import './filename.js'
       outputOption.hoistTransitiveImports = false
 

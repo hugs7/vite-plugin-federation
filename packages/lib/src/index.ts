@@ -224,7 +224,7 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
       return null
     },
 
-    generateBundle: function (_options, bundle, isWrite) {
+    generateBundle(_options, bundle, isWrite) {
       for (const pluginHook of pluginList) {
         pluginHook.generateBundle?.call(this, _options, bundle, isWrite)
       }

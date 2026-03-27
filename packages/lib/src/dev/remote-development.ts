@@ -13,12 +13,11 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { Rolldown, UserConfig } from 'vite'
+import type { Rolldown, UserConfig, ViteDevServer } from 'vite'
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
-import { walk } from 'estree-walker'
 import MagicString from 'magic-string'
 import { readFileSync } from 'fs'
-import type { Node, Program } from 'estree'
+import type { Program } from 'estree'
 
 import {
   createRemotesMap,
@@ -30,6 +29,11 @@ import {
 import { builderInfo, parsedOptions, devRemotes, PLUGIN_PREFIX } from '../public'
 import type { PluginHooks } from '../../types/pluginHooks'
 import { createLogger } from '../logger'
+import { buildFederationRuntimeCode } from '../runtime/federation-runtime'
+import {
+  rewriteRemoteImports,
+  buildFederationImportPreamble
+} from '../transform/rewrite-remote-imports'
 
 const logger = createLogger('remote')
 
@@ -68,148 +72,27 @@ export const devRemotePlugin = (
     name: [PLUGIN_PREFIX, 'remote-development'].join(':'),
     virtualFile: needsFederationModule
       ? {
-          __federation__: `
-${hasRemotes ? createRemotesMap(devRemotes) : 'const remotesMap = {};'}
-const loadJS = async (url, fn) => {
-  const resolvedUrl = typeof url === 'function' ? await url() : url;
-  const script = document.createElement('script')
-  script.type = 'text/javascript';
-  script.onload = fn;
-  script.src = resolvedUrl;
-  document.getElementsByTagName('head')[0].appendChild(script);
-}
-function get(name, ${REMOTE_FROM_PARAMETER}){
+          __federation__: buildFederationRuntimeCode({
+            remotesMapCode: hasRemotes ? createRemotesMap(devRemotes) : 'const remotesMap = {};',
+            getFunctionCode: `function get(name, ${REMOTE_FROM_PARAMETER}){
   return import(/* @vite-ignore */ name).then(module => ()=> {
     if ((globalThis.__federation_shared_remote_from__ ?? ${REMOTE_FROM_PARAMETER}) === 'webpack') {
       return Object.prototype.toString.call(module).indexOf('Module') > -1 && module.default ? module.default : module
     }
     return module
   })
-}
-const wrapShareScope = ${REMOTE_FROM_PARAMETER} => {
+}`,
+            shareScopeWrapperCode: `const wrapShareScope = ${REMOTE_FROM_PARAMETER} => {
   return {
     ${getModuleMarker('shareScope')}
   }
-}
-const initMap = Object.create(null);
-async function __federation_method_ensure(remoteId) {
-  const remote = remotesMap[remoteId];
-  if (!remote.inited) {
-    if ('var' === remote.format) {
-      // loading js with script tag
-      return new Promise(resolve => {
-        const callback = () => {
-          if (!remote.inited) {
-            remote.lib = window[remoteId];
-            remote.lib.init(wrapShareScope(remote.from))
-            remote.inited = true;
-          }
-          resolve(remote.lib);
-        }
-        return loadJS(remote.url, callback);
-      });
-    } else if (['esm', 'systemjs'].includes(remote.format)) {
-      // loading js with import(...)
-      return new Promise((resolve, reject) => {
-        const getUrl = typeof remote.url === 'function' ? remote.url : () => Promise.resolve(remote.url);
-        getUrl().then(url => {
-          import(/* @vite-ignore */ url).then(lib => {
-            if (!remote.inited) {
-              const shareScope = wrapShareScope(remote.from)
-              remote.lib = lib;
-              remote.lib.init(shareScope);
-              remote.inited = true;
-            }
-            resolve(remote.lib);
-          }).catch(reject)
-        })
-      })
-    }
-  } else {
-    return remote.lib;
-  }
-}
-
-function __federation_method_unwrapDefault(module) {
-  return (module?.__esModule || module?.[Symbol.toStringTag] === 'Module')?module.default:module
-}
-
-function __federation_method_wrapDefault(module, need){
-  if (!module?.default && need) {
-    let obj = Object.create(null);
-    obj.default = module;
-    obj.__esModule = true;
-    return obj;
-  }
-  return module; 
-}
-
-function __federation_method_getRemote(remoteName, componentName) {
-  return __federation_method_ensure(remoteName).then((remote) => remote.get(componentName).then(factory => factory()));
-}
-
-function __federation_method_setRemote(remoteName, remoteConfig) {
-  remotesMap[remoteName] = remoteConfig;
-}
-export {__federation_method_ensure, __federation_method_getRemote , __federation_method_setRemote , __federation_method_unwrapDefault , __federation_method_wrapDefault}
-;`
+}`
+          })
         }
       : { __federation__: '' },
-    config(config: UserConfig) {
-      // need to include remotes in the optimizeDeps.exclude
-      if (parsedOptions.devRemote.length) {
-        const excludeRemotes: string[] = []
-        parsedOptions.devRemote.forEach((item) => excludeRemotes.push(item[0]))
-        let optimizeDeps = config.optimizeDeps
-        if (!optimizeDeps) {
-          optimizeDeps = config.optimizeDeps = {}
-        }
-        if (!optimizeDeps.exclude) {
-          optimizeDeps.exclude = []
-        }
-        optimizeDeps.exclude = optimizeDeps.exclude.concat(excludeRemotes)
-      }
-    },
+    config: (config: UserConfig) => excludeRemotesFromOptimizeDeps(config),
 
-    configureServer(server) {
-      // Patch /@react-refresh on the HOST so it stores itself as a
-      // global singleton.  When a federated remote loads its own
-      // /@react-refresh from a different origin, it can re-export
-      // this singleton — ensuring all component families and mounted
-      // roots are tracked in one place for React Fast Refresh.
-      if (parsedOptions.devRemote.length) {
-        server.middlewares.use(async (req, res, next) => {
-          const url = req.url
-          if (
-            url === '/@react-refresh' ||
-            url?.startsWith('/@react-refresh?')
-          ) {
-            try {
-              const result = await server.transformRequest('/@react-refresh')
-              if (result) {
-                // Append a line that stores the module on the window
-                const code =
-                  result.code +
-                  `\nif(typeof window!=='undefined'){` +
-                  `window.__vite_react_refresh_runtime__={` +
-                  `injectIntoGlobalHook,register,createSignatureFunctionForTransform,` +
-                  `isLikelyComponentType,getFamilyByType,performReactRefresh,` +
-                  `setSignature,collectCustomHooksForSignature,` +
-                  `validateRefreshBoundaryAndEnqueueUpdate,` +
-                  `registerExportsForReactRefresh,__hmr_import` +
-                  `};};\n`
-                res.setHeader('Content-Type', 'application/javascript')
-                res.end(code)
-                return
-              }
-            } catch {
-              /* fall through */
-            }
-          }
-          next()
-        })
-      }
-    },
+    configureServer: (server) => handleHostReactRefresh(server),
     async transform(this: Rolldown.TransformPluginContext, code: string, id: string) {
       if (builderInfo.isHost || builderInfo.isShared) {
         for (const arr of parsedOptions.devShared) {
@@ -232,10 +115,7 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
       }
 
       if (id === '\0virtual:__federation__') {
-        const scopeCode = await devSharedScopeCode.call(
-          this,
-          parsedOptions.devShared
-        )
+        const scopeCode = await devSharedScopeCode(parsedOptions.devShared)
         return code.replace(getModuleMarker('shareScope'), scopeCode.join(','))
       }
 
@@ -256,154 +136,15 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
       }
 
       const magicString = new MagicString(code)
-      const hasStaticImported = new Map<string, string>()
-
-      let requiresRuntime = false
-      let manualRequired: any = null // set static import if exists
-      walk(ast as Node, {
-        enter(node: any) {
-          if (
-            node.type === 'ImportDeclaration' &&
-            node.source?.value === 'virtual:__federation__'
-          ) {
-            manualRequired = node
-          }
-
-          if (
-            (node.type === 'ImportExpression' ||
-              node.type === 'ImportDeclaration' ||
-              node.type === 'ExportNamedDeclaration') &&
-            node.source?.value?.indexOf('/') > -1
-          ) {
-            const moduleId = node.source.value
-            const remote = devRemotes.find((r) => r.regexp.test(moduleId))
-            const needWrap = remote?.config.from === 'vite'
-            if (remote) {
-              requiresRuntime = true
-              const modName = `.${moduleId.slice(remote.id.length)}`
-              switch (node.type) {
-                case 'ImportExpression': {
-                  magicString.overwrite(
-                    node.start,
-                    node.end,
-                    `__federation_method_getRemote(${JSON.stringify(
-                      remote.id
-                    )} , ${JSON.stringify(
-                      modName
-                    )}).then(module=>__federation_method_wrapDefault(module, ${needWrap}))`
-                  )
-                  break
-                }
-                case 'ImportDeclaration': {
-                  if (node.specifiers?.length) {
-                    const afterImportName = `__federation_var_${moduleId.replace(
-                      /[@/\\.-]/g,
-                      ''
-                    )}`
-                    if (!hasStaticImported.has(moduleId)) {
-                      magicString.overwrite(
-                        node.start,
-                        node.end,
-                        `const ${afterImportName} = await __federation_method_getRemote(${JSON.stringify(
-                          remote.id
-                        )} , ${JSON.stringify(modName)});`
-                      )
-                      hasStaticImported.set(moduleId, afterImportName)
-                    }
-                    let deconstructStr = ''
-                    node.specifiers.forEach((spec) => {
-                      // default import , like import a from 'lib'
-                      if (spec.type === 'ImportDefaultSpecifier') {
-                        magicString.appendRight(
-                          node.end,
-                          `\n let ${spec.local.name} = __federation_method_unwrapDefault(${afterImportName}) `
-                        )
-                      } else if (spec.type === 'ImportSpecifier') {
-                        //  like import {a as b} from 'lib'
-                        const importedName = spec.imported.name
-                        const localName = spec.local.name
-                        deconstructStr += `${
-                          importedName === localName
-                            ? localName
-                            : `${importedName} : ${localName}`
-                        },`
-                      } else if (spec.type === 'ImportNamespaceSpecifier') {
-                        //  like import * as a from 'lib'
-                        magicString.appendRight(
-                          node.end,
-                          `let {${spec.local.name}} = ${afterImportName}`
-                        )
-                      }
-                    })
-                    if (deconstructStr.length > 0) {
-                      magicString.appendRight(
-                        node.end,
-                        `\n let {${deconstructStr.slice(
-                          0,
-                          -1
-                        )}} = ${afterImportName}`
-                      )
-                    }
-                  }
-                  break
-                }
-                case 'ExportNamedDeclaration': {
-                  // handle export like export {a} from 'remotes/lib'
-                  const afterImportName = `__federation_var_${moduleId.replace(
-                    /[@/\\.-]/g,
-                    ''
-                  )}`
-                  if (!hasStaticImported.has(moduleId)) {
-                    hasStaticImported.set(moduleId, afterImportName)
-                    magicString.overwrite(
-                      node.start,
-                      node.end,
-                      `const ${afterImportName} = await __federation_method_getRemote(${JSON.stringify(
-                        remote.id
-                      )} , ${JSON.stringify(modName)});`
-                    )
-                  }
-                  if (node.specifiers.length > 0) {
-                    const specifiers = node.specifiers
-                    let exportContent = ''
-                    let deconstructContent = ''
-                    specifiers.forEach((spec) => {
-                      const localName = spec.local.name
-                      const exportName = spec.exported.name
-                      const variableName = `${afterImportName}_${localName}`
-                      deconstructContent = deconstructContent.concat(
-                        `${localName}:${variableName},`
-                      )
-                      exportContent = exportContent.concat(
-                        `${variableName} as ${exportName},`
-                      )
-                    })
-                    magicString.append(
-                      `\n const {${deconstructContent.slice(
-                        0,
-                        deconstructContent.length - 1
-                      )}} = ${afterImportName}; \n`
-                    )
-                    magicString.append(
-                      `\n export {${exportContent.slice(
-                        0,
-                        exportContent.length - 1
-                      )}}; `
-                    )
-                  }
-                  break
-                }
-              }
-            }
-          }
-        }
-      })
+      const { requiresRuntime, manualRequired } = rewriteRemoteImports(
+        ast,
+        magicString,
+        devRemotes
+      )
 
       if (requiresRuntime) {
-        let requiresCode = `import {__federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`
-        // clear static required
+        const requiresCode = buildFederationImportPreamble(manualRequired)
         if (manualRequired) {
-          requiresCode = `import {__federation_method_setRemote, __federation_method_ensure, __federation_method_getRemote , __federation_method_wrapDefault , __federation_method_unwrapDefault} from '__federation__';\n\n`
           magicString.overwrite(manualRequired.start, manualRequired.end, ``)
         }
         magicString.prepend(requiresCode)
@@ -412,10 +153,64 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
     }
   }
 
-  async function devSharedScopeCode(
-    this: Rolldown.TransformPluginContext,
+  const excludeRemotesFromOptimizeDeps = (config: UserConfig) => {
+    if (parsedOptions.devRemote.length) {
+      const excludeRemotes: string[] = []
+      parsedOptions.devRemote.forEach((item) => excludeRemotes.push(item[0]))
+      let optimizeDeps = config.optimizeDeps
+      if (!optimizeDeps) {
+        optimizeDeps = config.optimizeDeps = {}
+      }
+      if (!optimizeDeps.exclude) {
+        optimizeDeps.exclude = []
+      }
+      optimizeDeps.exclude = optimizeDeps.exclude.concat(excludeRemotes)
+    }
+  }
+
+  const handleHostReactRefresh = (server: ViteDevServer) => {
+    // Patch /@react-refresh on the HOST so it stores itself as a
+    // global singleton.  When a federated remote loads its own
+    // /@react-refresh from a different origin, it can re-export
+    // this singleton — ensuring all component families and mounted
+    // roots are tracked in one place for React Fast Refresh.
+    if (parsedOptions.devRemote.length) {
+      server.middlewares.use(async (req, res, next) => {
+        const url = req.url
+        if (
+          url === '/@react-refresh' ||
+          url?.startsWith('/@react-refresh?')
+        ) {
+          try {
+            const result = await server.transformRequest('/@react-refresh')
+            if (result) {
+              // Append a line that stores the module on the window
+              const code =
+                result.code +
+                `\nif(typeof window!=='undefined'){` +
+                `window.__vite_react_refresh_runtime__={` +
+                `injectIntoGlobalHook,register,createSignatureFunctionForTransform,` +
+                `isLikelyComponentType,getFamilyByType,performReactRefresh,` +
+                `setSignature,collectCustomHooksForSignature,` +
+                `validateRefreshBoundaryAndEnqueueUpdate,` +
+                `registerExportsForReactRefresh,__hmr_import` +
+                `};};\n`
+              res.setHeader('Content-Type', 'application/javascript')
+              res.end(code)
+              return
+            }
+          } catch {
+            /* fall through */
+          }
+        }
+        next()
+      })
+    }
+  }
+
+  const devSharedScopeCode = async (
     shared: (string | ConfigTypeSet)[]
-  ): Promise<string[]> {
+  ): Promise<string[]> => {
     const res: string[] = []
     if (shared.length) {
       for (const item of shared) {
