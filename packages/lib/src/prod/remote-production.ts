@@ -30,7 +30,6 @@ import {
 import {
   createRemotesMap,
   getModuleMarker,
-  joinUrlSegments,
   parseRemoteOptions,
   REMOTE_FROM_PARAMETER,
   injectToHead,

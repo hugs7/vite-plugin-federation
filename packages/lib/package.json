@@ -45,7 +45,7 @@
   "homepage": "https://github.com/hugs7/vite-plugin-federation#readme",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "build": "vite build",
+    "build": "pnpm run typecheck && vite build",
     "dev": "vite build --watch",
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s --commit-path ."
   },
