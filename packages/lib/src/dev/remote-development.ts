@@ -13,13 +13,12 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { UserConfig } from 'vite'
+import type { TransformPluginContext, UserConfig } from 'vite'
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
 import { walk } from 'estree-walker'
 import MagicString from 'magic-string'
 import { readFileSync } from 'fs'
-
-import type { AcornNode, TransformPluginContext } from 'rollup'
+import type { Node, Program } from 'estree'
 
 import {
   createRemotesMap,
@@ -30,7 +29,9 @@ import {
 } from '../utils'
 import { builderInfo, parsedOptions, devRemotes, PLUGIN_PREFIX } from '../public'
 import type { PluginHooks } from '../../types/pluginHooks'
-import { Node } from 'estree'
+import { createLogger } from '../logger'
+
+const logger = createLogger('remote')
 
 export const devRemotePlugin = (
   options: VitePluginFederationOptions
@@ -244,11 +245,11 @@ export {__federation_method_ensure, __federation_method_getRemote , __federation
         return
       }
 
-      let ast: AcornNode | null = null
+      let ast: Program | null = null
       try {
-        ast = this.parse(code)
+        ast = this.parse(code) as Program
       } catch (err) {
-        console.error(err)
+        logger.error('Failed to parse %s:', id, err)
       }
       if (!ast) {
         return null
