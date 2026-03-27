@@ -13,9 +13,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { execSync } from 'child_process'
-import { init, parse } from 'es-module-lexer'
-import { readFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join, resolve } from 'path'
 import type { VitePluginFederationOptions } from 'types'
@@ -26,39 +24,23 @@ import { NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter } from '../utils'
 
 import { FEDERATION_DEBUG_SNIPPET_ESM } from '../debug'
 
-/**
- * Detect whether a resolved module file is CJS (uses require/module.exports).
- * CJS modules must stay pre-bundled so the dep optimizer converts them to ESM.
- */
-const isCjsFile = (filePath: string): boolean => {
-  if (filePath.endsWith('.mjs')) return false
-  if (filePath.endsWith('.cjs')) return true
-  try {
-    const head = readFileSync(filePath, 'utf-8').slice(0, 2000)
-    return /\brequire\s*\(/.test(head) || /\bmodule\.exports\b/.test(head)
-  } catch {
-    return false
-  }
-}
-
 const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:'
 const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
 
-let lexerReady: Promise<void> | undefined
+const FEDERATION_DEPS_DIR = '.federation-deps'
 
 /**
- * Statically extract ESM export names from a file using es-module-lexer.
- * Runs in-process (no subprocess) for speed. Doesn't execute the module,
- * so it works even when the module references browser-only globals like
- * `window` or `localStorage` at the top level.
+ * Read the export names from a federation pre-bundled file.
+ * The pre-bundle output is clean ESM — es-module-lexer can parse it reliably
+ * because Rolldown already resolved all CJS/ESM/export* into flat exports.
  */
-const getExportNamesStatically = async (
-  resolvedPath: string
+const readPreBundledExports = async (
+  filePath: string
 ): Promise<string[]> => {
   try {
-    if (!lexerReady) lexerReady = init
-    await lexerReady
-    const code = readFileSync(resolvedPath, 'utf-8')
+    const { init, parse } = await import('es-module-lexer')
+    await init
+    const code = readFileSync(filePath, 'utf-8')
     const [, exports] = parse(code)
     return exports.map((e) => (typeof e === 'string' ? e : e.n)).filter(Boolean)
   } catch {
@@ -66,54 +48,19 @@ const getExportNamesStatically = async (
   }
 }
 
-const getModuleExportNames = async (
-  name: string,
-  root: string
-): Promise<string[]> => {
-  // Prefer static analysis — it only parses the file without executing it,
-  // so browser-only modules (e.g. SSO with localStorage) won't trigger
-  // Node.js warnings or side-effects.
-  try {
-    const nodeRequire = createRequire(join(root, 'package.json'))
-    const resolvedPath = nodeRequire.resolve(name)
-    const names = await getExportNamesStatically(resolvedPath)
-    if (names.length > 0) return names
-  } catch {
-    /* resolution failed — try dynamic import */
-  }
-
-  try {
-    const result = execSync(
-      `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
-      {
-        cwd: root,
-        encoding: 'utf-8',
-        timeout: 10000,
-        stdio: ['pipe', 'pipe', 'pipe']
-      }
-    )
-    return JSON.parse(result.trim())
-  } catch {
-    return []
-  }
-}
-
 /** Metadata for a shared virtual module */
 interface SharedModuleMeta {
-  /** Vite-serveable URL for the real local module (/@fs/... or root-relative) */
-  localUrl: string
-  /** Enumerated export names */
+  /** URL to the federation pre-bundled file (served via /@fs/ or root-relative) */
+  preBundleUrl: string
+  /** Enumerated export names (discovered from pre-bundle output) */
   exports: string[]
-  /** Whether this module's entry point is CJS */
-  isCjs?: boolean
-  /** Pre-bundled dep URL (e.g. /node_modules/.vite/deps/react.js) for CJS fallback */
-  depUrl?: string
 }
 
 /**
  * Build ESM wrapper code for a shared virtual module.
  * At runtime, checks globalThis.__federation_shared_modules__ first (set by
- * the host's init()), falling back to a dynamic import of the local package.
+ * the host's init()), falling back to a dynamic import of the federation
+ * pre-bundled version of the package.
  */
 const buildSharedWrapperCode = (
   name: string,
@@ -123,24 +70,18 @@ const buildSharedWrapperCode = (
   const named = meta.exports.filter((e) => e !== 'default')
   const hasDefault = meta.exports.includes('default')
 
-  // CJS modules use the pre-bundled dep URL (browsers can't load raw CJS).
-  // ESM modules use localUrl with ?__fed_raw to bypass our raw middleware.
-  const baseUrl =
-    meta.isCjs && meta.depUrl ? meta.depUrl : meta.localUrl + '?__fed_raw'
-  // When originUrl is provided, prefix the import URL so the browser
-  // fetches from this dev server, not the host page's origin.
-  const importUrl = originUrl ? `${originUrl}${baseUrl}` : baseUrl
+  const importUrl = originUrl
+    ? `${originUrl}${meta.preBundleUrl}`
+    : meta.preBundleUrl
 
   let code = ''
   code += `const __shared = globalThis.__federation_shared_modules__?.[${JSON.stringify(name)}];\n`
-  code += `console.log('[federation:shared-wrapper] ${name}:', __shared ? 'USING SHARED' : 'FALLBACK to local', Object.keys(__shared || {}).slice(0,5));\n`
   code += `const __mod = __shared ?? await import(/* @vite-ignore */ ${JSON.stringify(importUrl)});\n`
 
   if (hasDefault) {
     code += `export default (__mod.default ?? __mod);\n`
   }
   for (const e of named) {
-    // Use safe identifier check — most exports are valid JS identifiers
     if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e)) {
       code += `export const ${e} = __mod[${JSON.stringify(e)}];\n`
     }
@@ -149,7 +90,7 @@ const buildSharedWrapperCode = (
   return code
 }
 
-/** Map of shared specifier -> metadata, populated in config() */
+/** Map of shared specifier -> metadata, populated in configureServer() */
 const sharedModuleMeta = new Map<string, SharedModuleMeta>()
 
 // Convert an absolute filesystem path to a URL that Vite's dev server
@@ -169,15 +110,8 @@ export const devExposePlugin = (
 ): PluginHooks => {
   parsedOptions.devExpose = parseExposeOptions(options)
 
-  // Build list of shared module names for init code generation
-  const sharedList: string[] = []
-  // Modules actually excluded from dep optimization (only these get
-  // wrapper/patch treatment in middleware and transform)
-  const excludedShared = new Set<string>()
-  // CJS modules that must stay pre-bundled (detected at config time)
-  const cjsShared = new Set<string>()
-  // CJS sub-deps of excluded modules that need force-inclusion
-  const cjsSubDeps = new Set<string>()
+  // The set of ALL shared module specifiers (populated in config())
+  const sharedSet = new Set<string>()
   let resolvedRoot = process.cwd()
 
   let moduleMap = ''
@@ -271,217 +205,76 @@ export const get = async (module) => {
         return
       }
 
-      const root = resolvedRoot
-      const nodeRequire = createRequire(join(root, 'package.json'))
-
-      // Populate sharedList and discover exports for each shared module
+      // Collect all shared module specifiers
       for (const item of parsedOptions.devShared) {
-        const name = item[0]
-        sharedList.push(name)
-
-        let realPath: string
-        try {
-          realPath = nodeRequire.resolve(name)
-        } catch {
-          continue
-        }
-
-        const localUrl = toViteUrl(realPath, root)
-        const exports = await getModuleExportNames(name, root)
-        const cjs = isCjsFile(realPath)
-        const meta: SharedModuleMeta = { localUrl, exports, isCjs: cjs }
-        if (cjs) {
-          meta.depUrl = `/node_modules/.vite/deps/${name.replace(/\//g, '_')}.js`
-          cjsShared.add(name)
-        }
-        sharedModuleMeta.set(name, meta)
+        sharedSet.add(item[0])
       }
 
-      // Discover sub-paths of shared modules (e.g. react/jsx-runtime).
-      // These are known CJS entry points that need named re-export patching.
+      // Also add known sub-paths that are commonly imported
       const knownSubPaths = ['/jsx-runtime', '/jsx-dev-runtime', '/client']
-      for (const baseName of sharedList) {
+      const nodeRequire = createRequire(join(resolvedRoot, 'package.json'))
+      for (const baseName of sharedSet) {
         for (const sub of knownSubPaths) {
           const specifier = baseName + sub
-          if (sharedModuleMeta.has(specifier)) continue
           try {
-            const realPath = nodeRequire.resolve(specifier)
-            const localUrl = toViteUrl(realPath, root)
-            const exports = await getModuleExportNames(specifier, root)
-            if (exports.length > 0) {
-              const cjs = isCjsFile(realPath)
-              const subMeta: SharedModuleMeta = {
-                localUrl,
-                exports,
-                isCjs: cjs
-              }
-              if (cjs) {
-                subMeta.depUrl = `/node_modules/.vite/deps/${specifier.replace(/\//g, '_')}.js`
-              }
-              sharedModuleMeta.set(specifier, subMeta)
-            }
+            nodeRequire.resolve(specifier)
+            sharedSet.add(specifier)
           } catch {
-            /* sub-path doesn't exist for this module */
+            /* sub-path doesn't exist */
           }
         }
       }
 
-      // Determine which shared modules should be excluded from dep
-      // optimization.  When excluded, other pre-bundled deps (like the
-      // MFE framework bundle) create external bare-specifier imports
-      // instead of inlining the module's code.  Our resolveId hook then
-      // intercepts these bare specifiers and serves a virtual wrapper
-      // that uses the host's shared instance.
+      console.log(
+        '[federation:config] Shared modules (all externalized):',
+        [...sharedSet]
+      )
+
+      // Inject a Rolldown plugin into the dep optimizer that marks ALL
+      // shared modules as external.  This means when Rolldown pre-bundles
+      // dependencies (e.g. react-dom, some-ui-lib), any import of a shared
+      // module is left as a bare specifier in the .vite/deps/ output.
+      // Our Vite-level resolveId then intercepts these bare specifiers
+      // from the browser and serves the shared wrapper.
       //
-      // Rules:
-      // - CJS modules (react, react-dom, react-redux, zustand) MUST
-      //   stay pre-bundled — browsers can't load raw CJS.  Their
-      //   `t` factory export is patched by the .vite/deps/ middleware.
-      // - ESM modules with CJS sub-dependencies (react-router → cookie;
-      //   @reduxjs/toolkit → redux/immer) should also stay pre-bundled
-      //   to avoid cascading CJS failures.
-      // - Only exclude ESM modules that are self-contained bundles with
-      //   no relative imports — their bare-specifier deps are all shared
-      //   or pre-bundled by the dep optimizer.
-      const safeToExclude = new Set<string>()
-      for (const name of sharedList) {
-        const meta = sharedModuleMeta.get(name)
-        if (!meta || meta.isCjs) continue
+      // This replaces ALL heuristic classification (CJS/ESM detection,
+      // export* scanning, sub-dep discovery) with a single declarative rule.
+      config.optimizeDeps ??= {}
+      config.optimizeDeps.rolldownOptions ??= {}
 
-        // Non-CJS shared modules should be excluded from dep
-        // optimization so the virtual wrapper intercepts ALL imports
-        // (including from other pre-bundled deps).  When a shared
-        // module stays pre-bundled, other pre-bundled deps import its
-        // internal chunks directly, bypassing the shared wrapper.
-        //
-        // EXCEPTION: modules whose entry uses `export * from "pkg"`
-        // where pkg is a non-shared CJS module CANNOT be excluded.
-        // `export *` requires the target to have static named exports,
-        // but CJS modules pre-bundled by Vite only have a default
-        // export.  These modules must stay pre-bundled (the dep
-        // optimizer flattens the `export *` during bundling).
-        //
-        // Any non-shared bare-specifier deps are force-included so
-        // the browser can load them from .vite/deps/.
-        let hasExportStarFromNonShared = false
-
-        try {
-          const realPath = nodeRequire.resolve(name)
-          const src = readFileSync(realPath, 'utf-8')
-
-          // Check for `export * from "non-shared-pkg"` in entry
-          const exportStarDeps = [
-            ...src.matchAll(/export\s+\*\s+from\s+['"]([^'"./][^'"]*)['"]/g)
-          ].map((m) => m[1])
-          for (const dep of exportStarDeps) {
-            const pkg = dep.startsWith('@')
-              ? dep.split('/').slice(0, 2).join('/')
-              : dep.split('/')[0]
-            if (!sharedList.includes(pkg)) {
-              hasExportStarFromNonShared = true
-              break
-            }
+      const sharedNames = [...sharedSet]
+      const federationOptimizerPlugin = {
+        name: 'federation-shared-external',
+        resolveId(id: string) {
+          // Mark shared modules as external in the dep optimizer.
+          // This causes Rolldown to leave `import "react"` as-is in
+          // pre-bundled output instead of inlining/chunking the module.
+          if (sharedNames.includes(id)) {
+            return { id, external: true }
           }
-        } catch {
-          /* can't read module */
-        }
-
-        if (hasExportStarFromNonShared) continue
-
-        safeToExclude.add(name)
-
-        try {
-          const realPath = nodeRequire.resolve(name)
-          const entryDir = realPath.substring(0, realPath.lastIndexOf('/'))
-          const src = readFileSync(realPath, 'utf-8')
-
-          // Collect non-shared bare deps from the ENTRY file
-          const entryBareDeps = [
-            ...src.matchAll(/from\s+['"]([^'"./][^'"]*)['"]/g)
-          ]
-            .map((m) => m[1])
-            .filter((d) => !d.includes('$'))
-          for (const dep of entryBareDeps) {
-            const pkg = dep.startsWith('@')
-              ? dep.split('/').slice(0, 2).join('/')
-              : dep.split('/')[0]
-            if (!sharedList.includes(pkg)) {
-              cjsSubDeps.add(pkg)
-            }
-          }
-
-          // Scan internal chunks for non-shared bare deps too
-          const relImports = [...src.matchAll(/from\s+['"](\.\/.+?)['"]/g)].map(
-            (m) => m[1]
-          )
-          for (const rel of relImports) {
-            try {
-              const chunkSrc = readFileSync(join(entryDir, rel), 'utf-8')
-              const bareDeps = [
-                ...chunkSrc.matchAll(/from\s+['"]([^'"./][^'"]*)['"]/g)
-              ]
-                .map((m) => m[1])
-                .filter((d) => !d.includes('$'))
-              for (const dep of bareDeps) {
-                const pkg = dep.startsWith('@')
-                  ? dep.split('/').slice(0, 2).join('/')
-                  : dep.split('/')[0]
-                if (!sharedList.includes(pkg)) {
-                  cjsSubDeps.add(pkg)
-                }
-              }
-            } catch {
-              /* can't read chunk */
-            }
-          }
-        } catch {
-          /* can't read module */
+          return null
         }
       }
 
-      for (const name of safeToExclude) {
-        excludedShared.add(name)
-      }
-
-      console.log('[federation:config] Shared modules:', [...sharedModuleMeta.keys()])
-      console.log('[federation:config] CJS (stay pre-bundled):', [...cjsShared])
-      console.log('[federation:config] Excluded from dep optimization:', [...safeToExclude])
-      console.log('[federation:config] CJS sub-deps force-included:', [...cjsSubDeps])
-
-      if (safeToExclude.size > 0) {
-        config.optimizeDeps ??= {}
-        config.optimizeDeps.exclude = [
-          ...(config.optimizeDeps.exclude ?? []),
-          ...safeToExclude
+      const existingPlugins = config.optimizeDeps.rolldownOptions.plugins
+      if (Array.isArray(existingPlugins)) {
+        existingPlugins.push(federationOptimizerPlugin)
+      } else {
+        config.optimizeDeps.rolldownOptions.plugins = [
+          federationOptimizerPlugin
         ]
-        // Force-include CJS sub-deps of excluded modules so they're
-        // pre-bundled before the browser encounters them.
-        if (cjsSubDeps.size > 0) {
-          config.optimizeDeps.include = [
-            ...(config.optimizeDeps.include ?? []),
-            ...cjsSubDeps
-          ]
-        }
       }
-    },
-
-    transform(_code: string, _id: string) {
-      // Shared module patching is handled entirely by the middleware
-      // (response interception), which preserves Vite's import rewriting.
-      return null
     },
 
     resolveId(id: string) {
-      if (!excludedShared.size) return null
-
-      // Only intercept modules actually excluded from dep optimization.
-      // CJS modules (react, react-dom, react-redux, zustand) stay
-      // pre-bundled and are handled by the .vite/deps/ middleware.
-      // ESM modules with relative internal chunks (react-router) also
-      // stay pre-bundled to avoid cascading CJS failures.
-      if (!excludedShared.has(id)) return null
-
-      return RESOLVED_SHARED_PREFIX + id
+      // Intercept ALL shared module imports.  Because shared modules are
+      // externalized in the dep optimizer, bare specifiers for them appear
+      // in .vite/deps/ output and in application source code.  We redirect
+      // them all to our virtual shared wrapper.
+      if (sharedSet.has(id)) {
+        return RESOLVED_SHARED_PREFIX + id
+      }
+      return null
     },
 
     load(id: string) {
@@ -500,268 +293,66 @@ export const get = async (module) => {
         moduleType: 'js' as const
       }
     },
-    configureServer(server) {
-      // Intercept requests for pre-bundled shared modules in .vite/deps/.
-      // CJS shared modules (react, react-dom, react-redux, zustand) are
-      // kept pre-bundled.  Their pre-bundled output has:
-      //   export default require_xxx();
-      //   export { require_xxx as t };
-      // We patch these to check globalThis.__federation_shared_modules__
-      // first, and re-export the `t` factory to return the shared instance.
-      // This ensures other pre-bundled deps importing `{ t }` from react.js
-      // also get the host's shared instance.
-      if (sharedModuleMeta.size > 0) {
-        server.middlewares.use(async (req, res, next) => {
-          const url = req.url
-          if (!url || !url.includes('.vite/deps/')) {
-            next()
-            return
-          }
 
-          const urlPath = url.split('?')[0]
-          const depsMatch = urlPath.match(
-            /\/node_modules\/\.vite\/deps\/(.+)\.js$/
-          )
-          if (!depsMatch) {
-            next()
-            return
-          }
-          const fileName = depsMatch[1]
+    async configureServer(server) {
+      // Build the federation pre-bundle: use Rolldown to bundle each shared
+      // module into a clean ESM file.  This handles CJS→ESM conversion,
+      // export* resolution, and sub-dep inlining — all without heuristics.
+      if (sharedSet.size > 0) {
+        const root = resolvedRoot
+        const outDir = join(root, 'node_modules', FEDERATION_DEPS_DIR)
+        mkdirSync(outDir, { recursive: true })
 
-          // Match against all shared modules (not just excluded ones).
-          // Pre-bundled CJS modules need patching here.
-          let matchedName: string | undefined
-          let matchedMeta: SharedModuleMeta | undefined
-          for (const [name, meta] of sharedModuleMeta) {
-            if (name.replace(/\//g, '_') === fileName) {
-              matchedName = name
-              matchedMeta = meta
-              break
-            }
-          }
+        const { build } = await import('rolldown')
 
-          if (!matchedName || !matchedMeta) {
-            next()
-            return
-          }
-
-          const matchedBase = matchedName
-            .split('/')
-            .slice(0, matchedName.startsWith('@') ? 2 : 1)
-            .join('/')
-
-          // Intercept the response: let Vite serve the file normally
-          // (with proper import rewriting), then patch the output.
-          const origEnd = res.end.bind(res)
-          const chunks: Buffer[] = []
-
-          res.write = function (chunk: any, ...args: any[]) {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-            return true
-          } as any
-
-          res.end = function (chunk?: any, ...args: any[]) {
-            if (chunk)
-              chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-            let fileCode = Buffer.concat(chunks).toString('utf-8')
-
-            const exportNames = matchedMeta!.exports.filter(
-              (e) =>
-                e !== 'default' &&
-                e !== 'module.exports' &&
-                /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(e)
-            )
-            const isTopLevel = matchedName === matchedBase
-            const hasDefault = /export default .+;/.test(fileCode)
-
-            if (isTopLevel) {
-              // For top-level shared module facades, replace the ENTIRE
-              // file with a shared wrapper.  This handles both CJS modules
-              // (which have `export default` + `t` factory) and ESM modules
-              // (which may only have named re-exports from internal chunks).
-              //
-              // The wrapper checks __federation_shared_modules__ first.
-              // If found, all named exports come from the shared instance.
-              // Otherwise, fall back to the original module code.
-              //
-              // For CJS modules with a `t` factory, we also patch the factory
-              // so other pre-bundled deps that import `{ t }` from this module
-              // also get the shared instance.
-              const sharedName = JSON.stringify(matchedName!)
-              const hasFactory = /export \{ .+ as t \};/.test(fileCode)
-
-              if (hasDefault) {
-                // CJS pattern: export default require_xxx(); export { require_xxx as t };
-                fileCode = fileCode.replace(
-                  /export default (.+);/,
-                  `const __federation_default = globalThis.__federation_shared_modules__?.[${sharedName}] ?? $1;\nexport default __federation_default;\n` +
-                    exportNames
-                      .map(
-                        (e) =>
-                          `export const ${e} = __federation_default[${JSON.stringify(e)}];`
-                      )
-                      .join('\n')
-                )
-
-                if (hasFactory) {
-                  fileCode = fileCode.replace(
-                    /export \{ .+ as t \};/,
-                    `const __federation_t = () => __federation_default;\nexport { __federation_t as t };`
-                  )
-                }
-              } else if (exportNames.length > 0) {
-                // ESM pattern: only named re-exports from chunk (e.g. react-router).
-                // The facade has: import { a as X, b as Y } from "./chunk.js";
-                //                 export { X, Y, Foo as Bar, ... };
-                //
-                // Strategy: keep the original import (so standalone works),
-                // then rewrite the export {} block.  For each export specifier,
-                // check the shared module first, falling back to the local binding.
-                //
-                // Parse the export statement to extract local→exported mappings,
-                // because renamed exports like `Action as NavigationType` mean the
-                // local variable is `Action`, not `NavigationType`.
-                const exportMatch = fileCode.match(/export \{([^}]+)\};/)
-                if (exportMatch) {
-                  const specifiers = exportMatch[1]
-                    .split(',')
-                    .map((s) => s.trim())
-                    .filter(Boolean)
-                  // Parse each specifier: "Foo" or "Foo as Bar"
-                  const mappings = specifiers.map((s) => {
-                    const parts = s.split(/\s+as\s+/)
-                    const local = parts[0].trim()
-                    const exported = (parts[1] || parts[0]).trim()
-                    return { local, exported }
-                  })
-
-                  // Remove original export block
-                  fileCode = fileCode.replace(/export \{[^}]+\};/, '')
-
-                  // Append shared-aware re-exports
-                  fileCode +=
-                    `\nconst __federation_shared = globalThis.__federation_shared_modules__?.[${sharedName}];\n` +
-                    mappings
-                      .map(({ local, exported }) => {
-                        const safeId = `__fed_${exported.replace(/[^a-zA-Z0-9_$]/g, '_')}`
-                        return `const ${safeId} = __federation_shared ? __federation_shared[${JSON.stringify(exported)}] : ${local};\nexport { ${safeId} as ${exported} };`
-                      })
-                      .join('\n') +
-                    '\n'
-                }
-              }
-            } else if (exportNames.length > 0 && hasDefault) {
-              // Sub-path module (e.g. react/jsx-runtime) — patch default only
-              const reExports = exportNames
-                .map(
-                  (e) =>
-                    `export const ${e} = __federation_default[${JSON.stringify(e)}];`
-                )
-                .join('\n')
-              fileCode = fileCode.replace(
-                /export default (.+);/,
-                `const __federation_default = $1;\nexport default __federation_default;\n${reExports}`
-              )
-            }
-
-            // Remove content-length since we changed the body
-            res.removeHeader('content-length')
-            res.setHeader('Access-Control-Allow-Origin', '*')
-            origEnd(fileCode)
-          } as any
-
-          next()
-        })
-      }
-
-      // Intercept CJS sub-deps of excluded shared modules.
-      // When the fallback path loads an excluded module's chunks from
-      // node_modules, those chunks may import CJS packages (e.g. cookie).
-      // Browsers can't parse CJS, so we redirect these imports to the
-      // pre-bundled ESM versions in .vite/deps/.
-      // Match by /node_modules/<pkg>/ in the URL to handle nested deps
-      // (e.g. react-router/node_modules/cookie/).
-      if (cjsSubDeps.size > 0) {
-        server.middlewares.use((req, res, next) => {
-          const url = req.url
-          if (!url || !url.includes('/node_modules/')) {
-            next()
-            return
-          }
-
-          const urlPath = url.split('?')[0]
-          for (const dep of cjsSubDeps) {
-            if (urlPath.includes(`/node_modules/${dep}/`)) {
-              const depFile = dep.replace(/\//g, '_')
-              const preBundledUrl = `/node_modules/.vite/deps/${depFile}.js`
-              res.writeHead(302, { Location: preBundledUrl })
-              res.end()
-              return
-            }
-          }
-          next()
-        })
-      }
-
-      // Intercept requests for excluded shared modules served from
-      // node_modules (e.g. /@fs/.../sso/build/index.es.js).
-      // Since the main plugin runs with enforce:'post', our resolveId
-      // cannot intercept bare specifiers before Vite's internal resolver.
-      // Instead, Vite resolves them to file URLs, and we intercept those
-      // URLs here — serving a shared wrapper that checks the host's
-      // globalThis.__federation_shared_modules__ first.
-      if (excludedShared.size > 0) {
-        // Build a map: URL path (without query) → shared module name
-        const excludedUrlMap = new Map<string, string>()
-        for (const name of excludedShared) {
-          const meta = sharedModuleMeta.get(name)
-          if (meta) {
-            excludedUrlMap.set(meta.localUrl, name)
-          }
+        // Build each shared module individually so we get one file per module
+        // with its own clean export list.
+        const entries: Record<string, string> = {}
+        for (const name of sharedSet) {
+          entries[name.replace(/\//g, '_')] = name
         }
-        server.middlewares.use((req, res, next) => {
-          const url = req.url
-          if (!url) {
-            next()
-            return
-          }
 
-          // Skip the fallback URL — __fed_raw is the escape hatch so
-          // the wrapper's fallback import loads the REAL module file.
-          if (url.includes('__fed_raw')) {
-            next()
-            return
-          }
+        try {
+          await build({
+            input: entries,
+            cwd: root,
+            resolve: {
+              conditionNames: ['import', 'module', 'browser', 'default']
+            },
+            platform: 'browser',
+            output: {
+              format: 'esm',
+              dir: outDir,
+              entryFileNames: '[name].js',
+              chunkFileNames: '_shared_chunks/[name]-[hash].js'
+            },
+            // Silence warnings for circular deps in node_modules
+            logLevel: 'silent'
+          })
+        } catch (e) {
+          console.error('[federation] Failed to build federation pre-bundle:', e)
+        }
 
-          const urlPath = url.split('?')[0]
-          const matchedName = excludedUrlMap.get(urlPath)
-          if (!matchedName && urlPath.includes('node_modules')) {
-            // Debug: log unmatched node_modules URLs to help diagnose
-            // excluded shared module interception failures
-            for (const [mapUrl, mapName] of excludedUrlMap) {
-              if (urlPath.includes(mapName.replace(/\//g, '/')) || mapUrl.includes(urlPath.split('/').slice(-1)[0])) {
-                console.log('[federation:excluded-middleware] NEAR MISS:', urlPath, '≠', mapUrl, `(${mapName})`)
-              }
-            }
+        // Populate sharedModuleMeta from the pre-bundled output
+        for (const name of sharedSet) {
+          const fileName = name.replace(/\//g, '_') + '.js'
+          const filePath = join(outDir, fileName)
+          if (!existsSync(filePath)) {
+            console.warn(
+              `[federation] Pre-bundle missing for ${name}, skipping`
+            )
+            continue
           }
-          if (!matchedName) {
-            next()
-            return
-          }
+          const exports = await readPreBundledExports(filePath)
+          const preBundleUrl = toViteUrl(filePath, root)
 
-          const meta = sharedModuleMeta.get(matchedName)
-          if (!meta) {
-            next()
-            return
-          }
+          sharedModuleMeta.set(name, { preBundleUrl, exports })
+        }
 
-          const port = server.config.server.port ?? 5173
-          const originUrl = `http://localhost:${port}`
-          const code = buildSharedWrapperCode(matchedName, meta, originUrl)
-          res.setHeader('Content-Type', 'application/javascript')
-          res.setHeader('Access-Control-Allow-Origin', '*')
-          res.end(code)
-        })
+        console.log(
+          '[federation:configureServer] Pre-bundled shared modules:',
+          [...sharedModuleMeta.keys()]
+        )
       }
 
       // Add CORS headers to ALL responses so the HOST browser can load
@@ -806,13 +397,6 @@ export const get = async (module) => {
         // which resolves to the HOST page origin in cross-origin
         // federation.  Using an absolute origin works for both
         // standalone and federated modes.
-        //
-        // Also patch the page-reload debounce to trigger a reload
-        // when React Fast Refresh can't handle an update across the
-        // federation boundary.  The HMR accept callback in
-        // @vitejs/plugin-react calls import.meta.hot.invalidate()
-        // when fast refresh fails, which propagates up to a full
-        // reload — the patched base ensures the reload check works.
         if (url === '/@vite/client' || url?.startsWith('/@vite/client?')) {
           try {
             const clientResult = await server.transformRequest('/@vite/client')
@@ -845,20 +429,9 @@ export const get = async (module) => {
         // MFE has its own allFamiliesByID / mountedRoots maps
         // and performReactRefresh() doesn't trigger re-renders
         // for roots mounted by the HOST's React renderer.
-        //
-        // In standalone mode (no HOST runtime on window), the
-        // MFE's own runtime is loaded and stored globally instead.
-        // Patch /@react-refresh: if the HOST already stored its
-        // refresh runtime globally, re-export that singleton so
-        // all component families and mounted roots are shared.
-        // In standalone mode, import the real runtime and store it.
         if (url === '/@react-refresh' || url?.startsWith('/@react-refresh?')) {
           const code = `
 import * as _localRuntime from '/@react-refresh-runtime';
-// In federation mode the HOST has already stored its runtime
-// singleton on window.  Re-use it so all component families
-// and mounted roots are tracked in one place.
-// In standalone mode, store this runtime for potential future use.
 var _rt = (typeof window !== 'undefined' && window.__vite_react_refresh_runtime__) || _localRuntime;
 if (typeof window !== 'undefined' && !window.__vite_react_refresh_runtime__) {
   window.__vite_react_refresh_runtime__ = _localRuntime;
@@ -915,9 +488,6 @@ export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
               })
               if (exposeItem && exposeItem[1] && exposeItem[1].import) {
                 const modulePath = exposeItem[1].import
-                // Serve a thin re-export stub.  The browser follows
-                // the import to the real source file, which Vite serves
-                // with HMR metadata.
                 const viteUrl = toViteUrl(modulePath, resolvedRoot)
                 const code = `export { default } from '${viteUrl}';\nexport * from '${viteUrl}';`
                 res.setHeader('Content-Type', 'application/javascript')
