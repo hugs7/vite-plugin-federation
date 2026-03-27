@@ -11,7 +11,7 @@ export default defineConfig({
     minify: false,
     sourcemap: !process.env.CI,
     rolldownOptions: {
-      external: ['fs', 'path', 'crypto', 'magic-string', 'url', 'module', 'rolldown', 'es-module-lexer', 'node:fs', 'node:path', 'node:crypto', 'node:url', 'node:module'],
+      external: ['fs', 'path', 'crypto', 'magic-string', 'url', 'module', 'rolldown', 'es-module-lexer', 'debug', 'node:fs', 'node:path', 'node:crypto', 'node:url', 'node:module'],
       output: {
         minifyInternalExports: false
       }

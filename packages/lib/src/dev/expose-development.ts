@@ -22,6 +22,7 @@ import type { IncomingMessage, ServerResponse } from 'http'
 import type { PluginHooks } from '../../types/pluginHooks'
 import { parsedOptions, PLUGIN_PREFIX } from '../public'
 import { NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter } from '../utils'
+import { createLogger } from '../logger'
 
 import {
   type SharedModuleMeta,
@@ -30,6 +31,8 @@ import {
 } from './export-discovery'
 import { REACT_REFRESH_WRAPPER_CODE, patchViteClientCode } from './hmr'
 import { buildRemoteEntryCode } from './remote-entry-template'
+
+const logger = createLogger('expose')
 
 const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:'
 const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
@@ -211,7 +214,7 @@ const handleExposeModule = (
       res.end('Invalid expose module URL')
     }
   } catch (error) {
-    console.error('Error loading expose module:', error)
+    logger.error('Error loading expose module:', error)
     res.statusCode = 500
     res.end('Internal server error')
   }
@@ -289,8 +292,8 @@ const buildFederationPreBundle = async (root: string): Promise<void> => {
       logLevel: 'silent'
     })
   } catch (e) {
-    console.error(
-      '[federation] Failed to build federation pre-bundle:',
+    logger.error(
+      'Failed to build federation pre-bundle:',
       e instanceof Error ? e.message : e
     )
   }
@@ -299,9 +302,7 @@ const buildFederationPreBundle = async (root: string): Promise<void> => {
     const fileName = name.replace(/\//g, '_') + '.js'
     const filePath = join(outDir, fileName)
     if (!existsSync(filePath)) {
-      console.warn(
-        `[federation] Pre-bundle missing for ${name}, skipping`
-      )
+      logger.warn('Pre-bundle missing for %s, skipping', name)
       continue
     }
     const exports = await getPreBundleExports(filePath, name, root)
@@ -310,10 +311,7 @@ const buildFederationPreBundle = async (root: string): Promise<void> => {
     sharedModuleMeta.set(name, { preBundleUrl, exports })
   }
 
-  console.log(
-    '[federation:configureServer] Pre-bundled shared modules:',
-    [...sharedModuleMeta.keys()]
-  )
+  logger.info('Pre-bundled shared modules:', [...sharedModuleMeta.keys()])
 }
 
 // ---------------------------------------------------------------------------
