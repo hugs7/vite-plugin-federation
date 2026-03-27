@@ -13,6 +13,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import type { ServerResponse } from 'http'
 import type { Rolldown, UserConfig, ViteDevServer } from 'vite'
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
 import MagicString from 'magic-string'
@@ -36,6 +37,16 @@ import {
 } from '../transform/rewrite-remote-imports'
 
 const logger = createLogger('remote')
+
+/** Check whether a request URL matches a path (with or without query string). */
+const matchesUrl = (url: string | undefined, path: string): boolean =>
+  url === path || !!url?.startsWith(`${path}?`)
+
+/** Send a JavaScript response. */
+const sendJs = (res: ServerResponse, code: string): void => {
+  res.setHeader('Content-Type', 'application/javascript')
+  res.end(code)
+}
 
 export const devRemotePlugin = (
   options: VitePluginFederationOptions
@@ -87,25 +98,22 @@ export const devRemotePlugin = (
     if (parsedOptions.devRemote.length) {
       server.middlewares.use(async (req, res, next) => {
         const url = req.url
-        if (
-          url === '/@react-refresh' ||
-          url?.startsWith('/@react-refresh?')
-        ) {
+        if (matchesUrl(url, '/@react-refresh')) {
           try {
             const result = await server.transformRequest('/@react-refresh')
             if (result) {
-              const code =
-                result.code +
-                `\nif(typeof window!=='undefined'){` +
-                `window.__vite_react_refresh_runtime__={` +
-                `injectIntoGlobalHook,register,createSignatureFunctionForTransform,` +
-                `isLikelyComponentType,getFamilyByType,performReactRefresh,` +
-                `setSignature,collectCustomHooksForSignature,` +
-                `validateRefreshBoundaryAndEnqueueUpdate,` +
-                `registerExportsForReactRefresh,__hmr_import` +
-                `};};\n`
-              res.setHeader('Content-Type', 'application/javascript')
-              res.end(code)
+              const code = `${result.code}
+if(typeof window!=='undefined'){
+  window.__vite_react_refresh_runtime__={
+    injectIntoGlobalHook,register,createSignatureFunctionForTransform,
+    isLikelyComponentType,getFamilyByType,performReactRefresh,
+    setSignature,collectCustomHooksForSignature,
+    validateRefreshBoundaryAndEnqueueUpdate,
+    registerExportsForReactRefresh,__hmr_import
+  };
+}
+`
+              sendJs(res, code)
               return
             }
           } catch {

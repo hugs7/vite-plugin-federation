@@ -34,6 +34,16 @@ import { buildRemoteEntryCode } from './remote-entry-template'
 
 const logger = createLogger('expose')
 
+/** Check whether a request URL matches a path (with or without query string). */
+const matchesUrl = (url: string | undefined, path: string): boolean =>
+  url === path || !!url?.startsWith(`${path}?`)
+
+/** Send a JavaScript response. */
+const sendJs = (res: ServerResponse, code: string): void => {
+  res.setHeader('Content-Type', 'application/javascript')
+  res.end(code)
+}
+
 const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:'
 const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
 
@@ -110,8 +120,7 @@ const handleRemoteEntry = async (
     const moduleId = `${REMOTE_ENTRY_HELPER_PREFIX}${filename}`
     const result = await server.transformRequest(moduleId)
     if (result) {
-      res.setHeader('Content-Type', 'application/javascript')
-      res.end(result.code)
+      sendJs(res, result.code)
     } else {
       res.statusCode = 404
       res.end('Module not found')
@@ -141,8 +150,7 @@ const handleViteClient = async (
     const port = server.config.server.port ?? 5173
     const remoteOrigin = `http://localhost:${port}`
     const code = patchViteClientCode(clientResult.code, remoteOrigin)
-    res.setHeader('Content-Type', 'application/javascript')
-    res.end(code)
+    sendJs(res, code)
   } catch (error) {
     next()
   }
@@ -154,8 +162,7 @@ const handleViteClient = async (
  * runtime singleton for cross-origin component registration.
  */
 const handleReactRefresh = (res: ServerResponse): boolean => {
-  res.setHeader('Content-Type', 'application/javascript')
-  res.end(REACT_REFRESH_WRAPPER_CODE)
+  sendJs(res, REACT_REFRESH_WRAPPER_CODE)
   return true
 }
 
@@ -171,8 +178,7 @@ const handleReactRefreshRuntime = async (
   try {
     const result = await server.transformRequest('/@react-refresh')
     if (result) {
-      res.setHeader('Content-Type', 'application/javascript')
-      res.end(result.code)
+      sendJs(res, result.code)
       return true
     }
   } catch {
@@ -203,8 +209,7 @@ const handleExposeModule = (
         const modulePath = exposeItem[1].import
         const viteUrl = toViteUrl(modulePath, resolvedRoot)
         const code = `export { default } from '${viteUrl}';\nexport * from '${viteUrl}';`
-        res.setHeader('Content-Type', 'application/javascript')
-        res.end(code)
+        sendJs(res, code)
       } else {
         res.statusCode = 404
         res.end(`Expose module not found: ${exposeName}`)
@@ -414,20 +419,17 @@ export const devExposePlugin = (
           return
         }
 
-        if (url === '/@vite/client' || url?.startsWith('/@vite/client?')) {
+        if (matchesUrl(url, '/@vite/client')) {
           await handleViteClient(server, res, next)
           return
         }
 
-        if (url === '/@react-refresh' || url?.startsWith('/@react-refresh?')) {
+        if (matchesUrl(url, '/@react-refresh')) {
           handleReactRefresh(res)
           return
         }
 
-        if (
-          url === '/@react-refresh-runtime' ||
-          url?.startsWith('/@react-refresh-runtime?')
-        ) {
+        if (matchesUrl(url, '/@react-refresh-runtime')) {
           await handleReactRefreshRuntime(server, res, next)
           return
         }
