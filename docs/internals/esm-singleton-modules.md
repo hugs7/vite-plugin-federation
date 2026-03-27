@@ -1,16 +1,21 @@
 # ESM Singleton Modules (react-redux)
 
-ESM modules like `react-redux` require a different federation strategy than CJS modules. This page explains why and how the plugin handles them.
+> **Historical note**: This page previously documented a separate federation strategy for ESM modules. ESM modules now use the **exact same strategy** as CJS modules — all shared modules are externalized from the dep optimizer and served via the federation pre-bundle. See [Shared Modules: Uniform Handling](/internals/cjs-shared-modules) for the full architecture.
 
-## Why ESM Modules Are Different
+## Why ESM Modules Were Previously Different
 
-Unlike CJS modules (react, react-dom) which the dep optimizer wraps in a single `require_X()` factory, ESM modules are processed differently by Rolldown:
+In the old approach, CJS modules (react, react-dom) and ESM modules (react-redux) required different strategies because Vite's dep optimizer handled them differently:
 
-- The optimizer may split ESM modules into shared **chunks**
-- Other dep-optimized packages can import these chunks directly
-- There's no single factory function to intercept
+- CJS modules → single `require_X()` factory in `.vite/deps/`
+- ESM modules → split into shared chunks, no single intercept point
 
-For `react-redux` specifically, the critical issue is `ReactReduxContext`:
+This distinction no longer exists. All shared modules are **externalized** from the dep optimizer entirely, and the federation pre-bundle (`rolldown.build()`) converts everything to clean ESM in `node_modules/.federation-deps/`.
+
+## The Singleton Problem Still Matters
+
+Even though the implementation strategy is now uniform, understanding **why** ESM singleton modules need to be shared is still important for debugging.
+
+For `react-redux`, the critical issue is `ReactReduxContext`:
 
 ```js
 // Inside react-redux source
@@ -20,20 +25,13 @@ const ReactReduxContext = React.createContext(null)
 
 This `createContext()` call happens at module load time. If two copies of `react-redux` load, you get two different context objects, and `useSelector()`/`useDispatch()` in the remote can't find the host's `<Provider>`.
 
-## The Virtual Wrapper Approach
+## Current Strategy
 
-The plugin uses the same `resolveId` + `load` virtual wrapper approach as for CJS modules. When any file in the remote imports `react-redux`, the plugin intercepts it:
+All shared modules — CJS and ESM — follow the same flow:
 
-### resolveId
-
-```ts
-resolveId(id: string) {
-  if (sharedModuleMeta.has(id)) {
-    return { id: RESOLVED_SHARED_PREFIX + id }
-  }
-  return null
-}
-```
+1. **Externalized** in Vite's dep optimizer via a Rolldown plugin (`optimizeDeps.rolldownOptions.plugins`)
+2. **Pre-bundled** into clean ESM by `rolldown.build()` at server startup → `node_modules/.federation-deps/`
+3. **Virtual wrappers** via `resolveId` + `load` intercept all bare specifier imports
 
 ### Generated Wrapper Code
 
@@ -41,7 +39,7 @@ For ESM modules with named exports, `buildSharedWrapperCode` generates:
 
 ```js
 const __shared = globalThis.__federation_shared_modules__?.['react-redux'];
-const __mod = __shared ?? await import(/* @vite-ignore */ '/@fs/.../react-redux/dist/react-redux.mjs?__fed_raw');
+const __mod = __shared ?? await import('/node_modules/.federation-deps/react-redux.js');
 export default (__mod.default ?? __mod);
 export const Provider = __mod['Provider'];
 export const useSelector = __mod['useSelector'];
@@ -52,6 +50,8 @@ export const batch = __mod['batch'];
 export const ReactReduxContext = __mod['ReactReduxContext'];
 // ... all other named exports
 ```
+
+This is identical in structure to the wrapper generated for CJS modules like `react` — only the list of named exports differs.
 
 ### How It Works
 
@@ -64,8 +64,8 @@ export const ReactReduxContext = __mod['ReactReduxContext'];
 
 **In standalone mode** (no host):
 1. `globalThis.__federation_shared_modules__` is undefined
-2. Virtual wrapper falls back to `await import('/@fs/.../react-redux.mjs')`
-3. Loads the remote's own copy normally
+2. Virtual wrapper falls back to `await import('/node_modules/.federation-deps/react-redux.js')`
+3. Loads the federation pre-bundle output (clean ESM)
 4. ✅ Works as a standalone app
 
 ## Export Name Discovery
@@ -100,13 +100,3 @@ const nodeRequire = createRequire(join(root, 'package.json'))
 const realPath = nodeRequire.resolve('react-redux')
 // → /home/user/project/node_modules/react-redux/dist/react-redux.mjs
 ```
-
-## Key Differences from CJS Strategy
-
-| Aspect | CJS (react) | ESM (react-redux) |
-|--------|-------------|-------------------|
-| Module format | CommonJS | ES Modules |
-| Dep optimizer output | Single `require_X` factory | Chunks + re-exports |
-| Named exports | Only `default` | Many (`Provider`, `useSelector`, etc.) |
-| Singleton concern | Internal dispatcher | `ReactReduxContext` object |
-| Wrapper output | `export default (__mod.default ?? __mod)` | Default + all named exports |

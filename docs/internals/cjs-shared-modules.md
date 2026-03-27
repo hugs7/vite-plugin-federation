@@ -1,48 +1,57 @@
-# CJS Shared Modules (react, react-dom)
+# Shared Modules: Uniform Handling via Federation Pre-Bundle
 
-React 19 and React-DOM are purely CommonJS packages. Vite's Rolldown dep optimizer converts them to ESM, but the internal structure matters for understanding how federation intercepts them.
+> **Historical note**: This page was previously titled "CJS Shared Modules" and documented a separate strategy for CJS packages like React. The CJS/ESM distinction is **no longer relevant** — all shared modules are now handled uniformly via the Rolldown-based federation pre-bundle.
 
-## How Rolldown Handles CJS Modules
+## Why CJS vs ESM No Longer Matters
 
-When Vite's dep optimizer processes `react` (a CJS package), it generates a file like:
+Previously, the plugin needed to classify each shared module as CJS or ESM and apply different strategies:
+- CJS modules (react, react-dom) were served from Vite's `.vite/deps/` output
+- ESM modules (react-redux) were served via `/@fs/` URLs pointing to the real package source
 
-```js
-// node_modules/.vite/deps/react.js
-var require_react = __commonJS({
-  "node_modules/react/index.js"(exports, module) {
-    module.exports = require_react_production();
-  }
-});
-export default require_react();
-export { require_react as t };
-```
+This complexity existed because Vite's dep optimizer handled CJS and ESM modules differently internally. The new approach **bypasses this entirely** by:
 
-The key insight: **every other dep-optimized file that uses React imports the same factory**:
+1. **Externalizing** all shared modules from Vite's dep optimizer (so it never processes them)
+2. **Pre-bundling** each shared module independently via `rolldown.build()` into clean ESM files
 
-```js
-// node_modules/.vite/deps/react-dom.js
-import { t as require_react } from "./react.js";
-// uses require_react() internally
-```
+## How It Works
 
-```js
-// node_modules/.vite/deps/some-ui-library.js
-import { t as require_react } from "./react.js";
-// uses require_react() internally
-```
+### Step 1: Externalize in the Dep Optimizer
 
-This means there is a **single point of control** — the `react.js` file's exports. If we intercept what `react.js` returns, all consumers automatically get the federation-provided version.
-
-## The Virtual Wrapper Approach
-
-In dev mode, `devExposePlugin` intercepts imports of shared modules using `resolveId` + `load` hooks:
-
-### resolveId Hook
+A Rolldown plugin inside `optimizeDeps.rolldownOptions.plugins` marks ALL shared modules as `external`:
 
 ```ts
-// packages/lib/src/dev/expose-development.ts
+// Inside the dep optimizer plugin
+resolveId(id) {
+  if (sharedModuleMeta.has(id)) {
+    return { id, external: true }
+  }
+}
+```
+
+This prevents Vite's dep optimizer from bundling shared modules into `.vite/deps/`. Other dependencies that import shared modules will have `import` statements pointing to the bare specifier (e.g., `import react from "react"`), which the virtual wrapper then intercepts at runtime.
+
+### Step 2: Federation Pre-Bundle
+
+At server startup, `rolldown.build()` bundles each shared module into a clean ESM file in `node_modules/.federation-deps/`:
+
+```
+node_modules/.federation-deps/
+  react.js          ← Clean ESM, regardless of react being CJS
+  react-dom.js
+  react-redux.js
+  react/jsx-runtime.js
+```
+
+Rolldown handles CJS-to-ESM conversion automatically — the output is always clean ESM with proper `export default` and named exports. This is the key insight: **Rolldown normalizes all module formats into ESM**, so the plugin doesn't need to care about the input format.
+
+### Step 3: Virtual Wrappers via resolveId + load
+
+When application code does `import React from 'react'`, the plugin intercepts it:
+
+#### resolveId Hook
+
+```ts
 resolveId(id: string) {
-  // Intercept bare shared specifiers
   if (sharedModuleMeta.has(id)) {
     return { id: RESOLVED_SHARED_PREFIX + id }
   }
@@ -50,9 +59,7 @@ resolveId(id: string) {
 }
 ```
 
-When any file in the remote does `import React from 'react'`, instead of resolving to the real `react` package, it resolves to a virtual module `\0virtual:__federation_shared__:react`.
-
-### load Hook
+#### load Hook
 
 ```ts
 load(id: string) {
@@ -64,23 +71,21 @@ load(id: string) {
 }
 ```
 
-### The Wrapper Code
+#### The Wrapper Code
 
-The `buildSharedWrapperCode` function generates:
+All shared modules — regardless of original format — get the same wrapper structure:
 
 ```js
-// For 'react' (CJS, only has default export):
-// CJS modules use the pre-bundled dep URL (browsers can't load raw CJS)
+// For 'react':
 const __shared = globalThis.__federation_shared_modules__?.['react'];
-const __mod = __shared ?? await import('/node_modules/.vite/deps/react.js');
+const __mod = __shared ?? await import('/node_modules/.federation-deps/react.js');
 export default (__mod.default ?? __mod);
 ```
 
 ```js
-// For 'react-redux' (ESM, has named exports):
-// ESM modules use the local URL with ?__fed_raw to bypass the shared wrapper middleware
+// For 'react-redux' (has named exports):
 const __shared = globalThis.__federation_shared_modules__?.['react-redux'];
-const __mod = __shared ?? await import('/@fs/.../node_modules/react-redux/dist/react-redux.mjs?__fed_raw');
+const __mod = __shared ?? await import('/node_modules/.federation-deps/react-redux.js');
 export default (__mod.default ?? __mod);
 export const Provider = __mod['Provider'];
 export const useSelector = __mod['useSelector'];
@@ -88,7 +93,7 @@ export const useDispatch = __mod['useDispatch'];
 // ... all other named exports
 ```
 
-When running in the context of a remote dev server, the import URLs are prefixed with the absolute origin (e.g. `http://localhost:6001/node_modules/.vite/deps/react.js`) so the browser resolves them against the remote, not the host page origin.
+The fallback URL always points to the federation pre-bundle output — never to `.vite/deps/` or `/@fs/` paths.
 
 ### How Export Names Are Discovered
 
@@ -98,17 +103,14 @@ The plugin discovers export names at config time using two methods:
 2. **Static analysis** fallback — uses `es-module-lexer` to parse the source file without executing it (handles browser-only modules that reference `window`)
 
 ```ts
-// packages/lib/src/dev/expose-development.ts
 const getModuleExportNames = (name: string, root: string): string[] => {
   try {
-    // Try dynamic import first
     const result = execSync(
       `node --input-type=module -e "import('${name}').then(m => console.log(JSON.stringify(Object.keys(m))))"`,
       { cwd: root, encoding: 'utf-8', timeout: 10000 }
     )
     return JSON.parse(result.trim())
   } catch {
-    // Fall back to static analysis with es-module-lexer
     const resolvedPath = nodeRequire.resolve(name)
     return getExportNamesStatically(resolvedPath)
   }
@@ -130,16 +132,16 @@ When the remote runs in **standalone mode** (no host):
 1. No `init()` called → `globalThis.__federation_shared_modules__` is undefined
 2. Remote component does `import React from 'react'`
 3. Wrapper checks `globalThis.__federation_shared_modules__?.['react']` → **undefined**
-4. Falls back to `await import('/@fs/.../react/index.js')` → loads local copy
+4. Falls back to `await import('/node_modules/.federation-deps/react.js')` → loads federation pre-bundle
 5. Works normally as a standalone app
 
 ## Sub-path Imports
 
-For sub-path imports like `react/jsx-runtime`, the wrapper doesn't check the shared modules map (the host doesn't provide sub-paths). Instead, it always imports the local package:
+For sub-path imports like `react/jsx-runtime`, the wrapper doesn't check the shared modules map (the host doesn't provide sub-paths). Instead, it always imports from the federation pre-bundle:
 
 ```js
 // For 'react/jsx-runtime':
-const __mod = await import('/@fs/.../node_modules/react/jsx-runtime.js');
+const __mod = await import('/node_modules/.federation-deps/react/jsx-runtime.js');
 export default (__mod.default ?? __mod);
 export const jsx = __mod['jsx'];
 export const jsxs = __mod['jsxs'];
@@ -155,6 +157,6 @@ An earlier approach used `resolve.alias` to redirect `react` to a shim file. Thi
 3. Some `__esmMin` inits were generated as anonymous functions (a Rolldown bug)
 4. This made `import_react` undefined for some UI library components
 
-The virtual wrapper approach avoids this because it only intercepts at the Vite plugin level, not at the Rolldown optimizer level. The dep optimizer still processes `react` normally — the interception happens when application code imports it.
+The current approach avoids this entirely — shared modules are externalized from the dep optimizer, so Rolldown never tries to bundle them. The federation pre-bundle is a completely separate Rolldown invocation.
 
 See [Rolldown Dep Optimizer](/internals/rolldown-dep-optimizer) for the full explanation.
