@@ -30,9 +30,11 @@ import {
 import {
   createRemotesMap,
   getModuleMarker,
+  joinUrlSegments,
   parseRemoteOptions,
   REMOTE_FROM_PARAMETER,
   injectToHead,
+  toOutputFilePathWithoutRuntime,
   toPreloadTag
 } from '../utils'
 import { buildFederationRuntimeCode } from '../runtime/federation-runtime'
@@ -43,56 +45,6 @@ const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
   string,
   ConfigTypeSet
 >()
-
-const joinUrlSegments = (a: string, b: string): string => {
-  if (!a || !b) {
-    return a || b || ''
-  }
-  if (a[a.length - 1] === '/') {
-    a = a.substring(0, a.length - 1)
-  }
-  if (b[0] !== '/') {
-    b = '/' + b
-  }
-  return a + b
-}
-
-const toOutputFilePathWithoutRuntime = (
-  filename: string,
-  type: 'asset' | 'public',
-  hostId: string,
-  hostType: 'js' | 'css' | 'html',
-  config: ResolvedConfig,
-  toRelative: (filename: string, hostId: string) => string
-): string => {
-  const { renderBuiltUrl } = config.experimental
-  let relative = config.base === '' || config.base === './'
-  if (renderBuiltUrl) {
-    const result = renderBuiltUrl(filename, {
-      hostId,
-      hostType,
-      type,
-      ssr: !!config.build.ssr
-    })
-    if (typeof result === 'object') {
-      if (result.runtime) {
-        throw new Error(
-          `{ runtime: "${result.runtime}" } is not supported for assets in ${hostType} files: ${filename}`
-        )
-      }
-      if (typeof result.relative === 'boolean') {
-        relative = result.relative
-      }
-    } else if (result) {
-      return result
-    }
-  }
-  if (relative && !config.build.ssr) {
-    return toRelative(filename, hostId)
-  } else {
-    return joinUrlSegments(config.base, filename)
-  }
-}
 
 export const prodRemotePlugin = (
   options: VitePluginFederationOptions

@@ -31,7 +31,6 @@ import {
   PLUGIN_PREFIX,
   REMOTE_ENTRY_HELPER_PREFIX,
   SHARED,
-  toJsArrayLiteral,
   VITE_BASE_PLACEHOLDER,
   VITE_ASSETS_DIR_PLACEHOLDER,
   viteConfigResolved
@@ -42,7 +41,8 @@ import {
   NAME_CHAR_REG,
   normalizePath,
   parseExposeOptions,
-  removeNonRegLetter
+  removeNonRegLetter,
+  toJsArrayLiteral
 } from '../utils'
 
 export const prodExposePlugin = (

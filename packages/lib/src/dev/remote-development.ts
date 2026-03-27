@@ -13,7 +13,6 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { ServerResponse } from 'http'
 import type { Rolldown, UserConfig, ViteDevServer } from 'vite'
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
 import MagicString from 'magic-string'
@@ -24,8 +23,10 @@ import {
   createRemotesMap,
   getFileExtname,
   getModuleMarker,
+  matchesUrl,
   parseRemoteOptions,
-  REMOTE_FROM_PARAMETER
+  REMOTE_FROM_PARAMETER,
+  sendJs
 } from '../utils'
 import { builderInfo, parsedOptions, devRemotes, PLUGIN_PREFIX, VIRTUAL_FEDERATION_RESOLVED } from '../public'
 import type { PluginHooks } from '../../types/pluginHooks'
@@ -37,16 +38,6 @@ import {
 } from '../transform/rewrite-remote-imports'
 
 const logger = createLogger('remote')
-
-/** Check whether a request URL matches a path (with or without query string). */
-const matchesUrl = (url: string | undefined, path: string): boolean =>
-  url === path || !!url?.startsWith(`${path}?`)
-
-/** Send a JavaScript response. */
-const sendJs = (res: ServerResponse, code: string): void => {
-  res.setHeader('Content-Type', 'application/javascript')
-  res.end(code)
-}
 
 export const devRemotePlugin = (
   options: VitePluginFederationOptions

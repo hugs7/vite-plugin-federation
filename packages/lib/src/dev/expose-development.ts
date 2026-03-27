@@ -21,7 +21,7 @@ import type { UserConfig, ViteDevServer } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'http'
 import type { PluginHooks } from '../../types/pluginHooks'
 import { FEDERATION_EXPOSE_PREFIX, parsedOptions, PLUGIN_PREFIX, REMOTE_ENTRY_HELPER_PREFIX } from '../public'
-import { NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter } from '../utils'
+import { matchesUrl, NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter, sendJs } from '../utils'
 import { createLogger } from '../logger'
 
 import {
@@ -33,16 +33,6 @@ import { REACT_REFRESH_WRAPPER_CODE, patchViteClientCode } from './hmr'
 import { buildRemoteEntryCode } from './remote-entry-template'
 
 const logger = createLogger('expose')
-
-/** Check whether a request URL matches a path (with or without query string). */
-const matchesUrl = (url: string | undefined, path: string): boolean =>
-  url === path || !!url?.startsWith(`${path}?`)
-
-/** Send a JavaScript response. */
-const sendJs = (res: ServerResponse, code: string): void => {
-  res.setHeader('Content-Type', 'application/javascript')
-  res.end(code)
-}
 
 const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:'
 const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
