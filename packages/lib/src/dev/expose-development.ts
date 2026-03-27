@@ -372,6 +372,22 @@ export const get = async (module) => {
         return
       }
 
+      // Check if Rolldown is available (ships with Vite 8+).
+      // Without it, we can't build the federation pre-bundle, so shared
+      // module interception is disabled — the MFE works standalone but
+      // not federated over a host in dev mode.
+      try {
+        await import('rolldown')
+      } catch {
+        console.warn(
+          '[federation] Rolldown not available (requires Vite 8+). ' +
+            'Dev-mode federation with shared modules is disabled. ' +
+            'The MFE will work standalone but shared modules will not ' +
+            'be intercepted when loaded via a host.'
+        )
+        return
+      }
+
       // Collect all shared module specifiers
       for (const item of parsedOptions.devShared) {
         sharedSet.add(item[0])
