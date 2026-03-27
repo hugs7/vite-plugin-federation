@@ -219,6 +219,39 @@ const handleExposeModule = (
 }
 
 // ---------------------------------------------------------------------------
+// Shared module collection
+// ---------------------------------------------------------------------------
+
+/**
+ * Collect all shared module specifiers into sharedSet, including
+ * sub-path exports discovered from each package's exports map
+ * (e.g. react/jsx-runtime, zustand/middleware).
+ */
+const collectSharedSpecifiers = (root: string): void => {
+  for (const item of parsedOptions.devShared) {
+    sharedSet.add(item[0])
+  }
+
+  const nodeRequire = createRequire(join(root, 'package.json'))
+  const baseNames = [...sharedSet]
+  for (const baseName of baseNames) {
+    try {
+      const pkgJsonPath = nodeRequire.resolve(`${baseName}/package.json`)
+      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
+      if (pkgJson.exports && typeof pkgJson.exports === 'object') {
+        for (const subPath of Object.keys(pkgJson.exports)) {
+          if (subPath !== '.' && subPath.startsWith('./')) {
+            sharedSet.add(baseName + subPath.slice(1))
+          }
+        }
+      }
+    } catch {
+      /* package.json not found or not readable */
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Pre-bundle build
 // ---------------------------------------------------------------------------
 
@@ -351,47 +384,10 @@ export const devExposePlugin = (
         return
       }
 
-      // Collect all shared module specifiers
-      for (const item of parsedOptions.devShared) {
-        sharedSet.add(item[0])
-      }
+      collectSharedSpecifiers(resolvedRoot)
 
-      // Discover sub-path exports from each shared package's exports map
-      // (e.g. react/jsx-runtime, zustand/middleware) so they are also
-      // intercepted by the shared resolver.
-      const nodeRequire = createRequire(join(resolvedRoot, 'package.json'))
-      const baseNames = [...sharedSet]
-      for (const baseName of baseNames) {
-        try {
-          const pkgJsonPath = nodeRequire.resolve(`${baseName}/package.json`)
-          const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
-          if (pkgJson.exports && typeof pkgJson.exports === 'object') {
-            for (const subPath of Object.keys(pkgJson.exports)) {
-              if (subPath !== '.' && subPath.startsWith('./')) {
-                sharedSet.add(baseName + subPath.slice(1))
-              }
-            }
-          }
-        } catch {
-          /* package.json not found or not readable */
-        }
-      }
-
-      console.log(
-        '[federation:config] Shared modules (all externalized):',
-        [...sharedSet]
-      )
-
-      // Exclude ALL shared modules from Vite's dep optimizer.
-      // When excluded, bare specifier imports of these modules in other
-      // pre-bundled deps (e.g. react-dom importing react) are resolved
-      // through the normal Vite plugin pipeline — which hits our resolveId
-      // hook and serves the virtual shared wrapper.
-      //
-      // The old code couldn't exclude CJS modules because the fallback
-      // served raw CJS (browsers can't load it). Now our fallback imports
-      // from the federation pre-bundle (clean ESM built by Rolldown), so
-      // CJS/ESM distinction is no longer needed.
+      // Exclude ALL shared modules from Vite's dep optimizer so bare
+      // specifier imports hit our resolveId hook instead.
       config.optimizeDeps ??= {}
       config.optimizeDeps.exclude = [
         ...(config.optimizeDeps.exclude ?? []),
