@@ -19,6 +19,7 @@ import { Remote } from './utils'
 // for generateBundle Hook replace
 export const EXPOSES_MAP = new Map()
 export const EXPOSES_KEY_MAP = new Map()
+export const PLUGIN_PREFIX = 'hugs7'
 export const SHARED = 'shared'
 export const DYNAMIC_LOADING_CSS = 'dynamicLoadingCss'
 export const DYNAMIC_LOADING_CSS_PREFIX = '__v__css__'

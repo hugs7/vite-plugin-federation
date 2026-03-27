@@ -15,7 +15,7 @@
 
 import type { PluginHooks } from '../../types/pluginHooks'
 import { parseSharedOptions } from '../utils'
-import { parsedOptions } from '../public'
+import { parsedOptions, PLUGIN_PREFIX } from '../public'
 import type { VitePluginFederationOptions } from 'types'
 
 export const devSharedPlugin = (
@@ -24,6 +24,6 @@ export const devSharedPlugin = (
   parsedOptions.devShared = parseSharedOptions(options)
 
   return {
-    name: 'hugs7:shared-development'
+    name: [PLUGIN_PREFIX, 'shared-development'].join(':')
   }
 }

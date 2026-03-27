@@ -28,6 +28,7 @@ import {
   builderInfo,
   EXPOSES_KEY_MAP,
   parsedOptions,
+  PLUGIN_PREFIX,
   prodRemotes
 } from '../public'
 import {
@@ -115,7 +116,7 @@ export const prodRemotePlugin = (
   const hasShared = parsedOptions.prodShared.length > 0
   const needsFederationModule = hasRemotes || hasShared
   return {
-    name: 'hugs7:remote-production',
+    name: [PLUGIN_PREFIX, 'remote-production'].join(':'),
     virtualFile: needsFederationModule
       ? {
           // language=JS

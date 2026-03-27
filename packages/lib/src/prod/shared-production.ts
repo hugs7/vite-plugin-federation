@@ -15,7 +15,7 @@
 
 import type { PluginHooks } from '../../types/pluginHooks'
 import { NAME_CHAR_REG, parseSharedOptions, removeNonRegLetter } from '../utils'
-import { parsedOptions } from '../public'
+import { parsedOptions, PLUGIN_PREFIX } from '../public'
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
 import { basename, join, resolve } from 'path'
 import { readdirSync, readFileSync, statSync } from 'fs'
@@ -35,7 +35,7 @@ export const prodSharedPlugin = (
   const id2Prop = new Map<string, any>()
 
   return {
-    name: 'hugs7:shared-production',
+    name: [PLUGIN_PREFIX, 'shared-production'].join(':'),
     virtualFile: {
       __federation_fn_import: federation_fn_import
     },

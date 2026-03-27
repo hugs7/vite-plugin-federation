@@ -33,7 +33,7 @@ import { devSharedPlugin } from './dev/shared-development'
 import { prodExposePlugin } from './prod/expose-production'
 import { prodRemotePlugin } from './prod/remote-production'
 import { prodSharedPlugin } from './prod/shared-production'
-import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions } from './public'
+import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions, PLUGIN_PREFIX } from './public'
 
 const federation = (options: VitePluginFederationOptions): Plugin[] => {
   if (!options.filename) {
@@ -83,7 +83,7 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
   }
 
   const mainPlugin: Plugin = {
-    name: 'hugs7:federation',
+    name: [PLUGIN_PREFIX, 'federation'].join(':'),
     // for scenario vite.config.js build.cssCodeSplit: false
     // vite:css-post plugin will summarize all the styles in the style.xxxxxx.css file
     // so, this plugin need run after vite:css-post in post plugin list

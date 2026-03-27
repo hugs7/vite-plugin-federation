@@ -28,7 +28,7 @@ import {
   parseRemoteOptions,
   REMOTE_FROM_PARAMETER
 } from '../utils'
-import { builderInfo, parsedOptions, devRemotes } from '../public'
+import { builderInfo, parsedOptions, devRemotes, PLUGIN_PREFIX } from '../public'
 import type { PluginHooks } from '../../types/pluginHooks'
 import { Node } from 'estree'
 
@@ -64,7 +64,7 @@ export const devRemotePlugin = (
   const needsFederationModule = hasRemotes || hasShared
 
   return {
-    name: 'hugs7:remote-development',
+    name: [PLUGIN_PREFIX, 'remote-development'].join(':'),
     virtualFile: needsFederationModule
       ? {
           __federation__: `
