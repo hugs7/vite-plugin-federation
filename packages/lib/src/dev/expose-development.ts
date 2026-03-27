@@ -328,15 +328,17 @@ export const get = async (module) => {
     // from pre-bundled deps.
 
     async configureServer(server) {
-      // Build the federation pre-bundle: use Rolldown to bundle each shared
-      // module into a clean ESM file.  This handles CJS→ESM conversion,
-      // export* resolution, and sub-dep inlining — all without heuristics.
+      // Build the federation pre-bundle: use Rolldown to bundle ALL shared
+      // modules in a single build with code splitting.  This handles:
+      // - CJS→ESM conversion (react, react-dom)
+      // - export* resolution
+      // - Deduplication via shared chunks (react becomes a chunk that
+      //   zustand, react-dom, etc. all import — single instance)
       //
-      // Each shared module is built INDIVIDUALLY so that:
-      // 1. A failure in one module doesn't break all others
-      // 2. We can externalize other shared modules to avoid duplication
-      //    (e.g. react-dom's pre-bundle imports "react" as external,
-      //    not inlined — preventing dual React instances in standalone mode)
+      // We CANNOT externalize shared modules from each other because CJS
+      // modules use require() for their deps, and Rolldown leaves
+      // require() calls to externals as-is — browsers don't have require.
+      // A single build with code splitting solves this naturally.
       if (sharedSet.size > 0) {
         const root = resolvedRoot
         const outDir = join(root, 'node_modules', FEDERATION_DEPS_DIR)
@@ -345,49 +347,39 @@ export const get = async (module) => {
         const { build } = await import('rolldown')
         const sharedNames = [...sharedSet]
 
-        // Build each shared module individually.
-        // Externalize OTHER shared modules so they're not inlined —
-        // in standalone fallback mode, each shared wrapper imports the
-        // other shared modules through Vite's module graph (which hits
-        // our resolveId again), preserving singleton guarantees.
-        await Promise.all(
-          sharedNames.map(async (name) => {
-            const entryName = name.replace(/\//g, '_')
-            const otherShared = sharedNames.filter((n) => n !== name)
+        const entries: Record<string, string> = {}
+        for (const name of sharedNames) {
+          entries[name.replace(/\//g, '_')] = name
+        }
 
-            try {
-              await build({
-                input: { [entryName]: name },
-                cwd: root,
-                resolve: {
-                  conditionNames: ['import', 'module', 'browser', 'default']
-                },
-                platform: 'browser',
-                external: otherShared,
-                output: {
-                  format: 'esm',
-                  dir: outDir,
-                  entryFileNames: '[name].js',
-                  // Inline all non-shared deps into the entry file to avoid
-                  // chunk relative-import issues when served via /@fs/.
-                  inlineDynamicImports: true
-                },
-                logLevel: 'silent'
-              })
-            } catch (e) {
-              console.warn(
-                `[federation] Failed to pre-bundle ${name}:`,
-                e instanceof Error ? e.message : e
-              )
-            }
+        try {
+          await build({
+            input: entries,
+            cwd: root,
+            resolve: {
+              conditionNames: ['import', 'module', 'browser', 'default']
+            },
+            platform: 'browser',
+            output: {
+              format: 'esm',
+              dir: outDir,
+              entryFileNames: '[name].js',
+              chunkFileNames: '_chunks/[name]-[hash].js'
+            },
+            logLevel: 'silent'
           })
-        )
+        } catch (e) {
+          console.error(
+            '[federation] Failed to build federation pre-bundle:',
+            e instanceof Error ? e.message : e
+          )
+        }
 
         // Populate sharedModuleMeta from the pre-bundled output.
-        // Export names are discovered via dynamic import in a subprocess
-        // (not from the pre-bundle output) because CJS modules only have
-        // a default export in the Rolldown output — Node's import()
-        // correctly exposes CJS named properties as ESM named exports.
+        // Export names are discovered from the pre-bundle files:
+        // - ESM modules: es-module-lexer finds named exports directly
+        // - CJS modules: Rolldown only produces `export default`, so we
+        //   also scan for `exports.XXX = ...` patterns in the CJS body
         for (const name of sharedNames) {
           const fileName = name.replace(/\//g, '_') + '.js'
           const filePath = join(outDir, fileName)
