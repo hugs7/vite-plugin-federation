@@ -29,9 +29,9 @@ export const VITE = 'vite'
 
 // Virtual module identifiers
 export const VIRTUAL_FEDERATION = 'virtual:__federation__'
-export const VIRTUAL_FEDERATION_RESOLVED = '\0virtual:__federation__'
+export const VIRTUAL_FEDERATION_RESOLVED = `\0${VIRTUAL_FEDERATION}`
 export const VIRTUAL_FN_IMPORT = '__federation_fn_import'
-export const VIRTUAL_FN_IMPORT_RESOLVED = '\0virtual:__federation_fn_import'
+export const VIRTUAL_FN_IMPORT_RESOLVED = `\0virtual:${VIRTUAL_FN_IMPORT}`
 export const VIRTUAL_FN_SATISFY = '__federation_fn_satisfy'
 export const REMOTE_ENTRY_HELPER_PREFIX = '__remoteEntryHelper__'
 
@@ -42,6 +42,13 @@ export const VITE_ASSETS_DIR_PLACEHOLDER = '__VITE_ASSETS_DIR_PLACEHOLDER__'
 // Runtime identifiers used in generated code
 export const FEDERATION_EXPOSE_PREFIX = '__federation_expose_'
 export const FEDERATION_SHARED_PREFIX = '__federation_shared_'
+
+// Regex for matching CJS `exports.XXX = ...` patterns
+export const CJS_EXPORTS_RE = /exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
+
+/** Serialize an array of strings into a JS array literal (e.g. `['a','b']`). */
+export const toJsArrayLiteral = (items: string[]): string =>
+  `[${items.map((s) => JSON.stringify(s)).join(',')}]`
 
 export const builderInfo = {
   builder: 'rollup',

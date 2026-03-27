@@ -22,7 +22,6 @@ import type { ResolvedConfig, Rolldown } from 'vite'
 import type { PluginHooks } from '../../types/pluginHooks'
 import {
   builderInfo,
-  DYNAMIC_LOADING_CSS,
   DYNAMIC_LOADING_CSS_PREFIX,
   EXPOSES_KEY_MAP,
   EXPOSES_MAP,
@@ -32,6 +31,7 @@ import {
   PLUGIN_PREFIX,
   REMOTE_ENTRY_HELPER_PREFIX,
   SHARED,
+  toJsArrayLiteral,
   VITE_BASE_PLACEHOLDER,
   VITE_ASSETS_DIR_PLACEHOLDER,
   viteConfigResolved
@@ -127,8 +127,8 @@ export const prodExposePlugin = (
             `'${viteConfigResolved.config?.build?.assetsDir || ''}'`
           )
 
-        const filepathMap = new Map()
-        const getFilename = (name) => parse(parse(name).name).name
+        const filepathMap = new Map<string, any>()
+        const getFilename = (name: string) => parse(parse(name).name).name
         const cssBundlesMap: Map<string, Rolldown.OutputAsset | Rolldown.OutputChunk> =
           Object.keys(bundle)
             .filter((name) => extname(name) === '.css')
@@ -146,11 +146,9 @@ export const prodExposePlugin = (
               !viteConfigResolved.config.build.cssCodeSplit
             ) {
               if (cssBundlesMap.size) {
-                return `[${[...cssBundlesMap.values()]
-                  .map((cssBundle) =>
-                    JSON.stringify(basename(cssBundle.fileName))
-                  )
-                  .join(',')}]`
+                return toJsArrayLiteral(
+                  [...cssBundlesMap.values()].map((b) => basename(b.fileName))
+                )
               } else {
                 return '[]'
               }
@@ -169,7 +167,7 @@ export const prodExposePlugin = (
               else return str
             }
             const depCssFiles: Set<string> = new Set()
-            const addDepCss = (bundleName) => {
+            const addDepCss = (bundleName: string) => {
               const theBundle = bundle[bundleName] as any
               if (theBundle && theBundle.viteMetadata) {
                 for (const cssFileName of theBundle.viteMetadata.importedCss.values()) {
@@ -186,9 +184,7 @@ export const prodExposePlugin = (
 
             ;[fileBundle.fileName, ...fileBundle.imports].forEach(addDepCss)
 
-            return `[${[...depCssFiles]
-              .map((d) => JSON.stringify(basename(d)))
-              .join(',')}]`
+            return toJsArrayLiteral([...depCssFiles].map((d) => basename(d)))
           }
         )
 
@@ -235,7 +231,6 @@ export const prodExposePlugin = (
           return
         }
         const magicString = new MagicString(remoteEntryChunk.code)
-        // let cssFunctionName: string = DYNAMIC_LOADING_CSS
         walk(ast as Node, {
           enter(node: any) {
             if (

@@ -9,6 +9,14 @@ import { init as initLexer, parse as parseLexer } from 'es-module-lexer'
 import { readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
+import { CJS_EXPORTS_RE } from '../public'
+
+/** Collect CJS export names from a code string into a set. */
+const collectCjsExportNames = (code: string, target: Set<string>): void => {
+  for (const match of code.matchAll(CJS_EXPORTS_RE)) {
+    target.add(match[1])
+  }
+}
 
 /**
  * Scan a file (and optionally its chunk imports) for CJS `exports.XXX = ...`
@@ -21,12 +29,7 @@ export const scanCjsExports = (
 ): Set<string> => {
   const cjsExports = new Set<string>(['default'])
 
-  // Scan this file for exports.XXX = ...
-  for (const match of code.matchAll(
-    /exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
-  )) {
-    cjsExports.add(match[1])
-  }
+  collectCjsExportNames(code, cjsExports)
 
   // If we only found `default` in the entry, the CJS body may be in a chunk.
   // Follow relative imports and scan those too.
@@ -35,11 +38,7 @@ export const scanCjsExports = (
       try {
         const chunkPath = join(fileDir, imp[1])
         const chunkCode = readFileSync(chunkPath, 'utf-8')
-        for (const match of chunkCode.matchAll(
-          /exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
-        )) {
-          cjsExports.add(match[1])
-        }
+        collectCjsExportNames(chunkCode, cjsExports)
       } catch {
         /* chunk not found */
       }
@@ -100,12 +99,7 @@ export const getPreBundleExports = async (
       const origCode = readFileSync(origPath, 'utf-8')
       const origExports = new Set<string>(['default'])
 
-      // Scan the entry file
-      for (const m of origCode.matchAll(
-        /exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
-      )) {
-        origExports.add(m[1])
-      }
+      collectCjsExportNames(origCode, origExports)
 
       // Follow require('./...') to find CJS sub-files
       if (origExports.size <= 1) {
@@ -116,11 +110,7 @@ export const getPreBundleExports = async (
           try {
             const subPath = nodeRequire.resolve(join(origDir, req[1]))
             const subCode = readFileSync(subPath, 'utf-8')
-            for (const m of subCode.matchAll(
-              /exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
-            )) {
-              origExports.add(m[1])
-            }
+            collectCjsExportNames(subCode, origExports)
           } catch {
             /* sub-file not found */
           }
