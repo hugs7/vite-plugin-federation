@@ -22,7 +22,8 @@ The parsed options are stored in `parsedOptions.devShared` and consumed by the o
 The most complex plugin. It handles everything on the **remote** side:
 
 - **Generates `remoteEntry.js`** — the virtual module that implements `init()` and `get()`
-- **Shared module virtual wrappers** — `resolveId` + `load` hooks that intercept bare imports of shared modules and serve wrapper code checking `globalThis.__federation_shared_modules__`
+- **Externalizes shared modules** from the dep optimizer via a Rolldown plugin in `optimizeDeps.rolldownOptions.plugins`, and runs a federation pre-bundle (`rolldown.build()`) at startup to produce clean ESM fallbacks in `node_modules/.federation-deps/`
+- **Shared module virtual wrappers** — `resolveId` + `load` hooks that intercept bare imports of shared modules and serve wrapper code checking `globalThis.__federation_shared_modules__`, falling back to the federation pre-bundle
 - **`configureServer()` middleware** — CORS headers, remoteEntry serving, `@vite/client` patching, `@react-refresh` singleton, expose module stubs
 
 ### 3. `devRemotePlugin` (remote-development.ts)

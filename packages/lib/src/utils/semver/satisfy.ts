@@ -13,7 +13,7 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { combineVersion, extractComparator, pipe } from './utils'
+import { combineVersion, extractComparator, pipe } from './utils';
 import {
   parseHyphen,
   parseComparatorTrim,
@@ -24,9 +24,9 @@ import {
   parseXRanges,
   parseStar,
   parseGTE0
-} from './parser'
-import { compare } from './compare'
-import type { CompareAtom } from './compare'
+} from './parser';
+import { compare } from './compare';
+import type { CompareAtom } from './compare';
 
 function parseComparatorString(range: string): string {
   return pipe(
@@ -48,7 +48,7 @@ function parseComparatorString(range: string): string {
     parseTildes,
     parseXRanges,
     parseStar
-  )(range)
+  )(range);
 }
 
 function parseRange(range: string) {
@@ -67,26 +67,26 @@ function parseRange(range: string) {
     parseCaretTrim
   )(range.trim())
     .split(/\s+/)
-    .join(' ')
+    .join(' ');
 }
 
 export function satisfy(version: string, range: string): boolean {
   if (!version) {
-    return false
+    return false;
   }
 
-  const parsedRange = parseRange(range)
+  const parsedRange = parseRange(range);
   const parsedComparator = parsedRange
     .split(' ')
     .map((rangeVersion) => parseComparatorString(rangeVersion))
-    .join(' ')
+    .join(' ');
   const comparators = parsedComparator
     .split(/\s+/)
-    .map((comparator) => parseGTE0(comparator))
-  const extractedVersion = extractComparator(version)
+    .map((comparator) => parseGTE0(comparator));
+  const extractedVersion = extractComparator(version);
 
   if (!extractedVersion) {
-    return false
+    return false;
   }
 
   const [
@@ -97,7 +97,7 @@ export function satisfy(version: string, range: string): boolean {
     versionMinor,
     versionPatch,
     versionPreRelease
-  ] = extractedVersion
+  ] = extractedVersion;
   const versionAtom: CompareAtom = {
     operator: versionOperator,
     version: combineVersion(
@@ -110,13 +110,13 @@ export function satisfy(version: string, range: string): boolean {
     minor: versionMinor,
     patch: versionPatch,
     preRelease: versionPreRelease?.split('.')
-  }
+  };
 
   for (const comparator of comparators) {
-    const extractedComparator = extractComparator(comparator)
+    const extractedComparator = extractComparator(comparator);
 
     if (!extractedComparator) {
-      return false
+      return false;
     }
 
     const [
@@ -127,7 +127,7 @@ export function satisfy(version: string, range: string): boolean {
       rangeMinor,
       rangePatch,
       rangePreRelease
-    ] = extractedComparator
+    ] = extractedComparator;
     const rangeAtom: CompareAtom = {
       operator: rangeOperator,
       version: combineVersion(
@@ -140,12 +140,12 @@ export function satisfy(version: string, range: string): boolean {
       minor: rangeMinor,
       patch: rangePatch,
       preRelease: rangePreRelease?.split('.')
-    }
+    };
 
     if (!compare(rangeAtom, versionAtom)) {
-      return false // early return
+      return false; // early return
     }
   }
 
-  return true
+  return true;
 }

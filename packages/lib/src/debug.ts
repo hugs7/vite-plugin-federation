@@ -22,7 +22,7 @@ var __fed_debug = (function() {
     return function() { console.debug.apply(console, ['%c' + ns, 'color: #d97706'].concat(Array.prototype.slice.call(arguments))); };
   };
 })();
-`
+`;
 
 /** ESM snippet for virtual modules (runs in the browser via Vite dev server) */
 export const FEDERATION_DEBUG_SNIPPET_ESM = `\
@@ -36,4 +36,4 @@ const __fed_debug = (() => {
     return (...args) => console.debug('%c' + ns, 'color: #d97706', ...args);
   };
 })();
-`
+`;

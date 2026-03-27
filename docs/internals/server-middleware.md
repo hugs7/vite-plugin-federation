@@ -169,3 +169,5 @@ Request to Remote Dev Server (localhost:6001)
 │ (anything else) ──────────► next() → Vite's normal handler
 └─────────────────────────────┘
 ```
+
+> **Note**: Previous versions of this middleware included `.vite/deps/` response monkey-patching, `/@fs/` URL matching for ESM modules, and CJS sub-dep redirect handling. These are no longer needed — shared modules are externalized from the dep optimizer and served via virtual wrappers backed by the federation pre-bundle in `node_modules/.federation-deps/`.

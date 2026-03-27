@@ -87,16 +87,22 @@ Host (localhost:3000)              Remote (localhost:6001)
 
 Now all components — whether from the host or remote — use the same React instance, the same ReactReduxContext, and the same store.
 
-## CJS vs ESM: Different Strategies
+## Uniform Strategy for All Shared Modules
 
-The challenge is that different shared modules have different module formats, and Vite's Rolldown dep optimizer handles them differently:
+All shared modules — regardless of their original format (CJS or ESM) — use the same federation strategy:
 
-| Module | Format | Dep Optimizer Behavior | Federation Strategy |
-|--------|--------|----------------------|-------------------|
-| `react` | CJS | Single `require_react()` factory shared by all consumers | Virtual wrapper with `globalThis` check |
-| `react-dom` | CJS | Single `require_react_dom()` factory | Virtual wrapper with `globalThis` check |
-| `react-redux` | ESM | Shared via chunks, entry is a re-export | Virtual wrapper with `globalThis` check |
-| `react-router` | ESM | Shared via chunks | Virtual wrapper with `globalThis` check |
-| `zustand` | ESM | Shared via chunks | Virtual wrapper with `globalThis` check |
+1. **Externalized** from Vite's dep optimizer via a Rolldown plugin in `optimizeDeps.rolldownOptions.plugins`
+2. **Pre-bundled** into clean ESM by a separate `rolldown.build()` at server startup → `node_modules/.federation-deps/`
+3. **Virtual wrappers** via `resolveId` + `load` intercept all bare specifier imports and serve `globalThis` check → fallback to federation pre-bundle
 
-See [CJS Shared Modules](/internals/cjs-shared-modules) and [ESM Singleton Modules](/internals/esm-singleton-modules) for the implementation details of each strategy.
+| Module | Original Format | Federation Strategy |
+|--------|----------------|-------------------|
+| `react` | CJS | Externalized in dep optimizer + federation pre-bundle |
+| `react-dom` | CJS | Externalized in dep optimizer + federation pre-bundle |
+| `react-redux` | ESM | Externalized in dep optimizer + federation pre-bundle |
+| `react-router` | ESM | Externalized in dep optimizer + federation pre-bundle |
+| `zustand` | ESM | Externalized in dep optimizer + federation pre-bundle |
+
+The original module format is irrelevant — Rolldown's federation pre-bundle normalizes everything to clean ESM. There is no CJS/ESM classification, no `isCjsFile()` heuristic, and no format-specific middleware.
+
+See [Shared Modules: Uniform Handling](/internals/cjs-shared-modules) and [Rolldown Dep Optimizer](/internals/rolldown-dep-optimizer) for implementation details.

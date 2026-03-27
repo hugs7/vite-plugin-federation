@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
@@ -6,11 +6,11 @@ export default defineConfig({
       '**/node_modules/**',
       '**/dist/**',
       './packages/examples/**/*.*',
-      './packages/temp/**/*.*'
+      './temp/**/*.*'
     ],
     testTimeout: 20000
   },
   oxc: {
-    target: 'node22'
+    target: 'node24'
   }
-})
+});
