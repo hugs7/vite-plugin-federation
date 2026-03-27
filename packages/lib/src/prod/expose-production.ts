@@ -16,9 +16,11 @@
 import { Node, walk } from 'estree-walker'
 import MagicString from 'magic-string'
 import { basename, dirname, extname, parse, relative, resolve } from 'path'
-import type { AcornNode, OutputAsset, OutputChunk } from 'rollup'
+import type { Program } from 'estree'
 import type { VitePluginFederationOptions } from 'types'
-import type { ResolvedConfig } from 'vite'
+import type { OutputBundle, OutputChunk, ResolvedConfig } from 'vite'
+
+type OutputAsset = Exclude<OutputBundle[string], OutputChunk>
 import type { PluginHooks } from '../../types/pluginHooks'
 import {
   builderInfo,
@@ -300,9 +302,9 @@ export const prodExposePlugin = (
         }
 
         // remove all __f__dynamic_loading_css__ after replace
-        let ast: AcornNode | null = null
+        let ast: Program | null = null
         try {
-          ast = this.parse(remoteEntryChunk.code)
+          ast = this.parse(remoteEntryChunk.code) as Program
         } catch (err) {
           console.error(err)
         }

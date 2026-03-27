@@ -15,7 +15,7 @@
 
 import virtual from '@rollup/plugin-virtual'
 import { dirname } from 'path'
-import type { ModuleInfo } from 'rollup'
+import type { ModuleInfo } from 'vite'
 import { fileURLToPath } from 'url'
 import type {
   ConfigEnv,

@@ -24,7 +24,7 @@ import type {
 import { readFileSync } from 'fs'
 import { createHash } from 'crypto'
 import path, { parse, posix } from 'path'
-import type { PluginContext } from 'rollup'
+import type { PluginContext } from 'vite'
 
 export * from './html'
 

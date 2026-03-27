@@ -16,12 +16,7 @@
 import { walk } from 'estree-walker'
 import MagicString from 'magic-string'
 import path from 'node:path'
-import type {
-  AcornNode,
-  TransformPluginContext,
-  OutputAsset,
-  OutputChunk
-} from 'rollup'
+import type { Program } from 'estree'
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
 import type { PluginHooks } from '../../types/pluginHooks'
 import {
@@ -39,7 +34,14 @@ import {
   injectToHead,
   toPreloadTag
 } from '../utils'
-import { ResolvedConfig } from 'vite'
+import type {
+  OutputBundle,
+  OutputChunk,
+  ResolvedConfig,
+  TransformPluginContext
+} from 'vite'
+
+type OutputAsset = Exclude<OutputBundle[string], OutputChunk>
 
 const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
   string,
@@ -353,9 +355,9 @@ export const prodRemotePlugin = (
           }
         }
 
-        let ast: AcornNode | null = null
+        let ast: Program | null = null
         try {
-          ast = this.parse(code)
+          ast = this.parse(code) as Program
         } catch (err) {
           console.error(err)
         }
