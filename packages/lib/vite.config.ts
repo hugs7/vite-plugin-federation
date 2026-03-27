@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -7,14 +7,29 @@ export default defineConfig({
       entry: ['./src/index.ts', 'src/utils/semver/satisfy.ts'],
       formats: ['es', 'cjs']
     },
-    target: 'node22',
+    target: 'node24',
     minify: false,
     sourcemap: !process.env.CI,
     rolldownOptions: {
-      external: ['fs', 'path', 'crypto', 'magic-string', 'url', 'module', 'rolldown', 'es-module-lexer', 'debug', 'node:fs', 'node:path', 'node:crypto', 'node:url', 'node:module'],
+      external: [
+        'fs',
+        'path',
+        'crypto',
+        'magic-string',
+        'url',
+        'module',
+        'rolldown',
+        'es-module-lexer',
+        'debug',
+        'node:fs',
+        'node:path',
+        'node:crypto',
+        'node:url',
+        'node:module'
+      ],
       output: {
         minifyInternalExports: false
       }
     }
   }
-})
+});

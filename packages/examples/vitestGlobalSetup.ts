@@ -1,72 +1,71 @@
-import os from 'node:os'
-import path from 'node:path'
-import fs from 'fs-extra'
-import kill from 'kill-port'
-import type { BrowserServer } from 'playwright-chromium'
-import { chromium } from 'playwright-chromium'
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs/promises';
+import kill from 'kill-port';
+import type { BrowserServer } from 'playwright-chromium';
+import { chromium } from 'playwright-chromium';
 
-const DIR = path.join(os.tmpdir(), 'vitest_playwright_global_setup')
+const DIR = path.join(os.tmpdir(), 'vitest_playwright_global_setup');
 
-let browserServer: BrowserServer | undefined
+let browserServer: BrowserServer | undefined;
 
-export async function setup(): Promise<void> {
+export const setup = async (): Promise<void> => {
   browserServer = await chromium.launchServer({
     headless: !process.env.VITE_DEBUG_SERVE,
     args: process.env.CI
       ? ['--no-sandbox', '--disable-setuid-sandbox']
       : undefined
-  })
+  });
 
-  await fs.mkdirp(DIR)
-  await fs.writeFile(path.join(DIR, 'wsEndpoint'), browserServer.wsEndpoint())
+  await fs.mkdir(DIR, { recursive: true });
+  await fs.writeFile(path.join(DIR, 'wsEndpoint'), browserServer.wsEndpoint());
 
   // Kill any leftover server processes before touching the temp directory
   // so file handles are released (avoids EBUSY on Windows).
-  await kill('5000,5001,5002,5003,5004').catch(() => {})
+  await kill('5000,5001,5002,5003,5004').catch(() => {});
   if (process.platform === 'win32') {
-    await new Promise((r) => setTimeout(r, 2000))
+    await new Promise((r) => setTimeout(r, 2000));
   }
 
-  const tempDir = path.resolve(__dirname, '../temp')
-  await fs.ensureDir(tempDir)
-  try {
-    await fs.emptyDir(tempDir)
-  } catch {
-    // Retry once after a short delay (Windows file-lock release).
-    await new Promise((r) => setTimeout(r, 2000))
-    await fs.emptyDir(tempDir)
-  }
+  const tempDir = path.resolve(__dirname, '../temp');
+  await fs.rm(tempDir, { recursive: true, force: true });
+  await fs.mkdir(tempDir, { recursive: true });
   await fs
-    .copy(path.resolve(__dirname, '../examples'), tempDir, {
-      dereference: false,
-      filter(file) {
-        file = file.replace(/\\/g, '/')
-        return !file.includes('__tests__') && !file.match(/dist(\/|$)/)
+    .cp(path.resolve(__dirname, '../examples'), tempDir, {
+      recursive: true,
+      filter: (file) => {
+        const normalized = file.replace(/\\/g, '/');
+        return (
+          !normalized.includes('__tests__') && !normalized.match(/dist(\/|$)/)
+        );
       }
     })
     .catch(async (error) => {
       if (error.code === 'EPERM' && error.syscall === 'symlink') {
         throw new Error(
           'Could not create symlinks. On Windows, consider activating Developer Mode to allow non-admin users to create symlinks by following the instructions at https://docs.microsoft.com/en-us/windows/apps/get-started/enable-your-device-for-development.'
-        )
+        );
       } else {
-        throw error
+        throw error;
       }
-    })
-}
+    });
+};
 
-export async function teardown(): Promise<void> {
-  await browserServer?.close()
+export const teardown = async (): Promise<void> => {
+  await browserServer?.close();
   if (!process.env.VITE_PRESERVE_BUILD_ARTIFACTS) {
-    await kill('5000,5001,5002,5003,5004').catch(() => {})
+    await kill('5000,5001,5002,5003,5004').catch(() => {});
     if (process.platform === 'win32') {
-      await new Promise((r) => setTimeout(r, 2000))
+      await new Promise((r) => setTimeout(r, 2000));
     }
     try {
-      await fs.remove(path.resolve(__dirname, '../temp'))
-      console.log('temp file is deleted')
+      await fs.rm(path.resolve(__dirname, '../temp'), {
+        recursive: true,
+        force: true
+      });
+      console.log('temp file is deleted');
     } catch {
-      console.log('temp directory still locked, will be cleaned on next run')
+      console.log('temp directory still locked, will be cleaned on next run');
     }
   }
-}
+};

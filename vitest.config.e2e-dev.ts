@@ -1,7 +1,7 @@
-import { resolve } from 'node:path'
-import { defineConfig } from 'vitest/config'
+import { resolve } from 'node:path';
+import { defineConfig } from 'vitest/config';
 
-const timeout = process.env.CI ? 50000 : 30000
+const timeout = process.env.CI ? 50000 : 30000;
 
 export default defineConfig({
   resolve: {
@@ -20,10 +20,10 @@ export default defineConfig({
     reporters: 'default',
     onConsoleLog(log) {
       if (log.match(/experimental|jit engine|emitted file|tailwind/i))
-        return false
+        return false;
     }
   },
   oxc: {
-    target: 'node22'
+    target: 'node24'
   }
-})
+});

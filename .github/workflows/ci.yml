@@ -15,7 +15,7 @@ jobs:
       matrix:
         # remove macos temporarily
         os: [ubuntu-latest, windows-latest]
-        node_version: [22, 24]
+        node_version: [24]
       fail-fast: false
 
     name: 'Build&Test: node-${{ matrix.node_version }}, ${{ matrix.os }}'
@@ -59,7 +59,7 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    name: 'Lint: node-22, ubuntu-latest'
+    name: 'Lint: node-24, ubuntu-latest'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,10 +70,10 @@ jobs:
         with:
           version: 10
 
-      - name: Set node version to 22
+      - name: Set node version to 24
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: 'pnpm'
 
       - name: Install deps
