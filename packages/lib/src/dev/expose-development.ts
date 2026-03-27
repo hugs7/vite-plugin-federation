@@ -210,10 +210,12 @@ export const get = async (module) => {
         sharedSet.add(item[0])
       }
 
-      // Also add known sub-paths that are commonly imported
+      // Also add known sub-paths that are commonly imported.
+      // Snapshot the base names first to avoid mutating the set while iterating.
       const knownSubPaths = ['/jsx-runtime', '/jsx-dev-runtime', '/client']
       const nodeRequire = createRequire(join(resolvedRoot, 'package.json'))
-      for (const baseName of sharedSet) {
+      const baseNames = [...sharedSet]
+      for (const baseName of baseNames) {
         for (const sub of knownSubPaths) {
           const specifier = baseName + sub
           try {
