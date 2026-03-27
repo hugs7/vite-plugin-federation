@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [2.0.0](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.8.4...@hugs7/vite-plugin-federation@2.0.0) (2026-03-27)
+
+
+### Bug Fixes
+
+* add original-source fallback for CJS export discovery ([2a427dc](https://github.com/hugs7/vite-plugin-federation/commit/2a427dc9b5dabebabf1d5561445073238cfa6628))
+* avoid mutating Set while iterating for sub-path discovery ([a5b31c9](https://github.com/hugs7/vite-plugin-federation/commit/a5b31c9d2aadc6143933283057a73b620b8b0ad2))
+* externalize rolldown from plugin build, use root-relative pre-bundle URLs ([e6946cd](https://github.com/hugs7/vite-plugin-federation/commit/e6946cd68df6497ad3c4a9513cfe4005656f98ad))
+* filter non-importable sub-paths from shared module discovery ([0431418](https://github.com/hugs7/vite-plugin-federation/commit/0431418f51b01cea767e97e6d690a9e239e1003a))
+* filter Rolldown's internal 't' factory export from CJS detection ([46f0da4](https://github.com/hugs7/vite-plugin-federation/commit/46f0da4b6a6519134a6a6595467e545a57b3afa9))
+* follow chunk imports to discover CJS exports with code splitting ([38594ba](https://github.com/hugs7/vite-plugin-federation/commit/38594baa6d0f757b2215409c6582fd8938b9c3f3))
+* handle ESM vs CJS named export locations in shared wrapper ([6c4e3ef](https://github.com/hugs7/vite-plugin-federation/commit/6c4e3ef9d1efdba3bf9f9b014722fcab11a5fb53))
+* move helper functions before return statement in devRemotePlugin ([fe2a05e](https://github.com/hugs7/vite-plugin-federation/commit/fe2a05ea8e3f77767b5e20885e2df8fc0ce0aa71))
+* move temp dir to repo root, add missing DYNAMIC_LOADING_CSS import ([1db4749](https://github.com/hugs7/vite-plugin-federation/commit/1db4749e478fe716f3131e7cb66debda69965d0b))
+* resolve all type errors and gate build on tsc --noEmit ([f8e4720](https://github.com/hugs7/vite-plugin-federation/commit/f8e47200dccb327a48dfc94a5988267b17561593))
+* resolve shared modules before Vite's resolver, fix CJS export discovery ([975a5e6](https://github.com/hugs7/vite-plugin-federation/commit/975a5e634d59987ed3b9bd9ce85ce7e69fec8023))
+* use Rolldown namespace from vite for bundler types ([1909fc9](https://github.com/hugs7/vite-plugin-federation/commit/1909fc9b00a92c1f45a29cd094e729b30ae01144))
+* use single Rolldown build with code splitting for federation pre-bundle ([253c1d5](https://github.com/hugs7/vite-plugin-federation/commit/253c1d5bca15c177e9cb1b98b3693bfc231a6bd9))
+
+
+### Code Refactoring
+
+* overhaul e2e test infrastructure and bump to Node 24 ([08f93e5](https://github.com/hugs7/vite-plugin-federation/commit/08f93e542e2c7891d75807532a4bfe474ad89faf))
+
+
+### Features
+
+* add structured debug logging via npm debug package ([02222a2](https://github.com/hugs7/vite-plugin-federation/commit/02222a2c6f1b92d85c390055bce315b2230b206d))
+* define explicit boolean types ([38f8810](https://github.com/hugs7/vite-plugin-federation/commit/38f8810b0d61c2fd19878774eabbfe1049942553))
+* support Vite 7 by gracefully degrading when Rolldown is unavailable ([24afcb6](https://github.com/hugs7/vite-plugin-federation/commit/24afcb6bdbb5251ad6683db9184981c0016eb561))
+
+
+### BREAKING CHANGES
+
+* Minimum Node.js version is now 24.
+
+Amp-Thread-ID: https://ampcode.com/threads/T-019d3011-f87a-76bf-b07b-7ebba2ccc677
+Co-authored-by: Amp <amp@ampcode.com>
+
+
+
+
+
 ## [1.8.4](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.8.3...@hugs7/vite-plugin-federation@1.8.4) (2026-03-26)
 
 
