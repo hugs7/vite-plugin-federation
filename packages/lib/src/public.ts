@@ -13,17 +13,17 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { ConfigTypeSet, RemotesConfig } from 'types'
-import type { ResolvedConfig } from 'vite'
-import type { Remote } from './utils'
+import type { ConfigTypeSet, RemotesConfig } from 'types';
+import type { ResolvedConfig } from 'vite';
+import type { Remote } from './utils';
 
 // Re-export all constants for backwards compatibility
-export * from './constants'
+export * from './constants';
 
 // Mutable shared state
-export const EXPOSES_MAP = new Map()
-export const EXPOSES_KEY_MAP = new Map()
-export const EXTERNALS: string[] = []
+export const EXPOSES_MAP = new Map();
+export const EXPOSES_KEY_MAP = new Map();
+export const EXTERNALS: string[] = [];
 
 export const builderInfo = {
   builder: 'rollup',
@@ -32,7 +32,7 @@ export const builderInfo = {
   isHost: false,
   isRemote: false,
   isShared: false
-}
+};
 export const parsedOptions = {
   prodExpose: [] as (string | ConfigTypeSet)[],
   prodRemote: [] as (string | ConfigTypeSet)[],
@@ -40,13 +40,13 @@ export const parsedOptions = {
   devShared: [] as (string | ConfigTypeSet)[],
   devExpose: [] as (string | ConfigTypeSet)[],
   devRemote: [] as (string | ConfigTypeSet)[]
-}
+};
 export const devRemotes: {
-  id: string
-  regexp: RegExp
-  config: RemotesConfig
-}[] = []
-export const prodRemotes: Remote[] = []
+  id: string;
+  regexp: RegExp;
+  config: RemotesConfig;
+}[] = [];
+export const prodRemotes: Remote[] = [];
 export const viteConfigResolved: { config: ResolvedConfig | undefined } = {
   config: undefined
-}
+};

@@ -13,50 +13,61 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { existsSync, mkdirSync, readFileSync } from 'fs'
-import { createRequire } from 'module'
-import { join, resolve } from 'path'
-import type { VitePluginFederationOptions } from 'types'
-import type { UserConfig, ViteDevServer } from 'vite'
-import type { IncomingMessage, ServerResponse } from 'http'
-import type { PluginHooks } from '../../types/pluginHooks'
-import { FEDERATION_EXPOSE_PREFIX, parsedOptions, PLUGIN_PREFIX, REMOTE_ENTRY_HELPER_PREFIX } from '../public'
-import { matchesUrl, NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter, sendJs } from '../utils'
-import { createLogger } from '../logger'
+import { existsSync, mkdirSync, readFileSync } from 'fs';
+import { createRequire } from 'module';
+import { join, resolve } from 'path';
+import type { VitePluginFederationOptions } from 'types';
+import type { UserConfig, ViteDevServer } from 'vite';
+import type { IncomingMessage, ServerResponse } from 'http';
+import type { PluginHooks } from '../../types/pluginHooks';
+import {
+  FEDERATION_EXPOSE_PREFIX,
+  parsedOptions,
+  PLUGIN_PREFIX,
+  REMOTE_ENTRY_HELPER_PREFIX
+} from '../public';
+import {
+  matchesUrl,
+  NAME_CHAR_REG,
+  parseExposeOptions,
+  removeNonRegLetter,
+  sendJs
+} from '../utils';
+import { createLogger } from '../logger';
 
 import {
   type SharedModuleMeta,
   buildSharedWrapperCode,
   getPreBundleExports
-} from './export-discovery'
-import { REACT_REFRESH_WRAPPER_CODE, patchViteClientCode } from './hmr'
-import { buildRemoteEntryCode } from './remote-entry-template'
+} from './export-discovery';
+import { REACT_REFRESH_WRAPPER_CODE, patchViteClientCode } from './hmr';
+import { buildRemoteEntryCode } from './remote-entry-template';
 
-const logger = createLogger('expose')
+const logger = createLogger('expose');
 
-const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:'
-const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
+const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:';
+const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX;
 
-const FEDERATION_DEPS_DIR = '.federation-deps'
+const FEDERATION_DEPS_DIR = '.federation-deps';
 
 // Convert an absolute filesystem path to a URL that Vite's dev server
 // can serve.  If the path is inside the project root, return a root-
 // relative path; otherwise use /@fs/ prefix.
 const toViteUrl = (filePath: string, root: string): string => {
-  const normalized = filePath.replace(/\\/g, '/')
-  const normalizedRoot = root.replace(/\\/g, '/').replace(/\/$/, '')
+  const normalized = filePath.replace(/\\/g, '/');
+  const normalizedRoot = root.replace(/\\/g, '/').replace(/\/$/, '');
   if (normalized.startsWith(normalizedRoot + '/')) {
-    return normalized.slice(normalizedRoot.length)
+    return normalized.slice(normalizedRoot.length);
   }
-  return `/@fs${normalized}`
-}
+  return `/@fs${normalized}`;
+};
 
 // Shared state between the main plugin and the enforce:'pre' resolver plugin.
 // Both reference these module-level variables.  They're populated when
 // devExposePlugin() runs (called from config() hook) and used by the
 // resolver plugin at request time.
-const sharedSet = new Set<string>()
-let sharedModuleMeta = new Map<string, SharedModuleMeta>()
+const sharedSet = new Set<string>();
+let sharedModuleMeta = new Map<string, SharedModuleMeta>();
 
 /**
  * Separate enforce:'pre' plugin for shared module resolution.
@@ -73,28 +84,28 @@ export const devSharedResolverPlugin: import('vite').Plugin = {
 
   resolveId(id: string) {
     if (sharedSet.has(id)) {
-      return RESOLVED_SHARED_PREFIX + id
+      return RESOLVED_SHARED_PREFIX + id;
     }
-    return null
+    return null;
   },
 
   load(id: string) {
     if (!id.startsWith(RESOLVED_SHARED_PREFIX)) {
-      return null
+      return null;
     }
 
-    const specifier = id.slice(RESOLVED_SHARED_PREFIX.length)
-    const meta = sharedModuleMeta.get(specifier)
+    const specifier = id.slice(RESOLVED_SHARED_PREFIX.length);
+    const meta = sharedModuleMeta.get(specifier);
     if (!meta) {
-      return null
+      return null;
     }
 
     return {
       code: buildSharedWrapperCode(specifier, meta),
       moduleType: 'js' as const
-    }
+    };
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // Middleware handlers — each handles a single URL pattern.
@@ -107,20 +118,20 @@ const handleRemoteEntry = async (
   res: ServerResponse
 ): Promise<boolean> => {
   try {
-    const moduleId = `${REMOTE_ENTRY_HELPER_PREFIX}${filename}`
-    const result = await server.transformRequest(moduleId)
+    const moduleId = `${REMOTE_ENTRY_HELPER_PREFIX}${filename}`;
+    const result = await server.transformRequest(moduleId);
     if (result) {
-      sendJs(res, result.code)
+      sendJs(res, result.code);
     } else {
-      res.statusCode = 404
-      res.end('Module not found')
+      res.statusCode = 404;
+      res.end('Module not found');
     }
   } catch (error) {
-    res.statusCode = 500
-    res.end('Internal server error')
+    res.statusCode = 500;
+    res.end('Internal server error');
   }
-  return true
-}
+  return true;
+};
 
 /**
  * Patch @vite/client so HMR module re-imports use the absolute remote
@@ -132,29 +143,29 @@ const handleViteClient = async (
   next: () => void
 ): Promise<boolean> => {
   try {
-    const clientResult = await server.transformRequest('/@vite/client')
+    const clientResult = await server.transformRequest('/@vite/client');
     if (!clientResult) {
-      next()
-      return true
+      next();
+      return true;
     }
-    const port = server.config.server.port ?? 5173
-    const remoteOrigin = `http://localhost:${port}`
-    const code = patchViteClientCode(clientResult.code, remoteOrigin)
-    sendJs(res, code)
+    const port = server.config.server.port ?? 5173;
+    const remoteOrigin = `http://localhost:${port}`;
+    const code = patchViteClientCode(clientResult.code, remoteOrigin);
+    sendJs(res, code);
   } catch (error) {
-    next()
+    next();
   }
-  return true
-}
+  return true;
+};
 
 /**
  * Serve the react-refresh wrapper that re-uses the HOST's refresh
  * runtime singleton for cross-origin component registration.
  */
 const handleReactRefresh = (res: ServerResponse): boolean => {
-  sendJs(res, REACT_REFRESH_WRAPPER_CODE)
-  return true
-}
+  sendJs(res, REACT_REFRESH_WRAPPER_CODE);
+  return true;
+};
 
 /**
  * Serve the real react-refresh runtime under an alternate URL
@@ -166,17 +177,17 @@ const handleReactRefreshRuntime = async (
   next: () => void
 ): Promise<boolean> => {
   try {
-    const result = await server.transformRequest('/@react-refresh')
+    const result = await server.transformRequest('/@react-refresh');
     if (result) {
-      sendJs(res, result.code)
-      return true
+      sendJs(res, result.code);
+      return true;
     }
   } catch {
     /* fall through */
   }
-  next()
-  return true
-}
+  next();
+  return true;
+};
 
 /**
  * Serve exposed modules as re-export stubs that redirect the browser
@@ -188,33 +199,33 @@ const handleExposeModule = (
   res: ServerResponse
 ): boolean => {
   try {
-    const match = url.match(/__federation_expose_(.+?)\.js/)
+    const match = url.match(/__federation_expose_(.+?)\.js/);
     if (match) {
-      const exposeName = match[1]
+      const exposeName = match[1];
       const exposeItem = parsedOptions.devExpose.find((item) => {
-        const itemName = removeNonRegLetter(item[0], NAME_CHAR_REG)
-        return itemName === exposeName
-      })
+        const itemName = removeNonRegLetter(item[0], NAME_CHAR_REG);
+        return itemName === exposeName;
+      });
       if (exposeItem && exposeItem[1] && exposeItem[1].import) {
-        const modulePath = exposeItem[1].import
-        const viteUrl = toViteUrl(modulePath, resolvedRoot)
-        const code = `export { default } from '${viteUrl}';\nexport * from '${viteUrl}';`
-        sendJs(res, code)
+        const modulePath = exposeItem[1].import;
+        const viteUrl = toViteUrl(modulePath, resolvedRoot);
+        const code = `export { default } from '${viteUrl}';\nexport * from '${viteUrl}';`;
+        sendJs(res, code);
       } else {
-        res.statusCode = 404
-        res.end(`Expose module not found: ${exposeName}`)
+        res.statusCode = 404;
+        res.end(`Expose module not found: ${exposeName}`);
       }
     } else {
-      res.statusCode = 400
-      res.end('Invalid expose module URL')
+      res.statusCode = 400;
+      res.end('Invalid expose module URL');
     }
   } catch (error) {
-    logger.error('Error loading expose module:', error)
-    res.statusCode = 500
-    res.end('Internal server error')
+    logger.error('Error loading expose module:', error);
+    res.statusCode = 500;
+    res.end('Internal server error');
   }
-  return true
-}
+  return true;
+};
 
 // ---------------------------------------------------------------------------
 // Shared module collection
@@ -227,19 +238,19 @@ const handleExposeModule = (
  */
 const collectSharedSpecifiers = (root: string): void => {
   for (const item of parsedOptions.devShared) {
-    sharedSet.add(item[0])
+    sharedSet.add(item[0]);
   }
 
-  const nodeRequire = createRequire(join(root, 'package.json'))
-  const baseNames = [...sharedSet]
+  const nodeRequire = createRequire(join(root, 'package.json'));
+  const baseNames = [...sharedSet];
   for (const baseName of baseNames) {
     try {
-      const pkgJsonPath = nodeRequire.resolve(`${baseName}/package.json`)
-      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
+      const pkgJsonPath = nodeRequire.resolve(`${baseName}/package.json`);
+      const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
       if (pkgJson.exports && typeof pkgJson.exports === 'object') {
         for (const subPath of Object.keys(pkgJson.exports)) {
           if (subPath !== '.' && subPath.startsWith('./')) {
-            sharedSet.add(baseName + subPath.slice(1))
+            sharedSet.add(baseName + subPath.slice(1));
           }
         }
       }
@@ -247,7 +258,7 @@ const collectSharedSpecifiers = (root: string): void => {
       /* package.json not found or not readable */
     }
   }
-}
+};
 
 // ---------------------------------------------------------------------------
 // Pre-bundle build
@@ -259,15 +270,15 @@ const collectSharedSpecifiers = (root: string): void => {
  * sharedModuleMeta with discovered export names.
  */
 const buildFederationPreBundle = async (root: string): Promise<void> => {
-  const outDir = join(root, 'node_modules', FEDERATION_DEPS_DIR)
-  mkdirSync(outDir, { recursive: true })
+  const outDir = join(root, 'node_modules', FEDERATION_DEPS_DIR);
+  mkdirSync(outDir, { recursive: true });
 
-  const { build } = await import('rolldown')
-  const sharedNames = [...sharedSet]
+  const { build } = await import('rolldown');
+  const sharedNames = [...sharedSet];
 
-  const entries: Record<string, string> = {}
+  const entries: Record<string, string> = {};
   for (const name of sharedNames) {
-    entries[name.replace(/\//g, '_')] = name
+    entries[name.replace(/\//g, '_')] = name;
   }
 
   try {
@@ -285,29 +296,29 @@ const buildFederationPreBundle = async (root: string): Promise<void> => {
         chunkFileNames: '_chunks/[name]-[hash].js'
       },
       logLevel: 'silent'
-    })
+    });
   } catch (e) {
     logger.error(
       'Failed to build federation pre-bundle:',
       e instanceof Error ? e.message : e
-    )
+    );
   }
 
   for (const name of sharedNames) {
-    const fileName = name.replace(/\//g, '_') + '.js'
-    const filePath = join(outDir, fileName)
+    const fileName = name.replace(/\//g, '_') + '.js';
+    const filePath = join(outDir, fileName);
     if (!existsSync(filePath)) {
-      logger.warn('Pre-bundle missing for %s, skipping', name)
-      continue
+      logger.warn('Pre-bundle missing for %s, skipping', name);
+      continue;
     }
-    const exports = await getPreBundleExports(filePath, name, root)
-    const preBundleUrl = `/node_modules/${FEDERATION_DEPS_DIR}/${fileName}`
+    const exports = await getPreBundleExports(filePath, name, root);
+    const preBundleUrl = `/node_modules/${FEDERATION_DEPS_DIR}/${fileName}`;
 
-    sharedModuleMeta.set(name, { preBundleUrl, exports })
+    sharedModuleMeta.set(name, { preBundleUrl, exports });
   }
 
-  logger.info('Pre-bundled shared modules:', [...sharedModuleMeta.keys()])
-}
+  logger.info('Pre-bundled shared modules:', [...sharedModuleMeta.keys()]);
+};
 
 // ---------------------------------------------------------------------------
 // CORS middleware
@@ -319,16 +330,16 @@ const corsMiddleware = (
   res: ServerResponse,
   next: () => void
 ): void => {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', '*')
-  res.setHeader('Access-Control-Allow-Headers', '*')
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', '*');
+  res.setHeader('Access-Control-Allow-Headers', '*');
   if (req.method === 'OPTIONS') {
-    res.statusCode = 204
-    res.end()
-    return
+    res.statusCode = 204;
+    res.end();
+    return;
   }
-  next()
-}
+  next();
+};
 
 // ---------------------------------------------------------------------------
 // Main plugin
@@ -337,21 +348,21 @@ const corsMiddleware = (
 export const devExposePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
-  parsedOptions.devExpose = parseExposeOptions(options)
+  parsedOptions.devExpose = parseExposeOptions(options);
 
   // Reset shared state for this plugin instance.
   // The module-level sharedSet/sharedModuleMeta are shared with
   // devSharedResolverPlugin (enforce:'pre').
-  sharedSet.clear()
-  sharedModuleMeta = new Map<string, SharedModuleMeta>()
+  sharedSet.clear();
+  sharedModuleMeta = new Map<string, SharedModuleMeta>();
 
-  let resolvedRoot = process.cwd()
+  let resolvedRoot = process.cwd();
 
-  let moduleMap = ''
+  let moduleMap = '';
   for (const item of parsedOptions.devExpose) {
-    const name = removeNonRegLetter(item[0], NAME_CHAR_REG)
+    const name = removeNonRegLetter(item[0], NAME_CHAR_REG);
     moduleMap += `"${item[0]}":()=>{
-      return __federation_import('./__federation_expose_${name}.js').then(module => Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`
+      return __federation_import('./__federation_expose_${name}.js').then(module => Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`;
   }
 
   return {
@@ -361,31 +372,31 @@ export const devExposePlugin = (
         buildRemoteEntryCode(moduleMap)
     },
     async config(config: UserConfig) {
-      resolvedRoot = config.root ? resolve(config.root) : process.cwd()
+      resolvedRoot = config.root ? resolve(config.root) : process.cwd();
 
       // Only set up shared wrappers when this is a remote with shared modules
       if (!parsedOptions.devExpose.length || !parsedOptions.devShared.length) {
-        return
+        return;
       }
 
       // Rolldown ships with Vite 8+.  Without it we can't build the
       // federation pre-bundle, so shared module interception is silently
       // disabled — the MFE still works standalone.
       try {
-        await import('rolldown')
+        await import('rolldown');
       } catch {
-        return
+        return;
       }
 
-      collectSharedSpecifiers(resolvedRoot)
+      collectSharedSpecifiers(resolvedRoot);
 
       // Exclude ALL shared modules from Vite's dep optimizer so bare
       // specifier imports hit our resolveId hook instead.
-      config.optimizeDeps ??= {}
+      config.optimizeDeps ??= {};
       config.optimizeDeps.exclude = [
         ...(config.optimizeDeps.exclude ?? []),
         ...sharedSet
-      ]
+      ];
     },
 
     // Shared module resolution is handled by devSharedResolverPlugin
@@ -396,41 +407,41 @@ export const devExposePlugin = (
 
     async configureServer(server) {
       if (sharedSet.size > 0) {
-        await buildFederationPreBundle(resolvedRoot)
+        await buildFederationPreBundle(resolvedRoot);
       }
 
-      server.middlewares.use(corsMiddleware)
+      server.middlewares.use(corsMiddleware);
 
       server.middlewares.use(async (req, res, next) => {
-        const url = req.url
+        const url = req.url;
 
         if (url === `/${options.filename}`) {
-          await handleRemoteEntry(server, options.filename!, res)
-          return
+          await handleRemoteEntry(server, options.filename!, res);
+          return;
         }
 
         if (matchesUrl(url, '/@vite/client')) {
-          await handleViteClient(server, res, next)
-          return
+          await handleViteClient(server, res, next);
+          return;
         }
 
         if (matchesUrl(url, '/@react-refresh')) {
-          handleReactRefresh(res)
-          return
+          handleReactRefresh(res);
+          return;
         }
 
         if (matchesUrl(url, '/@react-refresh-runtime')) {
-          await handleReactRefreshRuntime(server, res, next)
-          return
+          await handleReactRefreshRuntime(server, res, next);
+          return;
         }
 
         if (url?.includes(FEDERATION_EXPOSE_PREFIX)) {
-          handleExposeModule(url, resolvedRoot, res)
-          return
+          handleExposeModule(url, resolvedRoot, res);
+          return;
         }
 
-        next()
-      })
+        next();
+      });
     }
-  }
-}
+  };
+};

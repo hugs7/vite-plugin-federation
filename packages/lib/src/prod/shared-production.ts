@@ -13,26 +13,37 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { PluginHooks } from '../../types/pluginHooks'
-import { NAME_CHAR_REG, parseSharedOptions, removeNonRegLetter } from '../utils'
-import { FEDERATION_SHARED_PREFIX, parsedOptions, PLUGIN_PREFIX, VIRTUAL_FN_IMPORT } from '../public'
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
-import { basename, join, resolve } from 'path'
-import { readdirSync, readFileSync, statSync } from 'fs'
-const sharedFilePathReg = new RegExp(`${FEDERATION_SHARED_PREFIX}(.+)-.{8}\\.js$`)
-import federation_fn_import from './federation_fn_import.js?raw'
+import type { PluginHooks } from '../../types/pluginHooks';
+import {
+  NAME_CHAR_REG,
+  parseSharedOptions,
+  removeNonRegLetter
+} from '../utils';
+import {
+  FEDERATION_SHARED_PREFIX,
+  parsedOptions,
+  PLUGIN_PREFIX,
+  VIRTUAL_FN_IMPORT
+} from '../public';
+import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import { basename, join, resolve } from 'path';
+import { readdirSync, readFileSync, statSync } from 'fs';
+const sharedFilePathReg = new RegExp(
+  `${FEDERATION_SHARED_PREFIX}(.+)-.{8}\\.js$`
+);
+import federation_fn_import from './federation_fn_import.js?raw';
 
 export const prodSharedPlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
-  parsedOptions.prodShared = parseSharedOptions(options)
-  const shareName2Prop = new Map<string, any>()
+  parsedOptions.prodShared = parseSharedOptions(options);
+  const shareName2Prop = new Map<string, any>();
   parsedOptions.prodShared.forEach((value) =>
     shareName2Prop.set(removeNonRegLetter(value[0], NAME_CHAR_REG), value[1])
-  )
-  let isHost: boolean
-  let isRemote: boolean
-  const id2Prop = new Map<string, any>()
+  );
+  let isHost: boolean;
+  let isRemote: boolean;
+  const id2Prop = new Map<string, any>();
 
   return {
     name: [PLUGIN_PREFIX, 'shared-production'].join(':'),
@@ -40,11 +51,11 @@ export const prodSharedPlugin = (
       [VIRTUAL_FN_IMPORT]: federation_fn_import
     },
     options(inputOptions) {
-      isRemote = !!parsedOptions.prodExpose.length
+      isRemote = !!parsedOptions.prodExpose.length;
       isHost =
         (!!parsedOptions.prodRemote.length ||
           !!parsedOptions.prodShared.length) &&
-        !parsedOptions.prodExpose.length
+        !parsedOptions.prodExpose.length;
 
       if (shareName2Prop.size) {
         // remove item which is both in external and shared
@@ -52,11 +63,11 @@ export const prodSharedPlugin = (
           inputOptions.external as (string | RegExp)[]
         )?.filter((item) => {
           if (item instanceof RegExp)
-            return ![...shareName2Prop.keys()].some((key) => item.test(key))
-          return !shareName2Prop.has(removeNonRegLetter(item, NAME_CHAR_REG))
-        })
+            return ![...shareName2Prop.keys()].some((key) => item.test(key));
+          return !shareName2Prop.has(removeNonRegLetter(item, NAME_CHAR_REG));
+        });
       }
-      return inputOptions
+      return inputOptions;
     },
 
     async buildStart() {
@@ -67,69 +78,69 @@ export const prodSharedPlugin = (
           type: 'chunk',
           id: VIRTUAL_FN_IMPORT,
           preserveSignature: 'strict'
-        })
+        });
       }
 
       // forEach and collect dir
       const collectDirFn = (filePath: string, collect: string[]) => {
-        const files = readdirSync(filePath)
+        const files = readdirSync(filePath);
         files.forEach((name) => {
-          const tempPath = join(filePath, name)
-          const isDir = statSync(tempPath).isDirectory()
+          const tempPath = join(filePath, name);
+          const isDir = statSync(tempPath).isDirectory();
           if (isDir) {
-            collect.push(tempPath)
-            collectDirFn(tempPath, collect)
+            collect.push(tempPath);
+            collectDirFn(tempPath, collect);
           }
-        })
-      }
+        });
+      };
 
-      const monoRepos: { arr: string[]; root: string | ConfigTypeSet }[] = []
-      const dirPaths: string[] = []
-      const currentDir = resolve()
+      const monoRepos: { arr: string[]; root: string | ConfigTypeSet }[] = [];
+      const dirPaths: string[] = [];
+      const currentDir = resolve();
       //  try to get every module package.json file
       for (const arr of parsedOptions.prodShared) {
         if (isHost && !arr[1].version && !arr[1].manuallyPackagePathSetting) {
           const packageJsonPath = (
             await this.resolve(`${arr[1].packagePath}/package.json`)
-          )?.id
+          )?.id;
           if (packageJsonPath) {
             const packageJson = JSON.parse(
               readFileSync(packageJsonPath, { encoding: 'utf-8' })
-            )
-            arr[1].version = packageJson.version
+            );
+            arr[1].version = packageJson.version;
           } else {
-            arr[1].removed = true
-            const dir = join(currentDir, 'node_modules', arr[0])
-            const dirStat = statSync(dir)
+            arr[1].removed = true;
+            const dir = join(currentDir, 'node_modules', arr[0]);
+            const dirStat = statSync(dir);
             if (dirStat.isDirectory()) {
-              collectDirFn(dir, dirPaths)
+              collectDirFn(dir, dirPaths);
             } else {
-              this.error(`cant resolve "${arr[1].packagePath}"`)
+              this.error(`cant resolve "${arr[1].packagePath}"`);
             }
 
             if (dirPaths.length > 0) {
-              monoRepos.push({ arr: dirPaths, root: arr })
+              monoRepos.push({ arr: dirPaths, root: arr });
             }
           }
 
           if (!arr[1].removed && !arr[1].version) {
             this.error(
               `No description file or no version in description file (usually package.json) of ${arr[0]}. Add version to description file, or manually specify version in shared config.`
-            )
+            );
           }
         }
       }
       parsedOptions.prodShared = parsedOptions.prodShared.filter(
         (item) => !item[1].removed
-      )
+      );
       // assign version to monoRepo
       if (monoRepos.length > 0) {
         for (const monoRepo of monoRepos) {
           for (const id of monoRepo.arr) {
             try {
-              const idResolve = await this.resolve(id)
+              const idResolve = await this.resolve(id);
               if (idResolve?.id) {
-                ;(parsedOptions.prodShared as any[]).push([
+                (parsedOptions.prodShared as any[]).push([
                   `${monoRepo.root[0]}/${basename(id)}`,
                   {
                     id: idResolve?.id,
@@ -137,7 +148,7 @@ export const prodSharedPlugin = (
                     shareScope: monoRepo.root[1].shareScope,
                     root: monoRepo.root
                   }
-                ])
+                ]);
               }
             } catch (e) {
               //    ignore
@@ -148,73 +159,73 @@ export const prodSharedPlugin = (
 
       if (parsedOptions.prodShared.length && isRemote) {
         for (const prod of parsedOptions.prodShared) {
-          id2Prop.set(prod[1].id, prod[1])
+          id2Prop.set(prod[1].id, prod[1]);
         }
       }
     },
 
     outputOptions(outputOption) {
       // remove rollup generated empty imports,like import './filename.js'
-      outputOption.hoistTransitiveImports = false
+      outputOption.hoistTransitiveImports = false;
 
       const manualChunkFunc = (id: string) => {
         //  if id is in shared dependencies, return id, else return vite function value
         const find = parsedOptions.prodShared.find((arr) =>
           arr[1].dependencies?.has(id)
-        )
-        return find ? find[0] : undefined
-      }
+        );
+        return find ? find[0] : undefined;
+      };
 
       // Vite 8+ uses Rolldown which supports codeSplitting as a replacement
       // for manualChunks. When codeSplitting is configured, setting
       // manualChunks causes a warning and is ignored. Skip setting it.
       if ((outputOption as any).codeSplitting) {
-        return outputOption
+        return outputOption;
       }
 
       // only active when manualChunks is function,array not to solve
       if (typeof outputOption.manualChunks === 'function') {
         outputOption.manualChunks = new Proxy(outputOption.manualChunks, {
           apply(target, thisArg, argArray) {
-            const result = manualChunkFunc(argArray[0])
-            return result ? result : target(argArray[0], argArray[1])
+            const result = manualChunkFunc(argArray[0]);
+            return result ? result : target(argArray[0], argArray[1]);
           }
-        })
+        });
       }
 
       // The default manualChunk function is no longer available from vite 2.9.0
       if (outputOption.manualChunks === undefined) {
-        outputOption.manualChunks = manualChunkFunc
+        outputOption.manualChunks = manualChunkFunc;
       }
 
-      return outputOption
+      return outputOption;
     },
 
     generateBundle(options, bundle) {
       if (!isRemote) {
-        return
+        return;
       }
-      const needRemoveShared = new Set<string>()
+      const needRemoveShared = new Set<string>();
       for (const key in bundle) {
-        const chunk = bundle[key]
+        const chunk = bundle[key];
         if (chunk.type === 'chunk') {
           if (!isHost) {
-            const regRst = sharedFilePathReg.exec(chunk.fileName)
+            const regRst = sharedFilePathReg.exec(chunk.fileName);
             if (
               regRst &&
               shareName2Prop.get(removeNonRegLetter(regRst[1], NAME_CHAR_REG))
                 ?.generate === false
             ) {
-              needRemoveShared.add(key)
+              needRemoveShared.add(key);
             }
           }
         }
       }
       if (needRemoveShared.size !== 0) {
         for (const key of needRemoveShared) {
-          delete bundle[key]
+          delete bundle[key];
         }
       }
     }
-  }
-}
+  };
+};

@@ -11,13 +11,13 @@
  * ```
  */
 
-import debug from 'debug'
+import debug from 'debug';
 
-const LOG_LEVELS = ['trace', 'debug', 'log', 'info', 'warn', 'error'] as const
+const LOG_LEVELS = ['trace', 'debug', 'log', 'info', 'warn', 'error'] as const;
 
-type LogLevel = (typeof LOG_LEVELS)[number]
+type LogLevel = (typeof LOG_LEVELS)[number];
 
-export type Logger = Record<LogLevel, debug.Debugger>
+export type Logger = Record<LogLevel, debug.Debugger>;
 
 const LOG_LEVEL_CONSOLE_MAP: Record<LogLevel, (...args: unknown[]) => void> = {
   trace: console.debug,
@@ -26,15 +26,15 @@ const LOG_LEVEL_CONSOLE_MAP: Record<LogLevel, (...args: unknown[]) => void> = {
   info: console.info,
   warn: console.warn,
   error: console.error
-}
+};
 
 const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = Object.fromEntries(
   LOG_LEVELS.map((level, index) => [level, index])
-) as Record<LogLevel, number>
+) as Record<LogLevel, number>;
 
-const DEFAULT_LOG_LEVEL: LogLevel = 'info'
+const DEFAULT_LOG_LEVEL: LogLevel = 'info';
 
-const NAMESPACE_ROOT = 'federation'
+const NAMESPACE_ROOT = 'federation';
 
 /**
  * Create a scoped logger with levelled output.
@@ -50,20 +50,20 @@ const NAMESPACE_ROOT = 'federation'
  * ```
  */
 export const createLogger = (...namespaces: string[]): Logger => {
-  const minPriority = LOG_LEVEL_PRIORITY[DEFAULT_LOG_LEVEL]
+  const minPriority = LOG_LEVEL_PRIORITY[DEFAULT_LOG_LEVEL];
 
   return LOG_LEVELS.reduce((logger, level) => {
-    const namespace = [NAMESPACE_ROOT, ...namespaces, level].join(':')
-    const instance = debug(namespace)
+    const namespace = [NAMESPACE_ROOT, ...namespaces, level].join(':');
+    const instance = debug(namespace);
 
-    const logEnabled = LOG_LEVEL_PRIORITY[level] >= minPriority
+    const logEnabled = LOG_LEVEL_PRIORITY[level] >= minPriority;
     if (logEnabled) {
-      instance.log = LOG_LEVEL_CONSOLE_MAP[level].bind(console)
+      instance.log = LOG_LEVEL_CONSOLE_MAP[level].bind(console);
     }
 
-    instance.enabled = logEnabled
+    instance.enabled = logEnabled;
 
-    logger[level] = instance
-    return logger
-  }, {} as Logger)
-}
+    logger[level] = instance;
+    return logger;
+  }, {} as Logger);
+};

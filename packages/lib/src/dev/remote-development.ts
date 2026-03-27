@@ -13,11 +13,11 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { Rolldown, UserConfig, ViteDevServer } from 'vite'
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
-import MagicString from 'magic-string'
-import { readFileSync } from 'fs'
-import type { Program } from 'estree'
+import type { Rolldown, UserConfig, ViteDevServer } from 'vite';
+import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import MagicString from 'magic-string';
+import { readFileSync } from 'fs';
+import type { Program } from 'estree';
 
 import {
   createRemotesMap,
@@ -27,29 +27,35 @@ import {
   parseRemoteOptions,
   REMOTE_FROM_PARAMETER,
   sendJs
-} from '../utils'
-import { builderInfo, parsedOptions, devRemotes, PLUGIN_PREFIX, VIRTUAL_FEDERATION_RESOLVED } from '../public'
-import type { PluginHooks } from '../../types/pluginHooks'
-import { createLogger } from '../logger'
-import { buildFederationRuntimeCode } from '../runtime/federation-runtime'
+} from '../utils';
+import {
+  builderInfo,
+  parsedOptions,
+  devRemotes,
+  PLUGIN_PREFIX,
+  VIRTUAL_FEDERATION_RESOLVED
+} from '../public';
+import type { PluginHooks } from '../../types/pluginHooks';
+import { createLogger } from '../logger';
+import { buildFederationRuntimeCode } from '../runtime/federation-runtime';
 import {
   rewriteRemoteImports,
-  buildFederationImportPreamble
-} from '../transform/rewrite-remote-imports'
+  applyFederationImportPreamble
+} from '../transform/rewrite-remote-imports';
 
-const logger = createLogger('remote')
+const logger = createLogger('remote');
 
 export const devRemotePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
-  parsedOptions.devRemote = parseRemoteOptions(options)
+  parsedOptions.devRemote = parseRemoteOptions(options);
   // const remotes: { id: string; regexp: RegExp; config: RemotesConfig }[] = []
   for (const item of parsedOptions.devRemote) {
     devRemotes.push({
       id: item[0],
       regexp: new RegExp(`^${item[0]}/.+?`),
       config: item[1]
-    })
+    });
   }
 
   const needHandleFileType = [
@@ -61,24 +67,25 @@ export const devRemotePlugin = (
     '.cjs',
     '.vue',
     '.svelte'
-  ]
+  ];
   options.transformFileTypes = (options.transformFileTypes ?? [])
     .concat(needHandleFileType)
-    .map((item) => item.toLowerCase())
-  const transformFileTypeSet = new Set(options.transformFileTypes)
-  const hasRemotes = !!options.remotes
-  const hasShared = parsedOptions.devShared.length > 0
-  const needsFederationModule = hasRemotes || hasShared
+    .map((item) => item.toLowerCase());
+  const transformFileTypeSet = new Set(options.transformFileTypes);
+  const hasRemotes = !!options.remotes;
+  const hasShared = parsedOptions.devShared.length > 0;
+  const needsFederationModule = hasRemotes || hasShared;
 
   const excludeRemotesFromOptimizeDeps = (config: UserConfig) => {
     if (parsedOptions.devRemote.length) {
-      const excludeRemotes: string[] = []
-      parsedOptions.devRemote.forEach((item) => excludeRemotes.push(item[0]))
-      config.optimizeDeps ??= {}
-      config.optimizeDeps.exclude ??= []
-      config.optimizeDeps.exclude = config.optimizeDeps.exclude.concat(excludeRemotes)
+      const excludeRemotes: string[] = [];
+      parsedOptions.devRemote.forEach((item) => excludeRemotes.push(item[0]));
+      config.optimizeDeps ??= {};
+      config.optimizeDeps.exclude ??= [];
+      config.optimizeDeps.exclude =
+        config.optimizeDeps.exclude.concat(excludeRemotes);
     }
-  }
+  };
 
   const handleHostReactRefresh = (server: ViteDevServer) => {
     // Patch /@react-refresh on the HOST so it stores itself as a
@@ -88,10 +95,10 @@ export const devRemotePlugin = (
     // roots are tracked in one place for React Fast Refresh.
     if (parsedOptions.devRemote.length) {
       server.middlewares.use(async (req, res, next) => {
-        const url = req.url
+        const url = req.url;
         if (matchesUrl(url, '/@react-refresh')) {
           try {
-            const result = await server.transformRequest('/@react-refresh')
+            const result = await server.transformRequest('/@react-refresh');
             if (result) {
               const code = `${result.code}
 if(typeof window!=='undefined'){
@@ -103,53 +110,55 @@ if(typeof window!=='undefined'){
     registerExportsForReactRefresh,__hmr_import
   };
 }
-`
-              sendJs(res, code)
-              return
+`;
+              sendJs(res, code);
+              return;
             }
           } catch {
             /* fall through */
           }
         }
-        next()
-      })
+        next();
+      });
     }
-  }
+  };
 
   const devSharedScopeCode = async (
     shared: (string | ConfigTypeSet)[]
   ): Promise<string[]> => {
-    const res: string[] = []
+    const res: string[] = [];
     if (shared.length) {
       for (const item of shared) {
-        const sharedName = item[0]
-        const obj = item[1]
+        const sharedName = item[0];
+        const obj = item[1];
         if (typeof obj === 'object') {
           const str = `get:() => import('${sharedName}').then(m => {
             const keys = Object.keys(m);
             const hasNamed = keys.some(k => k !== 'default' && k !== '__esModule');
             return () => hasNamed ? m : (m.default ?? m);
-          })`
-          res.push(`'${sharedName}':{'${obj.version}':{${str}}}`)
+          })`;
+          res.push(`'${sharedName}':{'${obj.version}':{${str}}}`);
         }
       }
     }
-    return res
-  }
+    return res;
+  };
 
   return {
     name: [PLUGIN_PREFIX, 'remote-development'].join(':'),
     virtualFile: needsFederationModule
       ? {
           __federation__: buildFederationRuntimeCode({
-            remotesMapCode: hasRemotes ? createRemotesMap(devRemotes) : 'const remotesMap = {};',
+            remotesMapCode: hasRemotes
+              ? createRemotesMap(devRemotes)
+              : 'const remotesMap = {};',
             getFunctionCode: `function get(name, ${REMOTE_FROM_PARAMETER}){
   return import(/* @vite-ignore */ name).then(module => ()=> {
     if ((globalThis.__federation_shared_remote_from__ ?? ${REMOTE_FROM_PARAMETER}) === 'webpack') {
-      return Object.prototype.toString.call(module).indexOf('Module') > -1 && module.default ? module.default : module
+      return Object.prototype.toString.call(module).indexOf('Module') > -1 && module.default ? module.default : module;
     }
-    return module
-  })
+    return module;
+  });
 }`,
             shareScopeWrapperCode: `const wrapShareScope = ${REMOTE_FROM_PARAMETER} => {
   return {
@@ -162,63 +171,56 @@ if(typeof window!=='undefined'){
     config: (config: UserConfig) => excludeRemotesFromOptimizeDeps(config),
 
     configureServer: (server) => handleHostReactRefresh(server),
-    async transform(this: Rolldown.TransformPluginContext, code: string, id: string) {
+    async transform(
+      this: Rolldown.TransformPluginContext,
+      code: string,
+      id: string
+    ) {
       if (builderInfo.isHost || builderInfo.isShared) {
         for (const arr of parsedOptions.devShared) {
           if (!arr[1].version && !arr[1].manuallyPackagePathSetting) {
             const packageJsonPath = (
               await this.resolve(`${arr[0]}/package.json`)
-            )?.id
+            )?.id;
             if (!packageJsonPath) {
               this.error(
                 `No description file or no version in description file (usually package.json) of ${arr[0]}(${packageJsonPath}). Add version to description file, or manually specify version in shared config.`
-              )
+              );
             } else {
               const json = JSON.parse(
                 readFileSync(packageJsonPath, { encoding: 'utf-8' })
-              )
-              arr[1].version = json.version
+              );
+              arr[1].version = json.version;
             }
           }
         }
       }
 
       if (id === VIRTUAL_FEDERATION_RESOLVED) {
-        const scopeCode = await devSharedScopeCode(parsedOptions.devShared)
-        return code.replace(getModuleMarker('shareScope'), scopeCode.join(','))
+        const scopeCode = await devSharedScopeCode(parsedOptions.devShared);
+        return code.replace(getModuleMarker('shareScope'), scopeCode.join(','));
       }
 
       // ignore some not need to handle file types
-      const fileExtname = getFileExtname(id)
+      const fileExtname = getFileExtname(id);
       if (!transformFileTypeSet.has((fileExtname ?? '').toLowerCase())) {
-        return
+        return;
       }
 
-      let ast: Program | null = null
+      let ast: Program | null = null;
       try {
-        ast = this.parse(code) as Program
+        ast = this.parse(code) as Program;
       } catch (err) {
-        logger.error('Failed to parse %s:', id, err)
+        logger.error('Failed to parse %s:', id, err);
       }
       if (!ast) {
-        return null
+        return null;
       }
 
-      const magicString = new MagicString(code)
-      const { requiresRuntime, manualRequired } = rewriteRemoteImports(
-        ast,
-        magicString,
-        devRemotes
-      )
-
-      if (requiresRuntime) {
-        const requiresCode = buildFederationImportPreamble(manualRequired)
-        if (manualRequired) {
-          magicString.overwrite(manualRequired.start, manualRequired.end, ``)
-        }
-        magicString.prepend(requiresCode)
-      }
-      return magicString.toString()
+      const magicString = new MagicString(code);
+      const result = rewriteRemoteImports(ast, magicString, devRemotes);
+      applyFederationImportPreamble(magicString, result);
+      return magicString.toString();
     }
-  }
-}
+  };
+};

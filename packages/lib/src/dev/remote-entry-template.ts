@@ -5,20 +5,20 @@
  * and load exposed modules from a federated remote.
  */
 
-import { FEDERATION_DEBUG_SNIPPET_ESM } from '../debug'
+import { FEDERATION_DEBUG_SNIPPET_ESM } from '../debug';
 
 export const buildRemoteEntryCode = (moduleMap: string): string => {
   return `
 ${FEDERATION_DEBUG_SNIPPET_ESM}
 const _logInit = __fed_debug('federation:init');
 const _logGet = __fed_debug('federation:get');
-const currentImports = {}
+const currentImports = {};
 const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
-let moduleMap = {${moduleMap}}
-const seen = {}
-async function __federation_import(name) {
-  currentImports[name] ??= import(/* @vite-ignore */ name)
-  return currentImports[name]
+let moduleMap = {${moduleMap}};
+const seen = {};
+const __federation_import = async (name) => {
+  currentImports[name] ??= import(/* @vite-ignore */ name);
+  return currentImports[name];
 };
 
 let __federation_shared_resolving;
@@ -77,7 +77,7 @@ export const get = async (module) => {
   if (__federation_shared_resolving) await __federation_shared_resolving;
   if (__federation_dev_client_loaded) await __federation_dev_client_loaded;
   _logGet(module, 'shared modules populated:', Object.keys(globalThis.__federation_shared_modules__ || {}));
-  if(!moduleMap[module]) throw new Error('Can not find remote module ' + module)
+  if(!moduleMap[module]) throw new Error('Can not find remote module ' + module);
   return moduleMap[module]();
-};`
-}
+};`;
+};

@@ -23,7 +23,7 @@ export var validateRefreshBoundaryAndEnqueueUpdate = _rt.validateRefreshBoundary
 export var registerExportsForReactRefresh = _rt.registerExportsForReactRefresh;
 export var __hmr_import = _rt.__hmr_import;
 export default { injectIntoGlobalHook: _rt.injectIntoGlobalHook };
-`
+`;
 
 export const patchViteClientCode = (
   code: string,
@@ -32,10 +32,10 @@ export const patchViteClientCode = (
   code = code.replace(
     /const base = "\/"\s*\|\|\s*"\/";/,
     `const base = "${remoteOrigin}/";`
-  )
+  );
   code = code.replace(
     /const base\$1 = "\/"\s*\|\|\s*"\/";/,
     `const base$1 = "${remoteOrigin}/";`
-  )
-  return code
-}
+  );
+  return code;
+};
