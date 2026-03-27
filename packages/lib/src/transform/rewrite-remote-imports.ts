@@ -8,6 +8,7 @@
 import type MagicString from 'magic-string'
 import { walk } from 'estree-walker'
 import type { Node, Program } from 'estree'
+import { VIRTUAL_FEDERATION } from '../public'
 
 interface RemoteInfo {
   id: string
@@ -34,7 +35,7 @@ export const rewriteRemoteImports = (
       // Detect manual virtual:__federation__ import
       if (
         node.type === 'ImportDeclaration' &&
-        node.source?.value === 'virtual:__federation__'
+        node.source?.value === VIRTUAL_FEDERATION
       ) {
         manualRequired = node
       }

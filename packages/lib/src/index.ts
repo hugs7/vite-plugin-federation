@@ -33,7 +33,7 @@ import { devSharedPlugin } from './dev/shared-development'
 import { prodExposePlugin } from './prod/expose-production'
 import { prodRemotePlugin } from './prod/remote-production'
 import { prodSharedPlugin } from './prod/shared-production'
-import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions, PLUGIN_PREFIX } from './public'
+import { builderInfo, DEFAULT_ENTRY_FILENAME, parsedOptions, PLUGIN_PREFIX, VIRTUAL_FEDERATION, VIRTUAL_FEDERATION_RESOLVED, VIRTUAL_FN_IMPORT_RESOLVED, VIRTUAL_FN_SATISFY } from './public'
 
 const federation = (options: VitePluginFederationOptions): Plugin[] => {
   if (!options.filename) {
@@ -147,13 +147,13 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
       if (v) {
         return v
       }
-      if (args[0] === '\0virtual:__federation_fn_import') {
+      if (args[0] === VIRTUAL_FN_IMPORT_RESOLVED) {
         return {
-          id: '\0virtual:__federation_fn_import',
+          id: VIRTUAL_FN_IMPORT_RESOLVED,
           moduleSideEffects: true
         }
       }
-      if (args[0] === '__federation_fn_satisfy') {
+      if (args[0] === VIRTUAL_FN_SATISFY) {
         const federationId = (
           await this.resolve('@hugs7/vite-plugin-federation')
         )?.id
@@ -162,9 +162,9 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
           : dirname(fileURLToPath(import.meta.url))
         return await this.resolve(`${pluginDir}/satisfy.mjs`)
       }
-      if (args[0] === 'virtual:__federation__') {
+      if (args[0] === VIRTUAL_FEDERATION) {
         return {
-          id: '\0virtual:__federation__',
+          id: VIRTUAL_FEDERATION_RESOLVED,
           moduleSideEffects: true
         }
       }

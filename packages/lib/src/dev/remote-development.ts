@@ -26,7 +26,7 @@ import {
   parseRemoteOptions,
   REMOTE_FROM_PARAMETER
 } from '../utils'
-import { builderInfo, parsedOptions, devRemotes, PLUGIN_PREFIX } from '../public'
+import { builderInfo, parsedOptions, devRemotes, PLUGIN_PREFIX, VIRTUAL_FEDERATION_RESOLVED } from '../public'
 import type { PluginHooks } from '../../types/pluginHooks'
 import { createLogger } from '../logger'
 import { buildFederationRuntimeCode } from '../runtime/federation-runtime'
@@ -184,7 +184,7 @@ export const devRemotePlugin = (
         }
       }
 
-      if (id === '\0virtual:__federation__') {
+      if (id === VIRTUAL_FEDERATION_RESOLVED) {
         const scopeCode = await devSharedScopeCode(parsedOptions.devShared)
         return code.replace(getModuleMarker('shareScope'), scopeCode.join(','))
       }

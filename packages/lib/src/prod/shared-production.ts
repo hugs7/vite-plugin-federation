@@ -15,11 +15,11 @@
 
 import type { PluginHooks } from '../../types/pluginHooks'
 import { NAME_CHAR_REG, parseSharedOptions, removeNonRegLetter } from '../utils'
-import { parsedOptions, PLUGIN_PREFIX } from '../public'
+import { FEDERATION_SHARED_PREFIX, parsedOptions, PLUGIN_PREFIX, VIRTUAL_FN_IMPORT } from '../public'
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types'
 import { basename, join, resolve } from 'path'
 import { readdirSync, readFileSync, statSync } from 'fs'
-const sharedFilePathReg = /__federation_shared_(.+)-.{8}\.js$/
+const sharedFilePathReg = new RegExp(`${FEDERATION_SHARED_PREFIX}(.+)-.{8}\\.js$`)
 import federation_fn_import from './federation_fn_import.js?raw'
 
 export const prodSharedPlugin = (
@@ -37,7 +37,7 @@ export const prodSharedPlugin = (
   return {
     name: [PLUGIN_PREFIX, 'shared-production'].join(':'),
     virtualFile: {
-      __federation_fn_import: federation_fn_import
+      [VIRTUAL_FN_IMPORT]: federation_fn_import
     },
     options(inputOptions) {
       isRemote = !!parsedOptions.prodExpose.length
@@ -63,9 +63,9 @@ export const prodSharedPlugin = (
       // Cannot emit chunks after module loading has finished, so emitFile first.
       if (parsedOptions.prodShared.length && isRemote) {
         this.emitFile({
-          name: '__federation_fn_import',
+          name: VIRTUAL_FN_IMPORT,
           type: 'chunk',
-          id: '__federation_fn_import',
+          id: VIRTUAL_FN_IMPORT,
           preserveSignature: 'strict'
         })
       }

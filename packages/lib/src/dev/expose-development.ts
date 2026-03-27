@@ -20,7 +20,7 @@ import type { VitePluginFederationOptions } from 'types'
 import type { UserConfig, ViteDevServer } from 'vite'
 import type { IncomingMessage, ServerResponse } from 'http'
 import type { PluginHooks } from '../../types/pluginHooks'
-import { parsedOptions, PLUGIN_PREFIX } from '../public'
+import { FEDERATION_EXPOSE_PREFIX, parsedOptions, PLUGIN_PREFIX, REMOTE_ENTRY_HELPER_PREFIX } from '../public'
 import { NAME_CHAR_REG, parseExposeOptions, removeNonRegLetter } from '../utils'
 import { createLogger } from '../logger'
 
@@ -107,7 +107,7 @@ const handleRemoteEntry = async (
   res: ServerResponse
 ): Promise<boolean> => {
   try {
-    const moduleId = `__remoteEntryHelper__${filename}`
+    const moduleId = `${REMOTE_ENTRY_HELPER_PREFIX}${filename}`
     const result = await server.transformRequest(moduleId)
     if (result) {
       res.setHeader('Content-Type', 'application/javascript')
@@ -362,7 +362,7 @@ export const devExposePlugin = (
   return {
     name: [PLUGIN_PREFIX, 'expose-development'].join(':'),
     virtualFile: {
-      [`__remoteEntryHelper__${options.filename}`]:
+      [`${REMOTE_ENTRY_HELPER_PREFIX}${options.filename}`]:
         buildRemoteEntryCode(moduleMap)
     },
     async config(config: UserConfig) {
@@ -432,7 +432,7 @@ export const devExposePlugin = (
           return
         }
 
-        if (url?.includes('__federation_expose_')) {
+        if (url?.includes(FEDERATION_EXPOSE_PREFIX)) {
           handleExposeModule(url, resolvedRoot, res)
           return
         }

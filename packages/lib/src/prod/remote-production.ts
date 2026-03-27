@@ -24,7 +24,8 @@ import {
   EXPOSES_KEY_MAP,
   parsedOptions,
   PLUGIN_PREFIX,
-  prodRemotes
+  prodRemotes,
+  VIRTUAL_FN_IMPORT_RESOLVED
 } from '../public'
 import {
   createRemotesMap,
@@ -166,7 +167,7 @@ async function __federation_import(name) {
           }
         }
 
-        if (id === '\0virtual:__federation_fn_import') {
+        if (id === VIRTUAL_FN_IMPORT_RESOLVED) {
           const moduleMapCode = parsedOptions.prodShared
             .filter((shareInfo) => shareInfo[1].generate)
             .map(
@@ -353,7 +354,7 @@ async function __federation_import(name) {
 
         if (hasImportShared) {
           magicString.prepend(
-            `import {importShared} from '\0virtual:__federation_fn_import';\n`
+            `import {importShared} from '${VIRTUAL_FN_IMPORT_RESOLVED}';\n`
           )
         }
 
