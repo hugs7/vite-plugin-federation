@@ -30,11 +30,50 @@ const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX
 const FEDERATION_DEPS_DIR = '.federation-deps'
 
 /**
+ * Scan a file (and optionally its chunk imports) for CJS `exports.XXX = ...`
+ * patterns.  With code splitting, CJS module bodies may live in chunk files
+ * rather than the entry file itself.
+ */
+const scanCjsExports = (
+  code: string,
+  fileDir: string
+): Set<string> => {
+  const cjsExports = new Set<string>(['default'])
+
+  // Scan this file for exports.XXX = ...
+  for (const match of code.matchAll(
+    /exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
+  )) {
+    cjsExports.add(match[1])
+  }
+
+  // If we only found `default` in the entry, the CJS body may be in a chunk.
+  // Follow relative imports and scan those too.
+  if (cjsExports.size <= 1) {
+    for (const imp of code.matchAll(/from\s+["'](\.[^"']+)["']/g)) {
+      try {
+        const chunkPath = join(fileDir, imp[1])
+        const chunkCode = readFileSync(chunkPath, 'utf-8')
+        for (const match of chunkCode.matchAll(
+          /exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g
+        )) {
+          cjsExports.add(match[1])
+        }
+      } catch {
+        /* chunk not found */
+      }
+    }
+  }
+
+  return cjsExports
+}
+
+/**
  * Discover export names from a federation pre-bundled file.
  *
  * Uses es-module-lexer for fast static analysis.  For CJS modules, Rolldown
- * produces only `export default require_xxx()` — in that case, we also scan
- * the CJS body for `exports.XXX = ...` assignments to discover named exports.
+ * produces only `export default require_xxx()` — in that case, we scan
+ * for `exports.XXX = ...` patterns in the entry and its chunk imports.
  * This is fast (pure string parsing, no subprocess).
  */
 const getPreBundleExports = async (filePath: string): Promise<string[]> => {
@@ -49,13 +88,10 @@ const getPreBundleExports = async (filePath: string): Promise<string[]> => {
 
     // If the only ESM export is `default`, this is a CJS module wrapped by
     // Rolldown.  Extract named exports from `exports.XXX = ...` patterns
-    // in the CJS body.
+    // in the entry file and its chunk imports.
     if (names.length <= 1 && names[0] === 'default') {
-      const cjsExports = new Set<string>(['default'])
-      for (const match of code.matchAll(/exports\.([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/g)) {
-        cjsExports.add(match[1])
-      }
-      return [...cjsExports]
+      const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
+      return [...scanCjsExports(code, fileDir)]
     }
 
     return names
