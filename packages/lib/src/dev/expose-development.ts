@@ -231,6 +231,14 @@ const handleExposeModule = (
 // Shared module collection
 // ---------------------------------------------------------------------------
 
+/** Sub-path patterns to skip — not importable browser code modules. */
+const SKIP_SUBPATH_RE =
+  /\.(json|css|scss|less)$|\/server|\.node$|\.edge$|\/internal|\/profiling|\/test-utils|\/static/;
+
+/** Whether a package.json exports sub-path is a browser code entry point. */
+const isImportableSubPath = (subPath: string): boolean =>
+  subPath !== '.' && subPath.startsWith('./') && !SKIP_SUBPATH_RE.test(subPath);
+
 /**
  * Collect all shared module specifiers into sharedSet, including
  * sub-path exports discovered from each package's exports map
@@ -249,7 +257,7 @@ const collectSharedSpecifiers = (root: string): void => {
       const pkgJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'));
       if (pkgJson.exports && typeof pkgJson.exports === 'object') {
         for (const subPath of Object.keys(pkgJson.exports)) {
-          if (subPath !== '.' && subPath.startsWith('./')) {
+          if (isImportableSubPath(subPath)) {
             sharedSet.add(baseName + subPath.slice(1));
           }
         }
