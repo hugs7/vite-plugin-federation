@@ -156,13 +156,13 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
       // Check sub-plugins first (e.g. shared module virtual resolution)
       for (const pluginHook of pluginList) {
         const result = await pluginHook.resolveId?.call(this, ...args);
-        if (result) {
+        if (result != null) {
           return result;
         }
       }
 
       const v = virtualMod.resolveId.call(this, ...args);
-      if (v) {
+      if (v != null) {
         return v;
       }
       if (args[0] === VIRTUAL_FN_IMPORT_RESOLVED) {
@@ -193,13 +193,13 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
       // Check sub-plugins first
       for (const pluginHook of pluginList) {
         const result = pluginHook.load?.call(this, ...args);
-        if (result) {
+        if (result != null) {
           return result;
         }
       }
 
       const v = virtualMod.load.call(this, ...args);
-      if (v) {
+      if (v != null) {
         return v;
       }
       return null;
@@ -208,11 +208,11 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
     transform(code: string, id: string) {
       for (const pluginHook of pluginList) {
         const result = pluginHook.transform?.call(this, code, id);
-        if (result) {
+        if (result != null) {
           return result;
         }
       }
-      return code;
+      return null;
     },
     moduleParsed(moduleInfo: Rolldown.ModuleInfo): void {
       for (const pluginHook of pluginList) {
@@ -235,7 +235,7 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
           chunkInfo,
           _options
         );
-        if (result) {
+        if (result != null) {
           return result;
         }
       }
