@@ -21,14 +21,8 @@ const __fed_debug = (() => {
 
 const _log = __fed_debug('federation:shared');
 
-const currentImports = {};
-
-// DO NOT REMOVE — appears unused but is called at runtime via dynamically
-// injected moduleMap code (see remote-production.ts transform of __rf_var__moduleMap).
-const __federation_import = async (name) => {
-  currentImports[name] ??= import(name);
-  return currentImports[name];
-};
+// __federation_import and currentImports are prepended by the shared
+// plugin at build time via FEDERATION_IMPORT_SNIPPET (see shared-production.ts).
 
 // eslint-disable-next-line no-undef
 const moduleMap = __rf_var__moduleMap;

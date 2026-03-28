@@ -10,13 +10,14 @@ import {
   VITE_BASE_PLACEHOLDER,
   VITE_ASSETS_DIR_PLACEHOLDER
 } from '../public';
+import { FEDERATION_IMPORT_SNIPPET } from '../runtime/snippets';
 
 export const buildProdRemoteEntryCode = (
   moduleMap: string,
   filename: string,
   name?: string
 ): string => `
-const currentImports = {};
+${FEDERATION_IMPORT_SNIPPET}
 const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
 let moduleMap = {${moduleMap}};
 const seen = {};
@@ -73,10 +74,6 @@ export const ${DYNAMIC_LOADING_CSS} = (cssFilePaths, dontAppendStylesToHead, exp
     element.href = href;
     document.head.appendChild(element);
   });
-};
-const __federation_import = async (name) => {
-  currentImports[name] ??= import(name);
-  return currentImports[name];
 };
 export const get = (module) => {
   if(!moduleMap[module]) throw new Error('Can not find remote module ' + module);

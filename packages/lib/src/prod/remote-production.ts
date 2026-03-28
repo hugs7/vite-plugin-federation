@@ -32,6 +32,7 @@ import {
   VIRTUAL_FN_IMPORT_RESOLVED
 } from '../public';
 import { buildFederationRuntimeCode } from '../runtime/federation-runtime';
+import { FEDERATION_IMPORT_SNIPPET } from '../runtime/snippets';
 import {
   applyFederationImportPreamble,
   rewriteRemoteImports
@@ -72,7 +73,7 @@ export const prodRemotePlugin = (
             remotesMapCode: hasRemotes
               ? createRemotesMap(prodRemotes)
               : 'const remotesMap = {};',
-            extraPreludeCode: `const currentImports = {};
+            extraPreludeCode: `${FEDERATION_IMPORT_SNIPPET}
 const merge = (obj1, obj2) => {
   const mergedObj = Object.assign(obj1, obj2);
   for (const key of Object.keys(mergedObj)) {
@@ -81,11 +82,6 @@ const merge = (obj1, obj2) => {
     }
   }
   return mergedObj;
-};
-
-const __federation_import = async (name) => {
-    currentImports[name] ??= import(name);
-    return currentImports[name];
 };`,
             getFunctionCode: `function get(name, ${REMOTE_FROM_PARAMETER}) {
     return __federation_import(name).then(module => () => {

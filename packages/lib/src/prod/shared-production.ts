@@ -26,6 +26,7 @@ import {
   PLUGIN_PREFIX,
   VIRTUAL_FN_IMPORT
 } from '../public';
+import { FEDERATION_IMPORT_SNIPPET } from '../runtime/snippets';
 import { parseSharedOptions, removeNonRegLetter } from '../utils';
 import federation_fn_import from './federation_fn_import.js?raw';
 
@@ -47,7 +48,10 @@ export const prodSharedPlugin = (
   return {
     name: [PLUGIN_PREFIX, 'shared-production'].join(':'),
     virtualFile: {
-      [VIRTUAL_FN_IMPORT]: federation_fn_import
+      [VIRTUAL_FN_IMPORT]: [
+        FEDERATION_IMPORT_SNIPPET,
+        federation_fn_import
+      ].join('\n')
     },
     options(inputOptions) {
       isRemote = !!parsedOptions.prodExpose.length;
@@ -155,7 +159,6 @@ export const prodSharedPlugin = (
           }
         }
       }
-
     },
 
     outputOptions(outputOption) {
