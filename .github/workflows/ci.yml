@@ -45,6 +45,9 @@ jobs:
       - name: Install deps
         run: pnpm install
 
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
+
       - name: Build vite-plugin-federation
         run: pnpm run build
 
@@ -53,9 +56,11 @@ jobs:
 
       - name: Dev mode e2e test
         run: pnpm run 'test:e2e-dev'
+        timeout-minutes: 5
 
       - name: Serve mode e2e test
         run: pnpm run 'test:e2e-serve'
+        timeout-minutes: 5
 
   lint:
     runs-on: ubuntu-latest
