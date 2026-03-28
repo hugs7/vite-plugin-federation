@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http';
 import type { ViteDevServer } from 'vite';
 
-import { buildLocalhostOrigin, sendJs } from '../utils';
+import { sendJs } from '../utils';
 import { patchViteClientCode } from './hmr';
 
 /**
@@ -36,7 +36,10 @@ export const handleViteClient = async (
       return true;
     }
     const port = server.config.server.port ?? 5173;
-    const remoteOrigin = buildLocalhostOrigin(port);
+    const host = typeof server.config.server.host === 'string'
+      ? server.config.server.host
+      : 'localhost';
+    const remoteOrigin = `http://${host}:${port}`;
     const code = patchViteClientCode(clientResult.code, remoteOrigin);
     sendJs(res, code);
   } catch (error) {
