@@ -195,7 +195,7 @@ export const prodSharedPlugin = (
       return outputOption;
     },
 
-    generateBundle(options, bundle) {
+    generateBundle(_options, bundle) {
       if (!isRemote) {
         return;
       }
