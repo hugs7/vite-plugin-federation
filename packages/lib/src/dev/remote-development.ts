@@ -152,7 +152,7 @@ if(typeof window!=='undefined'){
               ? createRemotesMap(devRemotes)
               : 'const remotesMap = {};',
             getFunctionCode: `function get(name, ${REMOTE_FROM_PARAMETER}){
-  return import(/* @vite-ignore */ name).then(module => ()=> {
+  return import(/* @vite-ignore */ name).then(module => () => {
     if ((globalThis.__federation_shared_remote_from__ ?? ${REMOTE_FROM_PARAMETER}) === 'webpack') {
       return Object.prototype.toString.call(module).indexOf('Module') > -1 && module.default ? module.default : module;
     }
