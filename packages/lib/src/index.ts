@@ -57,7 +57,9 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
   let registerCount = 0;
 
   const registerPlugins = (mode: string, command: string) => {
-    if (mode === 'production' || command === 'build') {
+    if (mode === 'test') {
+      pluginList = [];
+    } else if (mode === 'production' || command === 'build') {
       pluginList = [
         prodSharedPlugin(options),
         prodExposePlugin(options),
@@ -72,6 +74,7 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
     } else {
       pluginList = [];
     }
+
     builderInfo.isHost = !!(
       parsedOptions.prodRemote.length ||
       parsedOptions.devRemote.length ||
