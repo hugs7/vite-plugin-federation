@@ -1,4 +1,4 @@
-import { extname, parse, posix } from 'path';
+import { extname, parse, posix } from 'node:path';
 import { ResolvedConfig } from 'vite';
 
 import { joinUrlSegments } from './url';

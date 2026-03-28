@@ -1,4 +1,4 @@
-import { ServerResponse } from 'http';
+import { ServerResponse } from 'node:http';
 
 /**
  * Builds localhost origin given a port number.

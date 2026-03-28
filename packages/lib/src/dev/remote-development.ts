@@ -14,7 +14,7 @@
 // *****************************************************************************
 
 import type { Program } from 'estree';
-import { readFileSync } from 'fs';
+import { readFileSync } from 'node:fs';
 import MagicString from 'magic-string';
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
 import type { Rolldown, UserConfig, ViteDevServer } from 'vite';

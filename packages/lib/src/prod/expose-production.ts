@@ -16,7 +16,7 @@
 import type { Program } from 'estree';
 import { Node, walk } from 'estree-walker';
 import MagicString from 'magic-string';
-import { basename, dirname, extname, parse, relative, resolve } from 'path';
+import { basename, dirname, extname, parse, relative, resolve } from 'node:path';
 import type { VitePluginFederationOptions } from 'types';
 import type { ResolvedConfig, Rolldown } from 'vite';
 

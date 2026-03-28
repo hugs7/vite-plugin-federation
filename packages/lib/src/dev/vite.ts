@@ -1,4 +1,4 @@
-import { ServerResponse } from 'http';
+import { ServerResponse } from 'node:http';
 import { ViteDevServer } from 'vite';
 
 import { buildLocalhostOrigin, sendJs } from 'src/utils';

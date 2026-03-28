@@ -13,8 +13,8 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { readdirSync, readFileSync, statSync } from 'fs';
-import { basename, join, resolve } from 'path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
 
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
 

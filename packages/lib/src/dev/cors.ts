@@ -2,7 +2,7 @@
 // CORS middleware
 // ---------------------------------------------------------------------------
 
-import { IncomingMessage, ServerResponse } from 'http';
+import { IncomingMessage, ServerResponse } from 'node:http';
 
 /**
  * dd CORS headers so the HOST browser can load files

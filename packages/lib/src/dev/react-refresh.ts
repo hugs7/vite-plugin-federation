@@ -1,5 +1,5 @@
 import { ViteDevServer } from 'vite';
-import { ServerResponse } from 'http';
+import { ServerResponse } from 'node:http';
 
 import { sendJs } from 'src/utils';
 

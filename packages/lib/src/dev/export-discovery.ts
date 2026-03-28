@@ -6,8 +6,8 @@
  */
 
 import { init as initLexer, parse as parseLexer } from 'es-module-lexer';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { requirePackage } from 'src/utils';
 import { CJS_EXPORTS_RE } from '../public';
