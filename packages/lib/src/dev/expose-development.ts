@@ -14,53 +14,40 @@
 // *****************************************************************************
 
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import type { ServerResponse } from 'node:http';
 import { join, resolve } from 'node:path';
 import type { VitePluginFederationOptions } from 'types';
 import type { UserConfig, ViteDevServer } from 'vite';
-import type { IncomingMessage, ServerResponse } from 'node:http';
+
 import type { PluginHooks } from '../../types/pluginHooks';
+import { createLogger } from '../logger';
 import {
+  FEDERATION_DEPS_DIR,
   FEDERATION_EXPOSE_PREFIX,
   NAME_CHAR_REG,
   parsedOptions,
   PLUGIN_PREFIX,
-  REMOTE_ENTRY_HELPER_PREFIX
+  REMOTE_ENTRY_HELPER_PREFIX,
+  RESOLVED_SHARED_PREFIX
 } from '../public';
 import {
   matchesUrl,
   parseExposeOptions,
   removeNonRegLetter,
+  requirePackage,
   sendJs
 } from '../utils';
-import { createLogger } from '../logger';
-
+import { corsMiddleware } from './cors';
 import {
-  type SharedModuleMeta,
   buildSharedWrapperCode,
-  getPreBundleExports
+  getPreBundleExports,
+  type SharedModuleMeta
 } from './export-discovery';
-import { REACT_REFRESH_WRAPPER_CODE, patchViteClientCode } from './hmr';
+import { handleReactRefresh, handleReactRefreshRuntime } from './react-refresh';
 import { buildRemoteEntryCode } from './remote-entry-template';
+import { handleViteClient, toViteUrl } from './vite';
 
 const logger = createLogger('expose');
-
-const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:';
-const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX;
-
-const FEDERATION_DEPS_DIR = '.federation-deps';
-
-// Convert an absolute filesystem path to a URL that Vite's dev server
-// can serve.  If the path is inside the project root, return a root-
-// relative path; otherwise use /@fs/ prefix.
-const toViteUrl = (filePath: string, root: string): string => {
-  const normalized = filePath.replace(/\\/g, '/');
-  const normalizedRoot = root.replace(/\\/g, '/').replace(/\/$/, '');
-  if (normalized.startsWith(normalizedRoot + '/')) {
-    return normalized.slice(normalizedRoot.length);
-  }
-  return `/@fs${normalized}`;
-};
 
 // Shared state between the main plugin and the enforce:'pre' resolver plugin.
 // Both reference these module-level variables.  They're populated when
@@ -134,62 +121,6 @@ const handleRemoteEntry = async (
 };
 
 /**
- * Patch @vite/client so HMR module re-imports use the absolute remote
- * origin instead of the HOST page origin.
- */
-const handleViteClient = async (
-  server: ViteDevServer,
-  res: ServerResponse,
-  next: () => void
-): Promise<boolean> => {
-  try {
-    const clientResult = await server.transformRequest('/@vite/client');
-    if (!clientResult) {
-      next();
-      return true;
-    }
-    const port = server.config.server.port ?? 5173;
-    const remoteOrigin = `http://localhost:${port}`;
-    const code = patchViteClientCode(clientResult.code, remoteOrigin);
-    sendJs(res, code);
-  } catch (error) {
-    next();
-  }
-  return true;
-};
-
-/**
- * Serve the react-refresh wrapper that re-uses the HOST's refresh
- * runtime singleton for cross-origin component registration.
- */
-const handleReactRefresh = (res: ServerResponse): boolean => {
-  sendJs(res, REACT_REFRESH_WRAPPER_CODE);
-  return true;
-};
-
-/**
- * Serve the real react-refresh runtime under an alternate URL
- * so the wrapper can import it without recursion.
- */
-const handleReactRefreshRuntime = async (
-  server: ViteDevServer,
-  res: ServerResponse,
-  next: () => void
-): Promise<boolean> => {
-  try {
-    const result = await server.transformRequest('/@react-refresh');
-    if (result) {
-      sendJs(res, result.code);
-      return true;
-    }
-  } catch {
-    /* fall through */
-  }
-  next();
-  return true;
-};
-
-/**
  * Serve exposed modules as re-export stubs that redirect the browser
  * to import the real source file for HMR tracking.
  */
@@ -249,7 +180,7 @@ const collectSharedSpecifiers = (root: string): void => {
     sharedSet.add(item[0]);
   }
 
-  const nodeRequire = createRequire(join(root, 'package.json'));
+  const nodeRequire = requirePackage(root);
   const baseNames = [...sharedSet];
   for (const baseName of baseNames) {
     try {
@@ -320,33 +251,12 @@ const buildFederationPreBundle = async (root: string): Promise<void> => {
       continue;
     }
     const exports = await getPreBundleExports(filePath, name, root);
-    const preBundleUrl = `/node_modules/${FEDERATION_DEPS_DIR}/${fileName}`;
+    const preBundleUrl = join('/node_modules', FEDERATION_DEPS_DIR, fileName);
 
     sharedModuleMeta.set(name, { preBundleUrl, exports });
   }
 
   logger.info('Pre-bundled shared modules:', [...sharedModuleMeta.keys()]);
-};
-
-// ---------------------------------------------------------------------------
-// CORS middleware
-// ---------------------------------------------------------------------------
-
-/** Add CORS headers so the HOST browser can load files from this remote. */
-const corsMiddleware = (
-  req: IncomingMessage,
-  res: ServerResponse,
-  next: () => void
-): void => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', '*');
-  res.setHeader('Access-Control-Allow-Headers', '*');
-  if (req.method === 'OPTIONS') {
-    res.statusCode = 204;
-    res.end();
-    return;
-  }
-  next();
 };
 
 // ---------------------------------------------------------------------------
