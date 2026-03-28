@@ -27,8 +27,11 @@ export const setup = async (): Promise<void> => {
     await new Promise((r) => setTimeout(r, 2000));
   }
 
-  const tempDir = path.resolve(__dirname, '../../temp');
-  await fs.rm(tempDir, { recursive: true, force: true });
+  const tempRoot = path.resolve(__dirname, '../../temp');
+  await fs.rm(tempRoot, { recursive: true, force: true });
+  // Preserve the same directory depth as packages/examples/ so that
+  // relative pnpm symlinks in node_modules resolve correctly.
+  const tempDir = path.join(tempRoot, 'packages', 'examples');
   await fs.mkdir(tempDir, { recursive: true });
   await fs
     .cp(path.resolve(__dirname), tempDir, {

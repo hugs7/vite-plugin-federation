@@ -87,7 +87,7 @@ export const setupTestSuite = (config: ModeConfig): void => {
       testDir = dirname(testPath);
 
       if (testName) {
-        testDir = resolve(workspaceRoot, 'temp', testName);
+        testDir = resolve(workspaceRoot, 'temp', 'packages', 'examples', testName);
 
         await execa('pnpm', ['run', config.buildCommand], {
           cwd: testDir,
