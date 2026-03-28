@@ -17,7 +17,7 @@ import { walk } from 'estree-walker';
 import MagicString from 'magic-string';
 import path from 'node:path';
 import type { Program } from 'estree';
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import type { VitePluginFederationOptions } from 'types';
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
@@ -42,11 +42,6 @@ import {
   applyFederationImportPreamble
 } from '../transform/rewrite-remote-imports';
 import type { ResolvedConfig, Rolldown } from 'vite';
-
-const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
-  string,
-  ConfigTypeSet
->();
 
 export const prodRemotePlugin = (
   options: VitePluginFederationOptions
@@ -421,5 +416,3 @@ const __federation_import = async (name) => {
     }
   };
 };
-
-export { sharedFileName2Prop };

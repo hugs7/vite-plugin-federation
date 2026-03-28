@@ -26,19 +26,16 @@ import {
   DYNAMIC_LOADING_CSS_PREFIX,
   EXPOSES_KEY_MAP,
   EXPOSES_MAP,
-  EXTERNALS,
   FEDERATION_EXPOSE_PREFIX,
   parsedOptions,
   PLUGIN_PREFIX,
   REMOTE_ENTRY_HELPER_PREFIX,
-  SHARED,
-  VITE_BASE_PLACEHOLDER,
   VITE_ASSETS_DIR_PLACEHOLDER,
+  VITE_BASE_PLACEHOLDER,
   viteConfigResolved
 } from '../public';
 import { buildProdRemoteEntryCode } from './remote-entry-template';
 import {
-  getModuleMarker,
   NAME_CHAR_REG,
   normalizePath,
   parseExposeOptions,
@@ -61,8 +58,6 @@ export const prodExposePlugin = (
   }
   // exposes module
   for (const item of parseExposeOptions(options)) {
-    const moduleName = getModuleMarker(`\${${item[0]}}`, SHARED);
-    EXTERNALS.push(moduleName);
     const exposeFilepath = normalizePath(resolve(item[1].import));
     EXPOSES_MAP.set(item[0], exposeFilepath);
     EXPOSES_KEY_MAP.set(
