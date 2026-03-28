@@ -23,11 +23,8 @@ export * from './constants';
 // Mutable shared state
 export const EXPOSES_MAP = new Map();
 export const EXPOSES_KEY_MAP = new Map();
-export const EXTERNALS: string[] = [];
-
 export const builderInfo = {
   builder: 'rollup',
-  version: '',
   assetsDir: '',
   isHost: false,
   isRemote: false,

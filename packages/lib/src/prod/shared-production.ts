@@ -43,7 +43,6 @@ export const prodSharedPlugin = (
   );
   let isHost: boolean;
   let isRemote: boolean;
-  const id2Prop = new Map<string, any>();
 
   return {
     name: [PLUGIN_PREFIX, 'shared-production'].join(':'),
@@ -157,11 +156,6 @@ export const prodSharedPlugin = (
         }
       }
 
-      if (parsedOptions.prodShared.length && isRemote) {
-        for (const prod of parsedOptions.prodShared) {
-          id2Prop.set(prod[1].id, prod[1]);
-        }
-      }
     },
 
     outputOptions(outputOption) {

@@ -19,7 +19,7 @@ import MagicString from 'magic-string';
 import { posix } from 'node:path';
 import type { ResolvedConfig, Rolldown } from 'vite';
 
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import type { VitePluginFederationOptions } from 'types';
 
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
@@ -44,11 +44,6 @@ import {
   toOutputFilePathWithoutRuntime,
   toPreloadTag
 } from '../utils';
-
-export const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
-  string,
-  ConfigTypeSet
->();
 
 export const prodRemotePlugin = (
   options: VitePluginFederationOptions
