@@ -14,8 +14,8 @@
 // *****************************************************************************
 
 import virtual from '@rollup/plugin-virtual';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type {
   ConfigEnv,
   Plugin,
@@ -53,10 +53,13 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
   }
 
   let pluginList: PluginHooks[] = [];
-  let virtualMod;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let virtualMod: any;
   let registerCount = 0;
 
   const registerPlugins = (mode: string, command: string) => {
+    // Vitest uses command === 'serve' internally but federation plugins
+    // should be completely inert during test runs.
     if (mode === 'test') {
       pluginList = [];
     } else if (mode === 'production' || command === 'build') {

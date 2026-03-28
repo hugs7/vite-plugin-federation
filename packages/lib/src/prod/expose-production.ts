@@ -13,12 +13,13 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import type { Program } from 'estree';
 import { Node, walk } from 'estree-walker';
 import MagicString from 'magic-string';
-import { basename, dirname, extname, parse, relative, resolve } from 'path';
-import type { Program } from 'estree';
+import { basename, dirname, extname, parse, relative, resolve } from 'node:path';
 import type { VitePluginFederationOptions } from 'types';
 import type { ResolvedConfig, Rolldown } from 'vite';
+
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
@@ -26,25 +27,22 @@ import {
   DYNAMIC_LOADING_CSS_PREFIX,
   EXPOSES_KEY_MAP,
   EXPOSES_MAP,
-  EXTERNALS,
   FEDERATION_EXPOSE_PREFIX,
+  NAME_CHAR_REG,
   parsedOptions,
   PLUGIN_PREFIX,
   REMOTE_ENTRY_HELPER_PREFIX,
-  SHARED,
-  VITE_BASE_PLACEHOLDER,
   VITE_ASSETS_DIR_PLACEHOLDER,
+  VITE_BASE_PLACEHOLDER,
   viteConfigResolved
 } from '../public';
-import { buildProdRemoteEntryCode } from './remote-entry-template';
 import {
-  getModuleMarker,
-  NAME_CHAR_REG,
   normalizePath,
   parseExposeOptions,
   removeNonRegLetter,
   toJsArrayLiteral
 } from '../utils';
+import { buildProdRemoteEntryCode } from './remote-entry-template';
 
 export const prodExposePlugin = (
   options: VitePluginFederationOptions
@@ -61,8 +59,6 @@ export const prodExposePlugin = (
   }
   // exposes module
   for (const item of parseExposeOptions(options)) {
-    const moduleName = getModuleMarker(`\${${item[0]}}`, SHARED);
-    EXTERNALS.push(moduleName);
     const exposeFilepath = normalizePath(resolve(item[1].import));
     EXPOSES_MAP.set(item[0], exposeFilepath);
     EXPOSES_KEY_MAP.set(
@@ -71,7 +67,7 @@ export const prodExposePlugin = (
     );
     moduleMap += `\n"${item[0]}":()=>{
       ${DYNAMIC_LOADING_CSS}('${DYNAMIC_LOADING_CSS_PREFIX}${exposeFilepath}', ${item[1].dontAppendStylesToHead}, '${item[0]}')
-      return __federation_import('\${__federation_expose_${item[0]}}').then(module =>Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`;
+      return __federation_import('\${__federation_expose_${item[0]}}').then(module => Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`;
   }
 
   return {

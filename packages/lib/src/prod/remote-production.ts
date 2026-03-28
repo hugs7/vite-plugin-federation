@@ -13,11 +13,14 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import type { Program } from 'estree';
 import { walk } from 'estree-walker';
 import MagicString from 'magic-string';
-import path from 'node:path';
-import type { Program } from 'estree';
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import { posix } from 'node:path';
+import type { ResolvedConfig, Rolldown } from 'vite';
+
+import type { VitePluginFederationOptions } from 'types';
+
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
@@ -25,34 +28,28 @@ import {
   parsedOptions,
   PLUGIN_PREFIX,
   prodRemotes,
+  REMOTE_FROM_PARAMETER,
   VIRTUAL_FN_IMPORT_RESOLVED
 } from '../public';
+import { buildFederationRuntimeCode } from '../runtime/federation-runtime';
+import { FEDERATION_IMPORT_SNIPPET } from '../runtime/snippets';
+import {
+  applyFederationImportPreamble,
+  rewriteRemoteImports
+} from '../transform/rewrite-remote-imports';
 import {
   createRemotesMap,
   getModuleMarker,
-  parseRemoteOptions,
-  REMOTE_FROM_PARAMETER,
   injectToHead,
+  parseRemoteOptions,
   toOutputFilePathWithoutRuntime,
   toPreloadTag
 } from '../utils';
-import { buildFederationRuntimeCode } from '../runtime/federation-runtime';
-import {
-  rewriteRemoteImports,
-  applyFederationImportPreamble
-} from '../transform/rewrite-remote-imports';
-import type { ResolvedConfig, Rolldown } from 'vite';
-
-const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
-  string,
-  ConfigTypeSet
->();
 
 export const prodRemotePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
   parsedOptions.prodRemote = parseRemoteOptions(options);
-  // const remotes: Remote[] = []
   for (const item of parsedOptions.prodRemote) {
     prodRemotes.push({
       id: item[0],
@@ -67,6 +64,7 @@ export const prodRemotePlugin = (
   const hasRemotes = !!options.remotes;
   const hasShared = parsedOptions.prodShared.length > 0;
   const needsFederationModule = hasRemotes || hasShared;
+
   return {
     name: [PLUGIN_PREFIX, 'remote-production'].join(':'),
     virtualFile: needsFederationModule
@@ -75,7 +73,7 @@ export const prodRemotePlugin = (
             remotesMapCode: hasRemotes
               ? createRemotesMap(prodRemotes)
               : 'const remotesMap = {};',
-            extraPreludeCode: `const currentImports = {};
+            extraPreludeCode: `${FEDERATION_IMPORT_SNIPPET}
 const merge = (obj1, obj2) => {
   const mergedObj = Object.assign(obj1, obj2);
   for (const key of Object.keys(mergedObj)) {
@@ -84,10 +82,6 @@ const merge = (obj1, obj2) => {
     }
   }
   return mergedObj;
-};
-const __federation_import = async (name) => {
-    currentImports[name] ??= import(name);
-    return currentImports[name];
 };`,
             getFunctionCode: `function get(name, ${REMOTE_FROM_PARAMETER}) {
     return __federation_import(name).then(module => () => {
@@ -328,7 +322,7 @@ const __federation_import = async (name) => {
       }
     },
 
-    generateBundle(options, bundle) {
+    generateBundle(_options, bundle) {
       const preloadSharedReg = parsedOptions.prodShared
         .filter((shareInfo) => shareInfo[1].modulePreload)
         .map(
@@ -377,10 +371,8 @@ const __federation_import = async (name) => {
         const htmlPath = entryChunk[fileName].fileName;
         const basePath =
           resolvedConfig.base === './' || resolvedConfig.base === ''
-            ? path.posix.join(
-                path.posix
-                  .relative(entryChunk[fileName].fileName, '')
-                  .slice(0, -2),
+            ? posix.join(
+                posix.relative(entryChunk[fileName].fileName, '').slice(0, -2),
                 './'
               )
             : resolvedConfig.base;
@@ -421,5 +413,3 @@ const __federation_import = async (name) => {
     }
   };
 };
-
-export { sharedFileName2Prop };

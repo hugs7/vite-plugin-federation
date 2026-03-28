@@ -1,12 +1,6 @@
-export interface HtmlTagDescriptor {
-  tag: string;
-  attrs?: Record<string, string | boolean | undefined>;
-  children?: string | HtmlTagDescriptor[];
-  /**
-   * default: 'head-prepend'
-   */
-  injectTo?: 'head' | 'body' | 'head-prepend' | 'body-prepend';
-}
+import type { HtmlTagDescriptor } from '../types';
+
+export type { HtmlTagDescriptor };
 
 const unaryTags = new Set(['link', 'meta', 'base']);
 
@@ -64,7 +58,7 @@ const escapeHtml = (string: any) => {
     return str;
   }
 
-  let escape;
+  let escape: string | undefined;
   let html = '';
   let index = 0;
   let lastIndex = 0;
@@ -127,7 +121,7 @@ export const injectToHead = (
   if (tags.length === 0) return html;
 
   if (prepend) {
-    // inject as the first element of head
+    // Inject as the first element of head
     if (headPrependInjectRE.test(html)) {
       return html.replace(
         headPrependInjectRE,
@@ -135,9 +129,9 @@ export const injectToHead = (
       );
     }
   } else {
-    // inject before head close
+    // Inject before head close
     if (headInjectRE.test(html)) {
-      // respect indentation of head tag
+      // Respect indentation of head tag
       return html.replace(
         headInjectRE,
         (match, p1) => `${serializeTags(tags, incrementIndent(p1))}${match}`
@@ -151,17 +145,20 @@ export const injectToHead = (
       );
     }
   }
-  // if no head tag is present, we prepend the tag for both prepend and append
+
+  // If no head tag is present, we prepend the tag for both prepend and append
   return prependInjectFallback(html, tags);
 };
 
 const prependInjectFallback = (html: string, tags: HtmlTagDescriptor[]) => {
-  // prepend to the html tag, append after doctype, or the document start
+  // Prepend to the html tag, append after doctype, or the document start
   if (htmlPrependInjectRE.test(html)) {
     return html.replace(htmlPrependInjectRE, `$&\n${serializeTags(tags)}`);
   }
+
   if (doctypePrependInjectRE.test(html)) {
     return html.replace(doctypePrependInjectRE, `$&\n${serializeTags(tags)}`);
   }
+
   return serializeTags(tags) + html;
 };
