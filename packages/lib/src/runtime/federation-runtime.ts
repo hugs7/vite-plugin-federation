@@ -71,5 +71,6 @@ const __federation_method_getRemote = (remoteName, componentName) =>
 const __federation_method_setRemote = (remoteName, remoteConfig) => {
   remotesMap[remoteName] = remoteConfig;
 };
+
 export { __federation_method_ensure, __federation_method_getRemote, __federation_method_setRemote, __federation_method_unwrapDefault, __federation_method_wrapDefault };
 `;

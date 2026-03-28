@@ -72,7 +72,7 @@ export const prodExposePlugin = (
     );
     moduleMap += `\n"${item[0]}":()=>{
       ${DYNAMIC_LOADING_CSS}('${DYNAMIC_LOADING_CSS_PREFIX}${exposeFilepath}', ${item[1].dontAppendStylesToHead}, '${item[0]}')
-      return __federation_import('\${__federation_expose_${item[0]}}').then(module =>Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`;
+      return __federation_import('\${__federation_expose_${item[0]}}').then(module => Object.keys(module).every(item => exportSet.has(item)) ? () => module.default : () => module)},`;
   }
 
   return {
