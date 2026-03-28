@@ -63,6 +63,7 @@ export const prodRemotePlugin = (
   const hasRemotes = !!options.remotes;
   const hasShared = parsedOptions.prodShared.length > 0;
   const needsFederationModule = hasRemotes || hasShared;
+
   return {
     name: [PLUGIN_PREFIX, 'remote-production'].join(':'),
     virtualFile: needsFederationModule
@@ -81,6 +82,7 @@ const merge = (obj1, obj2) => {
   }
   return mergedObj;
 };
+
 const __federation_import = async (name) => {
     currentImports[name] ??= import(name);
     return currentImports[name];

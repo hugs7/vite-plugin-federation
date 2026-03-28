@@ -28,6 +28,7 @@ export const parseOptions = (
       }
     }
   };
+
   const object = (obj: object) => {
     for (const [key, value] of Object.entries(obj)) {
       if (typeof value === 'string' || Array.isArray(value)) {
@@ -37,6 +38,7 @@ export const parseOptions = (
       }
     }
   };
+
   if (Array.isArray(options)) {
     array(options);
   } else if (typeof options === 'object') {
@@ -44,6 +46,7 @@ export const parseOptions = (
   } else {
     throw new Error('Unexpected options format');
   }
+
   return list;
 };
 
@@ -56,6 +59,7 @@ export const parseSharedOptions = (
       import: true,
       shareScope: 'default',
       packagePath: key,
+      // Whether the path is set manually
       manuallyPackagePathSetting: false,
       generate: true,
       modulePreload: false

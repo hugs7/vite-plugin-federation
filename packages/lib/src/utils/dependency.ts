@@ -1,5 +1,10 @@
 import type { Rolldown } from 'vite';
 
+/**
+ * Finds dependencies of consuming project within plugin context.
+ *
+ * @param ctx -  Plugin context.
+ */
 export const findDependencies = (
   ctx: Rolldown.PluginContext,
   id: string,

@@ -107,6 +107,7 @@ const handleRemoteEntry = async (
   try {
     const moduleId = `${REMOTE_ENTRY_HELPER_PREFIX}${filename}`;
     const result = await server.transformRequest(moduleId);
+
     if (result) {
       sendJs(res, result.code);
     } else {
@@ -117,6 +118,7 @@ const handleRemoteEntry = async (
     res.statusCode = 500;
     res.end('Internal server error');
   }
+
   return true;
 };
 
@@ -250,6 +252,7 @@ const buildFederationPreBundle = async (root: string): Promise<void> => {
       logger.warn('Pre-bundle missing for %s, skipping', name);
       continue;
     }
+
     const exports = await getPreBundleExports(filePath, name, root);
     const preBundleUrl = join('/node_modules', FEDERATION_DEPS_DIR, fileName);
 

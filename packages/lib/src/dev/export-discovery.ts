@@ -7,8 +7,9 @@
 
 import { init as initLexer, parse as parseLexer } from 'es-module-lexer';
 import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import { join } from 'node:path';
+
+import { requirePackage } from '../utils';
 import { CJS_EXPORTS_RE } from '../public';
 
 /** Collect CJS export names from a code string into a set. */
@@ -91,7 +92,7 @@ export const getPreBundleExports = async (
     // CJS bodies can end up in shared chunks that the entry file doesn't
     // directly import (e.g. react/jsx-runtime shares a chunk with react).
     try {
-      const nodeRequire = createRequire(join(root, 'package.json'));
+      const nodeRequire = requirePackage(root);
       const origPath = nodeRequire.resolve(moduleName);
       const origCode = readFileSync(origPath, 'utf-8');
       const origExports = new Set<string>(['default']);
@@ -149,9 +150,7 @@ export const buildSharedWrapperCode = (
   const named = meta.exports.filter((e) => e !== 'default');
   const hasDefault = meta.exports.includes('default');
 
-  const importUrl = originUrl
-    ? `${originUrl}${meta.preBundleUrl}`
-    : meta.preBundleUrl;
+  const importUrl = [originUrl, meta.preBundleUrl].filter(Boolean).join('');
 
   // Named exports live in different places depending on module format:
   //   ESM pre-bundle: named exports are on __mod (the namespace object)
