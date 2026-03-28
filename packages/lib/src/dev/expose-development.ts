@@ -22,13 +22,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   FEDERATION_EXPOSE_PREFIX,
+  NAME_CHAR_REG,
   parsedOptions,
   PLUGIN_PREFIX,
   REMOTE_ENTRY_HELPER_PREFIX
 } from '../public';
 import {
   matchesUrl,
-  NAME_CHAR_REG,
   parseExposeOptions,
   removeNonRegLetter,
   sendJs

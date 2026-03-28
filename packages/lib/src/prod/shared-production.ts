@@ -15,16 +15,13 @@
 
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
-  NAME_CHAR_REG,
-  parseSharedOptions,
-  removeNonRegLetter
-} from '../utils';
-import {
   FEDERATION_SHARED_PREFIX,
+  NAME_CHAR_REG,
   parsedOptions,
   PLUGIN_PREFIX,
   VIRTUAL_FN_IMPORT
 } from '../public';
+import { parseSharedOptions, removeNonRegLetter } from '../utils';
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
 import { basename, join, resolve } from 'node:path';
 import { readdirSync, readFileSync, statSync } from 'node:fs';

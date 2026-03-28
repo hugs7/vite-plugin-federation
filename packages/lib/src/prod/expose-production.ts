@@ -27,6 +27,7 @@ import {
   EXPOSES_KEY_MAP,
   EXPOSES_MAP,
   FEDERATION_EXPOSE_PREFIX,
+  NAME_CHAR_REG,
   parsedOptions,
   PLUGIN_PREFIX,
   REMOTE_ENTRY_HELPER_PREFIX,
@@ -36,7 +37,6 @@ import {
 } from '../public';
 import { buildProdRemoteEntryCode } from './remote-entry-template';
 import {
-  NAME_CHAR_REG,
   normalizePath,
   parseExposeOptions,
   removeNonRegLetter,

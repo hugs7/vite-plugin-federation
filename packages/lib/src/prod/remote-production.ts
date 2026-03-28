@@ -25,14 +25,14 @@ import {
   parsedOptions,
   PLUGIN_PREFIX,
   prodRemotes,
+  REMOTE_FROM_PARAMETER,
   VIRTUAL_FN_IMPORT_RESOLVED
 } from '../public';
 import {
   createRemotesMap,
   getModuleMarker,
-  parseRemoteOptions,
-  REMOTE_FROM_PARAMETER,
   injectToHead,
+  parseRemoteOptions,
   toOutputFilePathWithoutRuntime,
   toPreloadTag
 } from '../utils';

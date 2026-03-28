@@ -20,21 +20,21 @@ import { readFileSync } from 'node:fs';
 import type { Program } from 'estree';
 
 import {
+  builderInfo,
+  devRemotes,
+  parsedOptions,
+  PLUGIN_PREFIX,
+  REMOTE_FROM_PARAMETER,
+  VIRTUAL_FEDERATION_RESOLVED
+} from '../public';
+import {
   createRemotesMap,
   getFileExtname,
   getModuleMarker,
   matchesUrl,
   parseRemoteOptions,
-  REMOTE_FROM_PARAMETER,
   sendJs
 } from '../utils';
-import {
-  builderInfo,
-  parsedOptions,
-  devRemotes,
-  PLUGIN_PREFIX,
-  VIRTUAL_FEDERATION_RESOLVED
-} from '../public';
 import type { PluginHooks } from '../../types/pluginHooks';
 import { createLogger } from '../logger';
 import { buildFederationRuntimeCode } from '../runtime/federation-runtime';
