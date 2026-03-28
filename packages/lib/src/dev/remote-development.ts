@@ -49,7 +49,6 @@ export const devRemotePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
   parsedOptions.devRemote = parseRemoteOptions(options);
-  // const remotes: { id: string; regexp: RegExp; config: RemotesConfig }[] = []
   for (const item of parsedOptions.devRemote) {
     devRemotes.push({
       id: item[0],
@@ -153,7 +152,7 @@ if(typeof window!=='undefined'){
               ? createRemotesMap(devRemotes)
               : 'const remotesMap = {};',
             getFunctionCode: `function get(name, ${REMOTE_FROM_PARAMETER}){
-  return import(/* @vite-ignore */ name).then(module => ()=> {
+  return import(/* @vite-ignore */ name).then(module => () => {
     if ((globalThis.__federation_shared_remote_from__ ?? ${REMOTE_FROM_PARAMETER}) === 'webpack') {
       return Object.prototype.toString.call(module).indexOf('Module') > -1 && module.default ? module.default : module;
     }

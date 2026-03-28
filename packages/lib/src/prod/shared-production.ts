@@ -180,7 +180,7 @@ export const prodSharedPlugin = (
       // only active when manualChunks is function,array not to solve
       if (typeof outputOption.manualChunks === 'function') {
         outputOption.manualChunks = new Proxy(outputOption.manualChunks, {
-          apply(target, thisArg, argArray) {
+          apply(target, _thisArg, argArray) {
             const result = manualChunkFunc(argArray[0]);
             return result ? result : target(argArray[0], argArray[1]);
           }

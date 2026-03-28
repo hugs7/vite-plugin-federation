@@ -47,7 +47,6 @@ export const prodRemotePlugin = (
   options: VitePluginFederationOptions
 ): PluginHooks => {
   parsedOptions.prodRemote = parseRemoteOptions(options);
-  // const remotes: Remote[] = []
   for (const item of parsedOptions.prodRemote) {
     prodRemotes.push({
       id: item[0],
