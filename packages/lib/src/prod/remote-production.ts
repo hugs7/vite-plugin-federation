@@ -331,7 +331,7 @@ const __federation_import = async (name) => {
       }
     },
 
-    generateBundle(bundle) {
+    generateBundle(_options, bundle) {
       const preloadSharedReg = parsedOptions.prodShared
         .filter((shareInfo) => shareInfo[1].modulePreload)
         .map(

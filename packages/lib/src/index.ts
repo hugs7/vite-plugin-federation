@@ -53,7 +53,8 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
   }
 
   let pluginList: PluginHooks[] = [];
-  let virtualMod: ReturnType<typeof virtual>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let virtualMod: any;
   let registerCount = 0;
 
   const registerPlugins = (mode: string, command: string) => {
