@@ -30,6 +30,7 @@ export const builderInfo = {
   isRemote: false,
   isShared: false
 };
+
 export const parsedOptions = {
   prodExpose: [] as (string | ConfigTypeSet)[],
   prodRemote: [] as (string | ConfigTypeSet)[],
@@ -38,12 +39,15 @@ export const parsedOptions = {
   devExpose: [] as (string | ConfigTypeSet)[],
   devRemote: [] as (string | ConfigTypeSet)[]
 };
+
 export const devRemotes: {
   id: string;
   regexp: RegExp;
   config: RemotesConfig;
 }[] = [];
+
 export const prodRemotes: Remote[] = [];
+
 export const viteConfigResolved: { config: ResolvedConfig | undefined } = {
   config: undefined
 };

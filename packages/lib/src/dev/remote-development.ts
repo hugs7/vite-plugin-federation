@@ -13,12 +13,14 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { Rolldown, UserConfig, ViteDevServer } from 'vite';
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
-import MagicString from 'magic-string';
-import { readFileSync } from 'node:fs';
 import type { Program } from 'estree';
+import { readFileSync } from 'node:fs';
+import MagicString from 'magic-string';
+import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+import type { Rolldown, UserConfig, ViteDevServer } from 'vite';
 
+import type { PluginHooks } from '../../types/pluginHooks';
+import { createLogger } from '../logger';
 import {
   builderInfo,
   devRemotes,
@@ -27,6 +29,11 @@ import {
   REMOTE_FROM_PARAMETER,
   VIRTUAL_FEDERATION_RESOLVED
 } from '../public';
+import { buildFederationRuntimeCode } from '../runtime/federation-runtime';
+import {
+  applyFederationImportPreamble,
+  rewriteRemoteImports
+} from '../transform/rewrite-remote-imports';
 import {
   createRemotesMap,
   getFileExtname,
@@ -35,13 +42,6 @@ import {
   parseRemoteOptions,
   sendJs
 } from '../utils';
-import type { PluginHooks } from '../../types/pluginHooks';
-import { createLogger } from '../logger';
-import { buildFederationRuntimeCode } from '../runtime/federation-runtime';
-import {
-  rewriteRemoteImports,
-  applyFederationImportPreamble
-} from '../transform/rewrite-remote-imports';
 
 const logger = createLogger('remote');
 

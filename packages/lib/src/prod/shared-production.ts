@@ -13,6 +13,11 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
+
+import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   FEDERATION_SHARED_PREFIX,
@@ -22,13 +27,11 @@ import {
   VIRTUAL_FN_IMPORT
 } from '../public';
 import { parseSharedOptions, removeNonRegLetter } from '../utils';
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
-import { basename, join, resolve } from 'node:path';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import federation_fn_import from './federation_fn_import.js?raw';
+
 const sharedFilePathReg = new RegExp(
   `${FEDERATION_SHARED_PREFIX}(.+)-.{8}\\.js$`
 );
-import federation_fn_import from './federation_fn_import.js?raw';
 
 export const prodSharedPlugin = (
   options: VitePluginFederationOptions

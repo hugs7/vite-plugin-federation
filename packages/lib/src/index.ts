@@ -58,6 +58,8 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
   let registerCount = 0;
 
   const registerPlugins = (mode: string, command: string) => {
+    // Vitest uses command === 'serve' internally but federation plugins
+    // should be completely inert during test runs.
     if (mode === 'test') {
       pluginList = [];
     } else if (mode === 'production' || command === 'build') {
