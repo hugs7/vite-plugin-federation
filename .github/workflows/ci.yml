@@ -21,15 +21,15 @@ jobs:
     name: 'Build&Test: node-${{ matrix.node_version }}, ${{ matrix.os }}'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
       - name: Cache pnpm modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.pnpm-store
           key: ${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -37,13 +37,16 @@ jobs:
             ${{ runner.os }}-
 
       - name: Set node version to ${{ matrix.node_version }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ matrix.node_version }}
           cache: 'pnpm'
 
       - name: Install deps
         run: pnpm install
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install chromium
 
       - name: Build vite-plugin-federation
         run: pnpm run build
@@ -53,25 +56,27 @@ jobs:
 
       - name: Dev mode e2e test
         run: pnpm run 'test:e2e-dev'
+        timeout-minutes: 5
 
       - name: Serve mode e2e test
         run: pnpm run 'test:e2e-serve'
+        timeout-minutes: 5
 
   lint:
     runs-on: ubuntu-latest
     name: 'Lint: node-24, ubuntu-latest'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
         with:
           version: 10
 
       - name: Set node version to 24
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 24
           cache: 'pnpm'
