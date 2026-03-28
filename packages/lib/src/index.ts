@@ -53,7 +53,7 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
   }
 
   let pluginList: PluginHooks[] = [];
-  let virtualMod;
+  let virtualMod: ReturnType<typeof virtual>;
   let registerCount = 0;
 
   const registerPlugins = (mode: string, command: string) => {
