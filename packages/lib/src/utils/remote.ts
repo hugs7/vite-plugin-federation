@@ -1,9 +1,9 @@
-import type { RemotesConfig } from '../../types';
 import type { ConfigTypeSet, VitePluginFederationOptions } from '../../types';
+import type { Remote } from '../types';
+
+export type { Remote };
 
 import { parseOptions } from './plugin';
-
-export type Remote = { id: string; regexp: RegExp; config: RemotesConfig };
 
 export const createRemotesMap = (remotes: Remote[]): string => {
   const createUrl = (remote: Remote) => {

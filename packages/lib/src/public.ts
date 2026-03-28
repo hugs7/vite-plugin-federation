@@ -15,9 +15,9 @@
 
 import type { ConfigTypeSet, RemotesConfig } from 'types';
 import type { ResolvedConfig } from 'vite';
-import type { Remote } from './utils';
 
-// Re-export all constants for backwards compatibility
+import type { Remote } from './types';
+
 export * from './constants';
 
 // Mutable shared state

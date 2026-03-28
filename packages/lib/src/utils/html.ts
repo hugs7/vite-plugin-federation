@@ -1,12 +1,6 @@
-export interface HtmlTagDescriptor {
-  tag: string;
-  attrs?: Record<string, string | boolean | undefined>;
-  children?: string | HtmlTagDescriptor[];
-  /**
-   * default: 'head-prepend'
-   */
-  injectTo?: 'head' | 'body' | 'head-prepend' | 'body-prepend';
-}
+import type { HtmlTagDescriptor } from '../types';
+
+export type { HtmlTagDescriptor };
 
 const unaryTags = new Set(['link', 'meta', 'base']);
 
