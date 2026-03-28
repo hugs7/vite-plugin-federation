@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.1](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@2.0.0...@hugs7/vite-plugin-federation@2.0.1) (2026-03-28)
+
+
+### Bug Fixes
+
+* disable federation plugins in consuming project unit tests ([0f2c6a2](https://github.com/hugs7/vite-plugin-federation/commit/0f2c6a2900ce2a30ab2537c7d303b43754eec0c8))
+
+
+
+
+
 # [2.0.0](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@1.8.4...@hugs7/vite-plugin-federation@2.0.0) (2026-03-27)
 
 
