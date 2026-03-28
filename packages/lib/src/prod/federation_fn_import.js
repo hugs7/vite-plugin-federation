@@ -23,6 +23,8 @@ const _log = __fed_debug('federation:shared');
 
 const currentImports = {};
 
+// DO NOT REMOVE — appears unused but is called at runtime via dynamically
+// injected moduleMap code (see remote-production.ts transform of __rf_var__moduleMap).
 const __federation_import = async (name) => {
   currentImports[name] ??= import(name);
   return currentImports[name];
@@ -32,21 +34,21 @@ const __federation_import = async (name) => {
 const moduleMap = __rf_var__moduleMap;
 const moduleCache = Object.create(null);
 
-function importShared(name, shareScope = 'default') {
+const importShared = (name, shareScope = 'default') => {
   return (
     moduleCache[name] ?? (moduleCache[name] = loadShared(name, shareScope))
   );
-}
+};
 
-async function loadShared(name, shareScope) {
+const loadShared = async (name, shareScope) => {
   const module =
     (await getSharedFromRuntime(name, shareScope)) ||
     (await getSharedFromLocal(name));
   moduleCache[name] = module;
   return module;
-}
+};
 
-async function getSharedFromRuntime(name, shareScope) {
+const getSharedFromRuntime = async (name, shareScope) => {
   let module = null;
   if (globalThis?.__federation_shared__?.[shareScope]?.[name]) {
     const versionObj = globalThis.__federation_shared__[shareScope][name];
@@ -76,9 +78,9 @@ async function getSharedFromRuntime(name, shareScope) {
   if (module) {
     return flattenModule(module, name);
   }
-}
+};
 
-async function getSharedFromLocal(name) {
+const getSharedFromLocal = async (name) => {
   if (moduleMap[name]?.import) {
     let module = await (await moduleMap[name].get())();
     return flattenModule(module, name);
@@ -87,9 +89,9 @@ async function getSharedFromLocal(name) {
       `consumer config import=false,so cant use callback shared module`
     );
   }
-}
+};
 
-function flattenModule(module, name) {
+const flattenModule = (module, name) => {
   // use a shared module which export default a function will getting error 'TypeError: xxx is not a function'
   if (typeof module.default === 'function') {
     Object.keys(module).forEach((key) => {
@@ -105,7 +107,7 @@ function flattenModule(module, name) {
   if (module.default) module = Object.assign({}, module.default, module);
   moduleCache[name] = module;
   return module;
-}
+};
 
 export {
   importShared,
