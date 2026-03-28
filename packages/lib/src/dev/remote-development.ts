@@ -16,7 +16,7 @@
 import type { Rolldown, UserConfig, ViteDevServer } from 'vite';
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
 import MagicString from 'magic-string';
-import { readFileSync } from 'fs';
+import { readFileSync } from 'node:fs';
 import type { Program } from 'estree';
 
 import {

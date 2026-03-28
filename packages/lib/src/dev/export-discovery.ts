@@ -6,9 +6,9 @@
  */
 
 import { init as initLexer, parse as parseLexer } from 'es-module-lexer';
-import { readFileSync } from 'fs';
-import { createRequire } from 'module';
-import { join } from 'path';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
 import { CJS_EXPORTS_RE } from '../public';
 
 /** Collect CJS export names from a code string into a set. */

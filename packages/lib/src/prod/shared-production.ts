@@ -26,8 +26,8 @@ import {
   VIRTUAL_FN_IMPORT
 } from '../public';
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
-import { basename, join, resolve } from 'path';
-import { readdirSync, readFileSync, statSync } from 'fs';
+import { basename, join, resolve } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 const sharedFilePathReg = new RegExp(
   `${FEDERATION_SHARED_PREFIX}(.+)-.{8}\\.js$`
 );

@@ -13,12 +13,12 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import { existsSync, mkdirSync, readFileSync } from 'fs';
-import { createRequire } from 'module';
-import { join, resolve } from 'path';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join, resolve } from 'node:path';
 import type { VitePluginFederationOptions } from 'types';
 import type { UserConfig, ViteDevServer } from 'vite';
-import type { IncomingMessage, ServerResponse } from 'http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   FEDERATION_EXPOSE_PREFIX,

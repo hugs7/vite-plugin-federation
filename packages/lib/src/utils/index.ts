@@ -21,11 +21,11 @@ import type {
   Shared,
   VitePluginFederationOptions
 } from '../../types';
-import { readFileSync } from 'fs';
-import { createHash } from 'crypto';
-import path, { parse, posix } from 'path';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import path, { parse, posix } from 'node:path';
 import type { ResolvedConfig, Rolldown } from 'vite';
-import type { ServerResponse } from 'http';
+import type { ServerResponse } from 'node:http';
 
 export * from './html';
 
