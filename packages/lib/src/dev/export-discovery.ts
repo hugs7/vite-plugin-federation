@@ -7,7 +7,7 @@
 
 import { init as initLexer, parse as parseLexer } from 'es-module-lexer';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { requirePackage } from '../utils';
 import { CJS_EXPORTS_RE } from '../public';
@@ -82,7 +82,7 @@ export const getPreBundleExports = async (
     }
 
     // CJS module — scan pre-bundle entry + chunks for exports.XXX patterns
-    const fileDir = filePath.substring(0, filePath.lastIndexOf('/'));
+    const fileDir = dirname(filePath);
     const cjsExports = scanCjsExports(code, fileDir);
     if (cjsExports.size > 1) {
       return [...cjsExports];
@@ -101,7 +101,7 @@ export const getPreBundleExports = async (
 
       // Follow require('./...') to find CJS sub-files
       if (origExports.size <= 1) {
-        const origDir = origPath.substring(0, origPath.lastIndexOf('/'));
+        const origDir = dirname(origPath);
         for (const req of origCode.matchAll(
           /require\s*\(\s*['"](\.[^'"]+)['"]\s*\)/g
         )) {
