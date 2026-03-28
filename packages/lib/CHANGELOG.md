@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.3](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@2.0.2...@hugs7/vite-plugin-federation@2.0.3) (2026-03-28)
+
+
+### Bug Fixes
+
+* posix path join prebundle url ([4739cee](https://github.com/hugs7/vite-plugin-federation/commit/4739cee50ad10fd813ed6b4f02eff0beb31cd792))
+* use dirname for module directory ([ff6dbf7](https://github.com/hugs7/vite-plugin-federation/commit/ff6dbf777c365d2ebfb319281ae50859278d1a6d))
+
+
+
+
+
 ## [2.0.2](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@2.0.1...@hugs7/vite-plugin-federation@2.0.2) (2026-03-28)
 
 
