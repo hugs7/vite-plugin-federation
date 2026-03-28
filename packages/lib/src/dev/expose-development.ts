@@ -15,7 +15,7 @@
 
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
-import { join, resolve } from 'node:path';
+import { join, posix, resolve } from 'node:path';
 import type { VitePluginFederationOptions } from 'types';
 import type { UserConfig, ViteDevServer } from 'vite';
 
@@ -254,7 +254,11 @@ const buildFederationPreBundle = async (root: string): Promise<void> => {
     }
 
     const exports = await getPreBundleExports(filePath, name, root);
-    const preBundleUrl = join('/node_modules', FEDERATION_DEPS_DIR, fileName);
+    const preBundleUrl = posix.join(
+      '/node_modules',
+      FEDERATION_DEPS_DIR,
+      fileName
+    );
 
     sharedModuleMeta.set(name, { preBundleUrl, exports });
   }
