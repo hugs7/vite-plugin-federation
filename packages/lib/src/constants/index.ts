@@ -1,3 +1,4 @@
 export * from './plugin';
-export * from './virtual-modules';
+export * from './remote';
 export * from './runtime';
+export * from './virtual-modules';

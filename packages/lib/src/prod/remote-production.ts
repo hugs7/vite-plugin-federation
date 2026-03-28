@@ -13,11 +13,14 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import type { Program } from 'estree';
 import { walk } from 'estree-walker';
 import MagicString from 'magic-string';
-import path from 'node:path';
-import type { Program } from 'estree';
+import { posix } from 'node:path';
+import type { ResolvedConfig, Rolldown } from 'vite';
+
 import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
+
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
@@ -25,25 +28,24 @@ import {
   parsedOptions,
   PLUGIN_PREFIX,
   prodRemotes,
+  REMOTE_FROM_PARAMETER,
   VIRTUAL_FN_IMPORT_RESOLVED
 } from '../public';
+import { buildFederationRuntimeCode } from '../runtime/federation-runtime';
+import {
+  applyFederationImportPreamble,
+  rewriteRemoteImports
+} from '../transform/rewrite-remote-imports';
 import {
   createRemotesMap,
   getModuleMarker,
-  parseRemoteOptions,
-  REMOTE_FROM_PARAMETER,
   injectToHead,
+  parseRemoteOptions,
   toOutputFilePathWithoutRuntime,
   toPreloadTag
 } from '../utils';
-import { buildFederationRuntimeCode } from '../runtime/federation-runtime';
-import {
-  rewriteRemoteImports,
-  applyFederationImportPreamble
-} from '../transform/rewrite-remote-imports';
-import type { ResolvedConfig, Rolldown } from 'vite';
 
-const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
+export const sharedFileName2Prop: Map<string, ConfigTypeSet> = new Map<
   string,
   ConfigTypeSet
 >();
@@ -328,7 +330,7 @@ const __federation_import = async (name) => {
       }
     },
 
-    generateBundle(options, bundle) {
+    generateBundle(bundle) {
       const preloadSharedReg = parsedOptions.prodShared
         .filter((shareInfo) => shareInfo[1].modulePreload)
         .map(
@@ -377,10 +379,8 @@ const __federation_import = async (name) => {
         const htmlPath = entryChunk[fileName].fileName;
         const basePath =
           resolvedConfig.base === './' || resolvedConfig.base === ''
-            ? path.posix.join(
-                path.posix
-                  .relative(entryChunk[fileName].fileName, '')
-                  .slice(0, -2),
+            ? posix.join(
+                posix.relative(entryChunk[fileName].fileName, '').slice(0, -2),
                 './'
               )
             : resolvedConfig.base;
@@ -421,5 +421,3 @@ const __federation_import = async (name) => {
     }
   };
 };
-
-export { sharedFileName2Prop };

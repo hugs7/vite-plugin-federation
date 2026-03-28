@@ -13,12 +13,13 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
+import type { Program } from 'estree';
 import { Node, walk } from 'estree-walker';
 import MagicString from 'magic-string';
 import { basename, dirname, extname, parse, relative, resolve } from 'path';
-import type { Program } from 'estree';
 import type { VitePluginFederationOptions } from 'types';
 import type { ResolvedConfig, Rolldown } from 'vite';
+
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,
@@ -28,23 +29,23 @@ import {
   EXPOSES_MAP,
   EXTERNALS,
   FEDERATION_EXPOSE_PREFIX,
+  NAME_CHAR_REG,
   parsedOptions,
   PLUGIN_PREFIX,
   REMOTE_ENTRY_HELPER_PREFIX,
   SHARED,
-  VITE_BASE_PLACEHOLDER,
   VITE_ASSETS_DIR_PLACEHOLDER,
+  VITE_BASE_PLACEHOLDER,
   viteConfigResolved
 } from '../public';
-import { buildProdRemoteEntryCode } from './remote-entry-template';
 import {
   getModuleMarker,
-  NAME_CHAR_REG,
   normalizePath,
   parseExposeOptions,
   removeNonRegLetter,
   toJsArrayLiteral
 } from '../utils';
+import { buildProdRemoteEntryCode } from './remote-entry-template';
 
 export const prodExposePlugin = (
   options: VitePluginFederationOptions
