@@ -150,9 +150,7 @@ export const buildSharedWrapperCode = (
   const named = meta.exports.filter((e) => e !== 'default');
   const hasDefault = meta.exports.includes('default');
 
-  const importUrl = originUrl
-    ? `${originUrl}${meta.preBundleUrl}`
-    : meta.preBundleUrl;
+  const importUrl = [originUrl, meta.preBundleUrl].filter(Boolean).join('');
 
   // Named exports live in different places depending on module format:
   //   ESM pre-bundle: named exports are on __mod (the namespace object)
