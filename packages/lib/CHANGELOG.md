@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.2](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@2.0.1...@hugs7/vite-plugin-federation@2.0.2) (2026-03-28)
+
+
+### Bug Fixes
+
+* prefix unused generateBundle options param with underscore ([d8dceaf](https://github.com/hugs7/vite-plugin-federation/commit/d8dceaf206b8bc572db67d978b2dc1de9905d9b3))
+* use configured server.host for HMR origin instead of hardcoded localhost ([a3850bf](https://github.com/hugs7/vite-plugin-federation/commit/a3850bfd362fd558b584bf5be0a8657229c99805))
+* use https protocol for HMR origin when server.https is configured ([fd6ace9](https://github.com/hugs7/vite-plugin-federation/commit/fd6ace902f67551312b38b823120c3ff3a0f9c4b))
+
+
+
+
+
 ## [2.0.1](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@2.0.0...@hugs7/vite-plugin-federation@2.0.1) (2026-03-28)
 
 
