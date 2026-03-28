@@ -7,9 +7,9 @@
 
 import { init as initLexer, parse as parseLexer } from 'es-module-lexer';
 import { readFileSync } from 'fs';
-import { createRequire } from 'module';
 import { join } from 'path';
 
+import { requirePackage } from 'src/utils';
 import { CJS_EXPORTS_RE } from '../public';
 
 /** Collect CJS export names from a code string into a set. */
@@ -92,7 +92,7 @@ export const getPreBundleExports = async (
     // CJS bodies can end up in shared chunks that the entry file doesn't
     // directly import (e.g. react/jsx-runtime shares a chunk with react).
     try {
-      const nodeRequire = createRequire(join(root, 'package.json'));
+      const nodeRequire = requirePackage(root);
       const origPath = nodeRequire.resolve(moduleName);
       const origCode = readFileSync(origPath, 'utf-8');
       const origExports = new Set<string>(['default']);
