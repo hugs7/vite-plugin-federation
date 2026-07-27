@@ -5,13 +5,15 @@
  * the `DEBUG` environment variable:
  *
  * ```sh
- * DEBUG=federation:*            # all federation logs
- * DEBUG=federation:*:debug      # only debug level
- * DEBUG=federation:expose:*     # only expose-development logs
+ * DEBUG=federation:*            # all plugin logs
+ * DEBUG=federation:*:info       # info, warn, and error logs
+ * DEBUG=federation:expose:warn  # expose warn and error logs
  * ```
  */
 
 import debug from 'debug';
+
+import { NAMESPACE_ROOT } from './constants';
 
 const LOG_LEVELS = ['trace', 'debug', 'log', 'info', 'warn', 'error'] as const;
 
@@ -28,19 +30,19 @@ const LOG_LEVEL_CONSOLE_MAP: Record<LogLevel, (...args: unknown[]) => void> = {
   error: console.error
 };
 
-const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = Object.fromEntries(
-  LOG_LEVELS.map((level, index) => [level, index])
-) as Record<LogLevel, number>;
+const isLevelEnabled = (namespaces: string[], level: LogLevel): boolean => {
+  const levelIndex = LOG_LEVELS.indexOf(level);
 
-const DEFAULT_LOG_LEVEL: LogLevel = 'info';
-
-const NAMESPACE_ROOT = 'federation';
+  return LOG_LEVELS.slice(0, levelIndex + 1).some((minimumLevel) =>
+    debug.enabled([NAMESPACE_ROOT, ...namespaces, minimumLevel].join(':'))
+  );
+};
 
 /**
  * Create a scoped logger with levelled output.
  *
- * Each log level gets its own `debug` namespace so consumers can
- * filter granularly via `DEBUG=federation:expose:warn`.
+ * Each log level gets its own `debug` namespace. A level suffix acts as
+ * a minimum severity, so `DEBUG=federation:expose:warn` enables warn and error.
  *
  * @example
  * ```ts
@@ -50,18 +52,12 @@ const NAMESPACE_ROOT = 'federation';
  * ```
  */
 export const createLogger = (...namespaces: string[]): Logger => {
-  const minPriority = LOG_LEVEL_PRIORITY[DEFAULT_LOG_LEVEL];
-
   return LOG_LEVELS.reduce((logger, level) => {
     const namespace = [NAMESPACE_ROOT, ...namespaces, level].join(':');
     const instance = debug(namespace);
 
-    const logEnabled = LOG_LEVEL_PRIORITY[level] >= minPriority;
-    if (logEnabled) {
-      instance.log = LOG_LEVEL_CONSOLE_MAP[level].bind(console);
-    }
-
-    instance.enabled = logEnabled;
+    instance.log = LOG_LEVEL_CONSOLE_MAP[level].bind(console);
+    instance.enabled = isLevelEnabled(namespaces, level);
 
     logger[level] = instance;
     return logger;
