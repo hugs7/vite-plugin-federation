@@ -36,9 +36,10 @@ export const handleViteClient = async (
       return true;
     }
     const port = server.config.server.port ?? 5173;
-    const host = typeof server.config.server.host === 'string'
-      ? server.config.server.host
-      : 'localhost';
+    const host =
+      typeof server.config.server.host === 'string'
+        ? server.config.server.host
+        : 'localhost';
     const protocol = server.config.server.https ? 'https' : 'http';
     const remoteOrigin = `${protocol}://${host}:${port}`;
     const code = patchViteClientCode(clientResult.code, remoteOrigin);

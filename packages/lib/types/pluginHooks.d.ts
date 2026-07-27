@@ -57,7 +57,11 @@ export interface PluginHooks {
     code: string,
     chunk: Rolldown.RenderedChunk,
     options: Rolldown.NormalizedOutputOptions
-  ) => string | { code: string } | null | Promise<string | { code: string } | null>;
+  ) =>
+    | string
+    | { code: string }
+    | null
+    | Promise<string | { code: string } | null>;
   generateBundle?: (
     this: Rolldown.PluginContext,
     options: Rolldown.NormalizedOutputOptions,

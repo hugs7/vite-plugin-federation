@@ -18,67 +18,69 @@ import {
   isSameFilepath,
   parseOptions,
   removeNonRegLetter
-} from '../src/utils'
-import type { ExposesObject } from '../types'
-import { expect, test } from 'vitest'
+} from '../src/utils';
+import type { ExposesObject } from '../types';
+import { expect, test } from 'vitest';
 
 test('remove nonLetter', () => {
-  const includeUnderline = 'user_name'
-  const includeDash = 'user-name'
-  const all = 'U"s-e@r#n$a%m^e&*(),./;[]{}'
-  const fileNameReg = new RegExp('[0-9a-zA-Z@_-]+')
-  expect(removeNonRegLetter(includeUnderline)).toMatch('userName')
-  expect(removeNonRegLetter(includeDash)).toMatch('userName')
-  expect(removeNonRegLetter(all)).toMatch('USERNAME')
-  expect(removeNonRegLetter(includeUnderline, fileNameReg)).toMatch('user_name')
-  expect(removeNonRegLetter(includeDash, fileNameReg)).toMatch('user-name')
-  expect(removeNonRegLetter(all, fileNameReg)).toMatch('US-e@rNAME')
-})
+  const includeUnderline = 'user_name';
+  const includeDash = 'user-name';
+  const all = 'U"s-e@r#n$a%m^e&*(),./;[]{}';
+  const fileNameReg = new RegExp('[0-9a-zA-Z@_-]+');
+  expect(removeNonRegLetter(includeUnderline)).toMatch('userName');
+  expect(removeNonRegLetter(includeDash)).toMatch('userName');
+  expect(removeNonRegLetter(all)).toMatch('USERNAME');
+  expect(removeNonRegLetter(includeUnderline, fileNameReg)).toMatch(
+    'user_name'
+  );
+  expect(removeNonRegLetter(includeDash, fileNameReg)).toMatch('user-name');
+  expect(removeNonRegLetter(all, fileNameReg)).toMatch('US-e@rNAME');
+});
 
 test('get moduleMarker', () => {
-  expect('__rf_placeholder__test').toMatch(getModuleMarker('test'))
-  expect('__rf_type__test').toMatch(getModuleMarker('test', 'type'))
-})
+  expect('__rf_placeholder__test').toMatch(getModuleMarker('test'));
+  expect('__rf_type__test').toMatch(getModuleMarker('test', 'type'));
+});
 
 test('parse exposes options', () => {
   const normalizeSimple = (item) => ({
     import: item,
     name: undefined,
     dontAppendStylesToHead: false
-  })
+  });
   const normalizeOptions = (item) => ({
     import: item.import,
     name: item.name || undefined,
     dontAppendStylesToHead: item.dontAppendStylesToHead || false
-  })
+  });
   // string[]
   let exposes: (string | ExposesObject)[] | ExposesObject = [
     './src/components/Content.vue',
     './src/components/Button.js'
-  ]
-  let ret = parseOptions(exposes, normalizeSimple, normalizeOptions)
+  ];
+  let ret = parseOptions(exposes, normalizeSimple, normalizeOptions);
   expect(ret[0]).toMatchObject([
     './src/components/Content.vue',
     { import: './src/components/Content.vue' }
-  ])
+  ]);
   expect(ret[1]).toMatchObject([
     './src/components/Button.js',
     { import: './src/components/Button.js' }
-  ])
+  ]);
   // ExposesObject
   exposes = {
     './Content': './src/components/Content.vue',
     './Button': './src/components/Button.js'
-  }
-  ret = parseOptions(exposes, normalizeSimple, normalizeOptions)
+  };
+  ret = parseOptions(exposes, normalizeSimple, normalizeOptions);
   expect(ret[0]).toMatchObject([
     './Content',
     { import: './src/components/Content.vue' }
-  ])
+  ]);
   expect(ret[1]).toMatchObject([
     './Button',
     { import: './src/components/Button.js' }
-  ])
+  ]);
 
   exposes = {
     './Content': {
@@ -90,8 +92,8 @@ test('parse exposes options', () => {
       import: './src/components/Button.js',
       name: 'button'
     }
-  }
-  ret = parseOptions(exposes, normalizeSimple, normalizeOptions)
+  };
+  ret = parseOptions(exposes, normalizeSimple, normalizeOptions);
   expect(ret[0]).toMatchObject([
     './Content',
     {
@@ -99,7 +101,7 @@ test('parse exposes options', () => {
       name: 'content',
       dontAppendStylesToHead: true
     }
-  ])
+  ]);
   expect(ret[1]).toMatchObject([
     './Button',
     {
@@ -107,23 +109,23 @@ test('parse exposes options', () => {
       name: 'button',
       dontAppendStylesToHead: false
     }
-  ])
+  ]);
   // console.log(JSON.stringify(ret))
 
   // ExposesObject[]
   exposes = [
     { Content: './src/components/Content.vue' },
     { Button: './src/components/Button.js' }
-  ]
-  ret = parseOptions(exposes, normalizeSimple, normalizeOptions)
+  ];
+  ret = parseOptions(exposes, normalizeSimple, normalizeOptions);
   expect(ret[0]).toMatchObject([
     'Content',
     { import: './src/components/Content.vue' }
-  ])
+  ]);
   expect(ret[1]).toMatchObject([
     'Button',
     { import: './src/components/Button.js' }
-  ])
+  ]);
 
   //  shared array
   expect(
@@ -138,7 +140,7 @@ test('parse exposes options', () => {
     ['vue', { import: 'vue' }],
     ['react', { import: 'react' }],
     ['react-dom', { import: 'react-dom' }]
-  ])
+  ]);
 
   // sharedObject
   expect(
@@ -155,8 +157,8 @@ test('parse exposes options', () => {
   ).toMatchObject([
     ['vue', { requiredVersion: '3.1.1' }],
     ['react', { requiredVersion: '16.1.0' }]
-  ])
-})
+  ]);
+});
 
 test('isSameFilepath', () => {
   // exactly the same
@@ -165,7 +167,7 @@ test('isSameFilepath', () => {
       'D:\\federation-test\\src\\button.js',
       'D:\\federation-test\\src\\button.js'
     )
-  ).toBe(true)
+  ).toBe(true);
 
   // different separator
   expect(
@@ -173,7 +175,7 @@ test('isSameFilepath', () => {
       'D:/federation-test/src/button.js',
       'D:\\federation-test\\src\\button.js'
     )
-  ).toBe(true)
+  ).toBe(true);
 
   // ignore file suffix
   expect(
@@ -181,27 +183,27 @@ test('isSameFilepath', () => {
       'D:/federation-test/src/button',
       'D:\\federation-test\\src\\button.js'
     )
-  ).toBe(true)
+  ).toBe(true);
   expect(
     isSameFilepath(
       'D:/federation-test/src/button.vue',
       'D:\\federation-test\\src\\button'
     )
-  ).toBe(true)
+  ).toBe(true);
   expect(
     isSameFilepath('D:/origin.js/src/button.vue', 'D:\\origin.js\\src\\button')
-  ).toBe(true)
+  ).toBe(true);
   expect(
     isSameFilepath(
       'D:/origin.js/src/button.vue',
       'D:\\origin.js\\src\\button.js'
     )
-  ).toBe(false)
+  ).toBe(false);
 
   // relative path
   expect(isSameFilepath('D:/origin.js/src/button.vue', 'src/button.vue')).toBe(
     false
-  )
+  );
 
   // similar file path
   expect(
@@ -209,14 +211,14 @@ test('isSameFilepath', () => {
       'D:\\origin.js\\src\\button.js',
       'D:\\origin.js\\src\\button1.js'
     )
-  ).toBe(false)
+  ).toBe(false);
   expect(
     isSameFilepath(
       'D:/federation-test/src/button.vue',
       'D:/federation-test/src/button1'
     )
-  ).toBe(false)
+  ).toBe(false);
   expect(
     isSameFilepath('D:\\origin.js\\src\\button', 'D:\\origin.js\\src\\button1')
-  ).toBe(false)
-})
+  ).toBe(false);
+});
