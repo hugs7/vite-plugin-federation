@@ -16,8 +16,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
-
+import type { ConfigTypeSet, VitePluginFederationOptions } from '../../types';
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   FEDERATION_SHARED_PREFIX,

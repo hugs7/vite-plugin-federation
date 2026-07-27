@@ -19,8 +19,7 @@ import MagicString from 'magic-string';
 import { posix } from 'node:path';
 import type { ResolvedConfig, Rolldown } from 'vite';
 
-import type { VitePluginFederationOptions } from 'types';
-
+import type { VitePluginFederationOptions } from '../../types';
 import type { PluginHooks } from '../../types/pluginHooks';
 import {
   builderInfo,

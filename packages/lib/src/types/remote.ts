@@ -1,4 +1,4 @@
-import type { RemotesConfig } from 'types';
+import type { RemotesConfig } from '../../types';
 
 export type Remote = {
   id: string;
