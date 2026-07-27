@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.4](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@2.0.3...@hugs7/vite-plugin-federation@2.0.4) (2026-07-27)
+
+
+### Bug Fixes
+
+* align public types with Vite 8 ([10e5088](https://github.com/hugs7/vite-plugin-federation/commit/10e50886079de8699b756a85bc3fc34373473bfc))
+* respect DEBUG federation log levels ([7313909](https://github.com/hugs7/vite-plugin-federation/commit/7313909d2c475b4def67dc8d318ec67ff254eee1))
+
+
+
+
+
 ## [2.0.3](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@2.0.2...@hugs7/vite-plugin-federation@2.0.3) (2026-03-28)
 
 
