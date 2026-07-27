@@ -3,3 +3,18 @@ packages:
   - 'packages/examples/**'
   - 'temp/**'
   - 'docs'
+allowBuilds:
+  esbuild: true
+  nx: true
+  playwright-chromium: true
+  vue-demi: true
+overrides:
+  '@nuxt/kit': 4.2.2
+  axios: 1.18.1
+  brace-expansion: 5.0.8
+  js-yaml: 4.3.0
+  tar: 7.5.22
+  'vitepress>vite': 6.4.3
+minimumReleaseAgeExclude:
+  - '@types/node@26.1.2'
+  - webpack@5.109.1
