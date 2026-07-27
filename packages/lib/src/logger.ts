@@ -13,6 +13,8 @@
 
 import debug from 'debug';
 
+import { NAMESPACE_ROOT } from './constants';
+
 const LOG_LEVELS = ['trace', 'debug', 'log', 'info', 'warn', 'error'] as const;
 
 type LogLevel = (typeof LOG_LEVELS)[number];
@@ -33,8 +35,6 @@ const LOG_LEVEL_PRIORITY: Record<LogLevel, number> = Object.fromEntries(
 ) as Record<LogLevel, number>;
 
 const DEFAULT_LOG_LEVEL: LogLevel = 'info';
-
-const NAMESPACE_ROOT = 'federation';
 
 /**
  * Create a scoped logger with levelled output.
