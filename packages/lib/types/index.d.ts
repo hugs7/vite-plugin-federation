@@ -2,7 +2,7 @@
  * The following code is adapted from https://github.com/webpack/webpack/types.d.ts
  * MIT License https://github.com/webpack/webpack/LICENSE
  */
-import { RenderedChunk } from 'rollup'
+import type { Plugin, Rollup } from 'vite'
 
 export default function federation(options: VitePluginFederationOptions): Plugin
 
@@ -98,7 +98,7 @@ declare interface SharedRuntimeInfo {
   fileName: string
   fileDir: string
   filePath: string
-  chunk: RenderedChunk
+  chunk: Rollup.RenderedChunk
 }
 
 /**
