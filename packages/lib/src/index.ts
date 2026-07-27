@@ -39,6 +39,7 @@ import { prodSharedPlugin } from './prod/shared-production';
 import {
   builderInfo,
   DEFAULT_ENTRY_FILENAME,
+  NAMESPACE_ROOT,
   parsedOptions,
   PLUGIN_PREFIX,
   VIRTUAL_FEDERATION,
@@ -53,7 +54,6 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
   }
 
   let pluginList: PluginHooks[] = [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let virtualMod: any;
   let registerCount = 0;
 
@@ -101,7 +101,7 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
   };
 
   const mainPlugin: Plugin = {
-    name: [PLUGIN_PREFIX, 'federation'].join(':'),
+    name: [PLUGIN_PREFIX, NAMESPACE_ROOT].join(':'),
     // for scenario vite.config.js build.cssCodeSplit: false
     // vite:css-post plugin will summarize all the styles in the style.xxxxxx.css file
     // so, this plugin need run after vite:css-post in post plugin list

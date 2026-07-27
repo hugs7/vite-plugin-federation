@@ -16,9 +16,9 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
 import { join, posix, resolve } from 'node:path';
-import type { VitePluginFederationOptions } from 'types';
 import type { UserConfig, ViteDevServer } from 'vite';
 
+import type { VitePluginFederationOptions } from '../../types';
 import type { PluginHooks } from '../../types/pluginHooks';
 import { createLogger } from '../logger';
 import {

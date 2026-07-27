@@ -16,9 +16,9 @@
 import type { Program } from 'estree';
 import { readFileSync } from 'node:fs';
 import MagicString from 'magic-string';
-import type { ConfigTypeSet, VitePluginFederationOptions } from 'types';
 import type { Rolldown, UserConfig, ViteDevServer } from 'vite';
 
+import type { ConfigTypeSet, VitePluginFederationOptions } from '../../types';
 import type { PluginHooks } from '../../types/pluginHooks';
 import { createLogger } from '../logger';
 import {

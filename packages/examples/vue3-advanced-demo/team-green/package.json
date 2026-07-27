@@ -11,13 +11,13 @@
     "stop": "kill-port --port 5001"
   },
   "dependencies": {
-    "vue": "^3.2.45",
-    "pinia": "^2.0.21"
+    "vue": "^3.5.40",
+    "pinia": "^4.0.2"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.0",
-    "typescript": "~5.9.3",
-    "vite": "^8.0.0",
-    "vue-tsc": "^0.39.5"
+    "@vitejs/plugin-vue": "^6.0.8",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "vite": "^8.1.5",
+    "vue-tsc": "^3.3.8"
   }
 }

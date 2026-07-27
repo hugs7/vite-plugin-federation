@@ -13,9 +13,9 @@
 // SPDX-License-Identifier: MulanPSL-2.0
 // *****************************************************************************
 
-import type { ConfigTypeSet, RemotesConfig } from 'types';
 import type { ResolvedConfig } from 'vite';
 
+import type { ConfigTypeSet, RemotesConfig } from '../types';
 import type { Remote } from './types';
 
 export * from './constants';

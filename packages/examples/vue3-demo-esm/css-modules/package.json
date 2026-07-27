@@ -9,13 +9,13 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "vue": "^3.2.45"
+    "vue": "^3.5.40"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.0",
-    "autoprefixer": "^10.3.2",
-    "postcss": "^8.4.31",
-    "vite": "^8.0.0"
+    "@vitejs/plugin-vue": "^6.0.8",
+    "autoprefixer": "^10.5.4",
+    "postcss": "^8.5.23",
+    "vite": "^8.1.5"
 
   }
 }
