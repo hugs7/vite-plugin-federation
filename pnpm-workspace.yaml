@@ -15,6 +15,10 @@ overrides:
   js-yaml: 4.3.0
   tar: 7.5.22
   'vitepress>vite': 6.4.3
+# Keep injected workspace deps (react-vite example's store-lib fixture) as
+# hard-linked copies under node_modules/.pnpm so they behave like a real
+# installed package instead of a symlink into the workspace.
+dedupeInjectedDeps: false
 minimumReleaseAgeExclude:
   - '@types/node@26.1.2'
   - webpack@5.109.1

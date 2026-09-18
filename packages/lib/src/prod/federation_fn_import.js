@@ -27,6 +27,8 @@ const _log = __fed_debug('federation:shared');
 // eslint-disable-next-line no-undef
 const moduleMap = __rf_var__moduleMap;
 const moduleCache = Object.create(null);
+// Shared modules that have finished loading, for synchronous CJS consumers.
+const resolvedModules = Object.create(null);
 
 const importShared = (name, shareScope = 'default') => {
   return (
@@ -34,11 +36,33 @@ const importShared = (name, shareScope = 'default') => {
   );
 };
 
+/**
+ * Synchronous lookup used by the `require('<shared>')` shim that the remote
+ * build injects into bundled CJS dependencies. Returns undefined until the
+ * shared module has been resolved via importShared()/preloadShared().
+ */
+const importSharedSync = (name) => resolvedModules[name];
+
+/**
+ * Resolve every shared module up front so that bundled CJS dependencies
+ * (which cannot await) see the host-provided instance. Failures are logged,
+ * not thrown: a missing provider surfaces where the module is actually used.
+ */
+const preloadShared = (shareScope = 'default') =>
+  Promise.all(
+    Object.keys(moduleMap).map((name) =>
+      importShared(name, shareScope).catch((err) =>
+        _log(`preload of shared module "${name}" failed`, err)
+      )
+    )
+  );
+
 const loadShared = async (name, shareScope) => {
   const module =
     (await getSharedFromRuntime(name, shareScope)) ||
     (await getSharedFromLocal(name));
   moduleCache[name] = module;
+  resolvedModules[name] = module;
   return module;
 };
 
@@ -105,6 +129,8 @@ const flattenModule = (module, name) => {
 
 export {
   importShared,
+  importSharedSync,
+  preloadShared,
   getSharedFromRuntime as importSharedRuntime,
   getSharedFromLocal as importSharedLocal
 };

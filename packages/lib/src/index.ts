@@ -35,6 +35,7 @@ import { devRemotePlugin } from './dev/remote-development';
 import { devSharedPlugin } from './dev/shared-development';
 import { prodExposePlugin } from './prod/expose-production';
 import { prodRemotePlugin } from './prod/remote-production';
+import { prodSharedCjsResolverPlugin } from './prod/shared-cjs-resolver';
 import { prodSharedPlugin } from './prod/shared-production';
 import {
   builderInfo,
@@ -249,12 +250,14 @@ const federation = (options: VitePluginFederationOptions): Plugin[] => {
     }
   };
 
-  // Return the main plugin + the enforce:'pre' shared resolver.
+  // Return the main plugin + the enforce:'pre' shared resolvers.
   // Vite flattens plugin arrays, so this works transparently.
   // devSharedResolverPlugin runs before Vite's internal resolver to
   // intercept shared module imports.  It's a no-op in production or
   // when no shared modules are configured.
-  return [mainPlugin, devSharedResolverPlugin];
+  // prodSharedCjsResolverPlugin redirects CJS require('<shared>') calls in
+  // production remote builds to the host-provided instance.
+  return [mainPlugin, devSharedResolverPlugin, prodSharedCjsResolverPlugin];
 };
 
 export default federation;

@@ -7,3 +7,9 @@ export const REMOTE_ENTRY_HELPER_PREFIX = '__remoteEntryHelper__';
 
 export const SHARED_VIRTUAL_PREFIX = 'virtual:__federation_shared__:';
 export const RESOLVED_SHARED_PREFIX = '\0' + SHARED_VIRTUAL_PREFIX;
+
+/**
+ * Prod-only: CJS `require('<shared>')` calls in a remote build are redirected
+ * to `<prefix><sharedName>\0<realId>` so they read the host-provided instance.
+ */
+export const SHARED_CJS_PREFIX = '\0virtual:__federation_shared_cjs__:';

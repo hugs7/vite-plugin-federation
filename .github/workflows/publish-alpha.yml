@@ -1,0 +1,69 @@
+name: Publish alpha
+
+# Manually publish the current ref as a prerelease under an npm dist-tag
+# (default `alpha`). The version bump is not committed or tagged, so the
+# regular release from `main` still derives its version from conventional
+# commits. Each run produces a unique version: <next patch>-<tag>.<run number>.
+on:
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: 'npm dist-tag / prerelease id (e.g. alpha, beta)'
+        required: false
+        default: 'alpha'
+        type: string
+
+jobs:
+  publish-alpha:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Ensure latest npm (OIDC requires >=11.5.1)
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build
+        run: pnpm build
+
+      - name: Unit test
+        run: pnpm run test:unit
+
+      - name: Set prerelease version
+        id: version
+        working-directory: packages/lib
+        env:
+          PREID: ${{ inputs.dist_tag }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          npm version prerelease --preid "$PREID" --no-git-tag-version --allow-same-version
+          version="$(node -p "require('./package.json').version.replace(/\d+$/, '$RUN_NUMBER')")"
+          npm pkg set version="$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Publishing @hugs7/vite-plugin-federation@$version with tag $PREID" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish
+        working-directory: packages/lib
+        env:
+          DIST_TAG: ${{ inputs.dist_tag }}
+        run: npm publish --tag "$DIST_TAG" --provenance --access public
