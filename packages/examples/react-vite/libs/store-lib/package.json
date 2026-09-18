@@ -1,0 +1,15 @@
+{
+  "name": "store-lib",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Test fixture mirroring zustand's module layout: an ESM entry that imports react, an ESM sub-path entry (./traditional) that also pulls in a CJS helper which require()s react.",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./traditional": "./traditional.js",
+    "./package.json": "./package.json"
+  },
+  "peerDependencies": {
+    "react": ">=18"
+  }
+}

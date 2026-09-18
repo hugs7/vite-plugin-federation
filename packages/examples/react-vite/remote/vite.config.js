@@ -12,7 +12,7 @@ export default defineConfig({
       exposes: {
         './Button': './src/components/Button'
       },
-      shared: ['react','react-dom']
+      shared: ['react', 'react-dom', 'store-lib']
     })
   ],
   build: {
