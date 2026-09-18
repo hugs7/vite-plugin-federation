@@ -38,6 +38,7 @@ import {
 } from '../transform/rewrite-remote-imports';
 import {
   createRemotesMap,
+  findOwningSharedPackage,
   getModuleMarker,
   injectToHead,
   parseRemoteOptions,
@@ -195,6 +196,15 @@ const merge = (obj1, obj2) => {
         const isNodeModules =
           id.includes('/node_modules/') || id.includes('\\node_modules\\');
 
+        // Remote builds: allow the transform for third-party libraries so
+        // their shared-module imports (e.g. react) go through importShared()
+        // — preventing duplicate module instances at runtime. Files that
+        // belong to a shared package's own directory (including sub-path
+        // entries such as zustand/traditional, which are bundled locally)
+        // still get their imports of *other* shared modules rewritten, but
+        // never an import of their own package, which would deadlock on
+        // importShared() of the module being evaluated.
+        let selfSharedName: string | undefined;
         if (isNodeModules) {
           if (!builderInfo.isRemote) {
             // Host-only builds: skip node_modules entirely — transforming
@@ -203,25 +213,10 @@ const merge = (obj1, obj2) => {
             // self-referential deadlocks during module evaluation.
             return null;
           }
-
-          // Remote builds: allow the transform for third-party libraries
-          // so their shared-module imports (e.g. react) go through
-          // importShared() — preventing duplicate module instances at
-          // runtime.  However, skip files that belong to a shared module's
-          // own package to avoid self-referential deadlocks (e.g.
-          // react/index.js importing itself via importShared('react')).
-          const normalizedId = id.replace(/\\/g, '/');
-          const isSharedModuleSource = parsedOptions.prodShared.some(
-            (sharedInfo) => {
-              const sharedName = sharedInfo[0];
-              // Match node_modules/<sharedName>/ or node_modules/@scope/pkg/
-              const pattern = `/node_modules/${sharedName}/`;
-              return normalizedId.includes(pattern);
-            }
+          selfSharedName = findOwningSharedPackage(
+            id,
+            parsedOptions.prodShared.map((sharedInfo) => sharedInfo[0])
           );
-          if (isSharedModuleSource) {
-            return null;
-          }
         }
 
         let ast: Program | null = null;
@@ -244,6 +239,7 @@ const merge = (obj1, obj2) => {
             if (node.type === 'ImportDeclaration') {
               const moduleName = node.source.value;
               if (
+                moduleName !== selfSharedName &&
                 parsedOptions.prodShared.some(
                   (sharedInfo) => sharedInfo[0] === moduleName
                 )
