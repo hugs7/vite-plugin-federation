@@ -8,16 +8,38 @@
 import {
   DYNAMIC_LOADING_CSS,
   VITE_BASE_PLACEHOLDER,
-  VITE_ASSETS_DIR_PLACEHOLDER
+  VITE_ASSETS_DIR_PLACEHOLDER,
+  VIRTUAL_FN_IMPORT
 } from '../public';
 import { FEDERATION_IMPORT_SNIPPET } from '../runtime/snippets';
+
+/**
+ * When the remote consumes shared modules, resolve all of them once the host
+ * has called init() and before any exposed module is handed out. Bundled CJS
+ * dependencies that `require('<shared>')` cannot await, so they rely on the
+ * shared instance already being available (see importSharedSync).
+ */
+const buildSharedPreloadCode = (hasShared: boolean) =>
+  hasShared
+    ? {
+        imports: `import { preloadShared } from '${VIRTUAL_FN_IMPORT}';`,
+        state: `let sharedReady = null;`,
+        onInit: `sharedReady = preloadShared();`,
+        onGet: `if (sharedReady) await sharedReady;`
+      }
+    : { imports: '', state: '', onInit: '', onGet: '' };
 
 export const buildProdRemoteEntryCode = (
   moduleMap: string,
   filename: string,
-  name?: string
-): string => `
+  name?: string,
+  hasShared = false
+): string => {
+  const preload = buildSharedPreloadCode(hasShared);
+  return `
+${preload.imports}
 ${FEDERATION_IMPORT_SNIPPET}
+${preload.state}
 const exportSet = new Set(['Module', '__esModule', 'default', '_export_sfc']);
 let moduleMap = {${moduleMap}};
 const seen = {};
@@ -75,8 +97,9 @@ export const ${DYNAMIC_LOADING_CSS} = (cssFilePaths, dontAppendStylesToHead, exp
     document.head.appendChild(element);
   });
 };
-export const get = (module) => {
+export const get = async (module) => {
   if(!moduleMap[module]) throw new Error('Can not find remote module ' + module);
+  ${preload.onGet}
   return moduleMap[module]();
 };
 export const init = (shareScope) => {
@@ -89,4 +112,6 @@ export const init = (shareScope) => {
       (shared[key] = shared[key]||{})[versionKey] = versionValue;
     }
   });
+  ${preload.onInit}
 };`;
+};

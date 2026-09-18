@@ -81,7 +81,12 @@ export const prodExposePlugin = (
     name: [PLUGIN_PREFIX, 'expose-production'].join(':'),
     virtualFile: {
       [`${REMOTE_ENTRY_HELPER_PREFIX}${options.filename}`]:
-        buildProdRemoteEntryCode(moduleMap, options.filename!, options.name)
+        buildProdRemoteEntryCode(
+          moduleMap,
+          options.filename!,
+          options.name,
+          parsedOptions.prodShared.length > 0
+        )
     },
 
     configResolved(config: ResolvedConfig) {
