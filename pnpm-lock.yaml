@@ -11088,7 +11088,10 @@ packages:
 
   store-lib@file:packages/examples/react-vite/libs/store-lib:
     resolution:
-      { directory: packages/examples/react-vite/libs/store-lib, type: directory }
+      {
+        directory: packages/examples/react-vite/libs/store-lib,
+        type: directory
+      }
     peerDependencies:
       react: '>=18'
 

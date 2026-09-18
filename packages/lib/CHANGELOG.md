@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [2.0.5](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@2.0.4...@hugs7/vite-plugin-federation@2.0.5) (2026-09-18)
+
+
+### Bug Fixes
+
+* **remote:** 🐛 rewrite shared imports inside shared package sub-path entries ([bceffa1](https://github.com/hugs7/vite-plugin-federation/commit/bceffa11ae86d7c35fbd943d39d3d852e05872a2))
+* **remote:** 🐛 route CJS require() of shared modules to the host instance ([83e8b30](https://github.com/hugs7/vite-plugin-federation/commit/83e8b30191bde2fadd05ee8b1d8a2b9c49cd41c7))
+
+
+
+
+
 ## [2.0.4](https://github.com/hugs7/vite-plugin-federation/compare/@hugs7/vite-plugin-federation@2.0.3...@hugs7/vite-plugin-federation@2.0.4) (2026-07-27)
 
 
